@@ -21,7 +21,7 @@ def extract_faces_from_dir(path_to_dir:str, output_dir:str,detector:object, resi
     # get filenames of all images in dir
     image_filenames=os.listdir(path_to_dir)
     # create, if necessary, output dir
-    if not os.path.dir(output_dir):
+    if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
     # extract faces from each image
     for image_filename in image_filenames:
@@ -59,7 +59,7 @@ def extract_faces_from_all_subdirectories_in_directory(path_to_dir:str, path_to_
         if not os.path.exists(output_dir_name):
             os.makedirs(output_dir_name, exist_ok=True)
         # extract faces from defined subdirectory
-        extract_faces_from_dir(path_to_dir=os.path.join(path_to_dir, subdirectory_with_frames),
+        extract_faces_from_dir(path_to_dir=os.path.join(path_to_dir, subdirectory, subdirectory_with_frames),
                                output_dir=output_dir_name, detector=detector, resize=resize)
 
 

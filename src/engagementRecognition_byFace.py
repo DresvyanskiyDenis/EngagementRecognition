@@ -3,6 +3,7 @@
 """
 TODO: write description of module
 """
+import math
 import time
 from typing import Optional, Tuple, Dict, NamedTuple
 
@@ -10,6 +11,7 @@ import numpy as np
 import pandas as pd
 import cv2
 import os
+import tensorflow as tf
 
 from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
@@ -94,18 +96,25 @@ def load_labels_to_dict(path:str)->Dict[str, Label]:
 def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, labels_dict:Dict[str,Label])-> pd.DataFrame:
     # TODO: write description
     directories_according_path=os.listdir(path_to_data)
-    df_with_relative_paths_and_labels=pd.DataFrame(columns=['path','y_col'])
+    df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename','class'])
     for dir in directories_according_path:
         img_filenames=os.listdir(os.path.join(path_to_data, dir))
         label=labels_dict[dir].engagement
         labels=[label for _ in range(len(img_filenames))]
-        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]), columns=['path', 'y_col'])
+        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]), columns=['filename', 'class'])
         df_with_relative_paths_and_labels.append(tmp_df)
     return df_with_relative_paths_and_labels
 
 
-
-
+def tmp_model()->tf.keras.Model:
+    model_tmp=tf.keras.applications.mobilenet_v2.MobileNetV2(input_shape=(224,224,3),include_top=False,
+                                                             weights='imagenet', pooling='avg')
+    x=tf.keras.layers.Dense(512, activation="relu")(model_tmp.output)
+    x = tf.keras.layers.Dropout(0.4)(x)
+    x = tf.keras.layers.Dense(128, activation="relu")(x)
+    x = tf.keras.layers.Dense(4, activation="softmax")(x)
+    result_model=tf.keras.Model(inputs=model_tmp.inputs, outputs=[x])
+    return result_model
 
 
 
@@ -123,4 +132,33 @@ if __name__ == '__main__':
     path_to_train_labels=r'D:\Databases\DAiSEE\Labels\TrainLabels.csv'
     path_to_dev_frames=r'D:\Databases\DAiSEE\dev_preprocessed\frames'
     path_to_dev_labels=r'D:\Databases\DAiSEE\Labels\ValidationLabels.csv'
-    dict_labels=
+    input_shape=(224,224,3)
+    batch_size=32
+    epochs=10
+    lr=0.005
+    optimizer=tf.keras.optimizers.Adam(lr)
+    loss=tf.keras.losses.categorical_crossentropy
+    # load labels
+    dict_labels_train=load_labels_to_dict(path_to_train_labels)
+    dict_labels_dev=load_labels_to_dict(path_to_dev_labels)
+    # form dataframes with relative paths and labels
+    labels_train=form_dataframe_of_relative_paths_to_data_with_labels(path_to_train_frames, dict_labels_train)
+    labels_dev=form_dataframe_of_relative_paths_to_data_with_labels(path_to_dev_frames, dict_labels_dev)
+    # create train generator
+    train_data_generator=tf.keras.preprocessing.image.ImageDataGenerator(
+    rotation_range=45, width_shift_range=0.4,
+    height_shift_range=0.3, brightness_range=[-0.2, 0.2], shear_range=0.4, zoom_range=0.3,
+    channel_shift_range=0.1,
+    horizontal_flip=True, rescale=1./255).flow_from_dataframe(labels_train, directory=path_to_train_frames,
+                                                              target_size=(224,224), batch_size=batch_size)
+    # create dev generator
+    dev_data_generator=tf.keras.preprocessing.image.ImageDataGenerator(
+        rescale=1./255).flow_from_dataframe(labels_dev, directory=path_to_dev_frames,
+                                                              target_size=(224,224), batch_size=batch_size)
+    # create model
+    model=tmp_model()
+    model.compile(optimizer=optimizer, loss=loss)
+
+    model.fit(train_data_generator, batch_size=batch_size, epochs=epochs, validation_data=dev_data_generator)
+
+

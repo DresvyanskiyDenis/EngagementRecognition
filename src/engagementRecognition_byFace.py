@@ -4,7 +4,7 @@
 TODO: write description of module
 """
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -14,6 +14,14 @@ import os
 from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
     extract_face_according_bbox, load_and_prepare_detector_retinaFace
+
+class Label(NamedTuple):
+    # TODO: write description
+    boredom: int
+    engagement: int
+    confusion:int
+    frustration:int
+
 
 
 def extract_faces_from_dir(path_to_dir:str, output_dir:str,detector:object, resize:Optional[Tuple[int,int]])->None:
@@ -73,7 +81,27 @@ def extract_faces_from_all_subdirectories_in_directory(path_to_dir:str, path_to_
         print('processed:%i, overall:%i, time:%f'%(counter, overall, time.time()-start))
         counter+=1
 
+def load_labels_to_dict(path:str)->Dict[str, Label]:
+    # TODO:write description
+    labels_df=pd.read_csv(path)
+    labels_df['ClipID']=labels_df['ClipID'].apply(lambda x: x.split('.')[0])
+    labels_dict=labels_df.set_index('ClipID').T.to_dict(Label)
+    return labels_dict
 
+
+
+
+def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, labels_dict:Dict[str,Label])-> pd.DataFrame:
+    # TODO: write description
+    directories_according_path=os.listdir(path_to_data)
+    df_with_relative_paths_and_labels=pd.DataFrame(columns=['path','y_col'])
+    for dir in directories_according_path:
+        img_filenames=os.listdir(os.path.join(path_to_data, dir))
+        label=labels_dict[dir].engagement
+        labels=[label for _ in range(len(img_filenames))]
+        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]), columns=['path', 'y_col'])
+        df_with_relative_paths_and_labels.append(tmp_df)
+    return df_with_relative_paths_and_labels
 
 
 
@@ -86,7 +114,13 @@ def extract_faces_from_all_subdirectories_in_directory(path_to_dir:str, path_to_
 
 
 if __name__ == '__main__':
-    path_to_directory_with_frames=r'D:\Databases\DAiSEE\frames'
+    '''path_to_directory_with_frames=r'D:\Databases\DAiSEE\frames'
     path_to_output_directory=r'D:\Databases\DAiSEE\extracted_faces'
     resize=(224,224)
-    extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)
+    extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
+    # params
+    path_to_train_frames=r'D:\Databases\DAiSEE\train_preprocessed\frames'
+    path_to_train_labels=r'D:\Databases\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev_frames=r'D:\Databases\DAiSEE\dev_preprocessed\frames'
+    path_to_dev_labels=r'D:\Databases\DAiSEE\Labels\ValidationLabels.csv'
+    dict_labels=

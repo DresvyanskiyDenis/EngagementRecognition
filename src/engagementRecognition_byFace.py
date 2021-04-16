@@ -4,6 +4,7 @@
 TODO: write description of module
 """
 import math
+import shutil
 import time
 from typing import Optional, Tuple, Dict, NamedTuple
 
@@ -13,9 +14,9 @@ import cv2
 import os
 import tensorflow as tf
 
-from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
+"""from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
-    extract_face_according_bbox, load_and_prepare_detector_retinaFace
+    extract_face_according_bbox, load_and_prepare_detector_retinaFace"""
 
 class Label(NamedTuple):
     # TODO: write description
@@ -26,7 +27,7 @@ class Label(NamedTuple):
 
 
 
-def extract_faces_from_dir(path_to_dir:str, output_dir:str,detector:object, resize:Optional[Tuple[int,int]])->None:
+"""def extract_faces_from_dir(path_to_dir:str, output_dir:str,detector:object, resize:Optional[Tuple[int,int]])->None:
     # TODO: add description
     # get filenames of all images in dir
     image_filenames=os.listdir(path_to_dir)
@@ -81,13 +82,43 @@ def extract_faces_from_all_subdirectories_in_directory(path_to_dir:str, path_to_
         extract_faces_from_dir(path_to_dir=os.path.join(path_to_dir, subdirectory, subdirectory_with_frames),
                                output_dir=output_dir_name, detector=detector, resize=resize)
         print('processed:%i, overall:%i, time:%f'%(counter, overall, time.time()-start))
-        counter+=1
+        counter+=1"""
+
+def sort_images_according_their_class(path_to_images:str, output_path:str, path_to_labels:str):
+    dict_labels=load_labels_to_dict(path_to_labels)
+    dirs_with_images=os.listdir(path_to_images)
+    # check if output path is existed
+    if not os.path.exists(output_path):
+        os.makedirs(output_path, exist_ok=True)
+    num_classes=np.unique(np.array(list(x.engagement for x in dict_labels.values()))).shape[0]
+    # create subdirectories for classes
+    for num_class in range(num_classes):
+        if not os.path.exists(os.path.join(output_path, str(num_class))):
+            os.makedirs(os.path.join(output_path, str(num_class)), exist_ok=True)
+    # copy images according their class
+    for dir_with_images in dirs_with_images:
+        if not dir_with_images in dict_labels.keys():
+            continue
+        class_num=dict_labels[dir_with_images].engagement
+        image_filenames=os.listdir(os.path.join(path_to_images, dir_with_images))
+        for image_filename in image_filenames:
+            shutil.copy(os.path.join(path_to_images, dir_with_images, image_filename),
+                    os.path.join(output_path, str(class_num), image_filename))
+
+
+
+
 
 def load_labels_to_dict(path:str)->Dict[str, Label]:
     # TODO:write description
     labels_df=pd.read_csv(path)
     labels_df['ClipID']=labels_df['ClipID'].apply(lambda x: x.split('.')[0])
-    labels_dict=labels_df.set_index('ClipID').T.to_dict(Label)
+    #labels_df.columns=[labels_df.columns[0]]+[x.lower() for x in labels_df.columns[1:]]
+    labels_dict=dict(
+        (row[1].iloc[0],
+         Label(*row[1].iloc[1:].values))
+        for row in labels_df.iterrows()
+    )
     return labels_dict
 
 
@@ -98,11 +129,14 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
     directories_according_path=os.listdir(path_to_data)
     df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename','class'])
     for dir in directories_according_path:
+        if not dir in labels_dict.keys():
+            continue
         img_filenames=os.listdir(os.path.join(path_to_data, dir))
+        img_filenames=[os.path.join(dir, x) for x in img_filenames]
         label=labels_dict[dir].engagement
         labels=[label for _ in range(len(img_filenames))]
-        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]), columns=['filename', 'class'])
-        df_with_relative_paths_and_labels.append(tmp_df)
+        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]).T, columns=['filename', 'class'])
+        df_with_relative_paths_and_labels=df_with_relative_paths_and_labels.append(tmp_df)
     return df_with_relative_paths_and_labels
 
 
@@ -128,14 +162,17 @@ if __name__ == '__main__':
     resize=(224,224)
     extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
     # params
-    path_to_train_frames=r'D:\Databases\DAiSEE\train_preprocessed\frames'
+    path_to_train_frames=r'D:\Databases\DAiSEE\train_preprocessed\sorted_faces'
     path_to_train_labels=r'D:\Databases\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev_frames=r'D:\Databases\DAiSEE\dev_preprocessed\frames'
+    path_to_dev_frames=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
     path_to_dev_labels=r'D:\Databases\DAiSEE\Labels\ValidationLabels.csv'
+    '''output_path=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
+    sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
+                                      path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
-    batch_size=32
-    epochs=10
-    lr=0.005
+    batch_size=16
+    epochs=5
+    lr=0.0001
     optimizer=tf.keras.optimizers.Adam(lr)
     loss=tf.keras.losses.categorical_crossentropy
     # load labels
@@ -149,16 +186,17 @@ if __name__ == '__main__':
     rotation_range=45, width_shift_range=0.4,
     height_shift_range=0.3, brightness_range=[-0.2, 0.2], shear_range=0.4, zoom_range=0.3,
     channel_shift_range=0.1,
-    horizontal_flip=True, rescale=1./255).flow_from_dataframe(labels_train, directory=path_to_train_frames,
+    horizontal_flip=True)
+    train_data_gen=train_data_generator.flow_from_directory(directory=path_to_train_frames,
                                                               target_size=(224,224), batch_size=batch_size)
     # create dev generator
-    dev_data_generator=tf.keras.preprocessing.image.ImageDataGenerator(
-        rescale=1./255).flow_from_dataframe(labels_dev, directory=path_to_dev_frames,
+    dev_data_generator=tf.keras.preprocessing.image.ImageDataGenerator()
+    dev_data_gen=dev_data_generator.flow_from_directory(directory=path_to_dev_frames,
                                                               target_size=(224,224), batch_size=batch_size)
     # create model
     model=tmp_model()
-    model.compile(optimizer=optimizer, loss=loss)
+    model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
 
-    model.fit(train_data_generator, batch_size=batch_size, epochs=epochs, validation_data=dev_data_generator)
+    model.fit(train_data_gen, epochs=epochs, use_multiprocessing=True, validation_data=dev_data_gen)
 
 

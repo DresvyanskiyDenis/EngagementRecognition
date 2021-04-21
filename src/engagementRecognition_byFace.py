@@ -6,13 +6,17 @@ TODO: write description of module
 import math
 import shutil
 import time
-from typing import Optional, Tuple, Dict, NamedTuple
+from functools import partial
+from typing import Optional, Tuple, Dict, NamedTuple, Iterable, List
 
 import numpy as np
 import pandas as pd
-import cv2
 import os
 import tensorflow as tf
+from sklearn.metrics import recall_score
+
+from keras_datagenerators import ImageDataLoader
+from tensorflow_utils.callbacks import best_weights_setter_callback
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
@@ -140,8 +144,8 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
     return df_with_relative_paths_and_labels
 
 
-def tmp_model()->tf.keras.Model:
-    model_tmp=tf.keras.applications.mobilenet_v2.MobileNetV2(input_shape=(224,224,3),include_top=False,
+def tmp_model(input_shape)->tf.keras.Model:
+    model_tmp=tf.keras.applications.mobilenet_v2.MobileNetV2(input_shape=input_shape,include_top=False,
                                                              weights='imagenet', pooling='avg')
     x=tf.keras.layers.Dense(512, activation="relu")(model_tmp.output)
     x = tf.keras.layers.Dropout(0.4)(x)
@@ -151,7 +155,20 @@ def tmp_model()->tf.keras.Model:
     return result_model
 
 
-
+def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:tf.keras.Model,
+                optimizer:tf.keras.optimizers.Optimizer, loss:tf.keras.losses.Loss,
+                epochs:int,
+                val_generator:Iterable[Tuple[np.ndarray, np.ndarray]],
+                metrics:List[tf.keras.metrics.Metric],
+                callbacks:List[tf.keras.callbacks.Callback],
+                path_to_save_results:str)->tf.keras.Model:
+    # create directory for saving results
+    if not os.path.exists(path_to_save_results):
+        os.makedirs(path_to_save_results)
+    # compile model
+    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator)
+    return model
 
 
 
@@ -162,17 +179,17 @@ if __name__ == '__main__':
     resize=(224,224)
     extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
     # params
-    path_to_train_frames=r'D:\Databases\DAiSEE\train_preprocessed\sorted_faces'
-    path_to_train_labels=r'D:\Databases\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev_frames=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
-    path_to_dev_labels=r'D:\Databases\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_train_frames=r'D:\Databases\DAiSEE\DAiSEE\train_preprocessed\sorted_faces'
+    path_to_train_labels=r'D:\Databases\DAiSEE\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev_frames=r'D:\Databases\DAiSEE\DAiSEE\dev_preprocessed\sorted_faces'
+    path_to_dev_labels=r'D:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv'
     '''output_path=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
     sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
                                       path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
-    batch_size=16
-    epochs=5
-    lr=0.0001
+    batch_size=64
+    epochs=20
+    lr=0.0005
     optimizer=tf.keras.optimizers.Adam(lr)
     loss=tf.keras.losses.categorical_crossentropy
     # load labels
@@ -181,22 +198,39 @@ if __name__ == '__main__':
     # form dataframes with relative paths and labels
     labels_train=form_dataframe_of_relative_paths_to_data_with_labels(path_to_train_frames, dict_labels_train)
     labels_dev=form_dataframe_of_relative_paths_to_data_with_labels(path_to_dev_frames, dict_labels_dev)
-    # create train generator
-    train_data_generator=tf.keras.preprocessing.image.ImageDataGenerator(
-    rotation_range=45, width_shift_range=0.4,
-    height_shift_range=0.3, brightness_range=[-0.2, 0.2], shear_range=0.4, zoom_range=0.3,
-    channel_shift_range=0.1,
-    horizontal_flip=True)
-    train_data_gen=train_data_generator.flow_from_directory(directory=path_to_train_frames,
-                                                              target_size=(224,224), batch_size=batch_size)
-    # create dev generator
-    dev_data_generator=tf.keras.preprocessing.image.ImageDataGenerator()
-    dev_data_gen=dev_data_generator.flow_from_directory(directory=path_to_dev_frames,
-                                                              target_size=(224,224), batch_size=batch_size)
-    # create model
-    model=tmp_model()
-    model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
+    # add full path to them
+    labels_train['filename']=path_to_train_frames+labels_train['filename']
+    labels_dev['filename'] = path_to_dev_frames + labels_dev['filename']
+    # create generators
+    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size, preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+                 horizontal_flip= 0.1, vertical_flip= None,
+                 shift= 0.1,
+                 brightness= 0.1, shearing= 0.1, zooming= 0.1,
+                 random_cropping_out = 0.1, rotation = 0.1,
+                 scaling= None,
+                 channel_random_noise= 0.1, bluring= 0.1,
+                 worse_quality= 0.1,
+                 mixup = None,
+                 pool_workers=4)
 
-    model.fit(train_data_gen, epochs=epochs, use_multiprocessing=True, validation_data=dev_data_gen)
+    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size, preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+                 horizontal_flip= None, vertical_flip= None,
+                 shift= None,
+                 brightness= None, shearing= None, zooming= None,
+                 random_cropping_out = None, rotation = None,
+                 scaling= None,
+                 channel_random_noise= None, bluring= None,
+                 worse_quality= None,
+                 mixup = None,
+                 pool_workers=4)
+    # create model
+    model=tmp_model(input_shape)
+    # create callbacks
+    callbacks=[best_weights_setter_callback(dev_gen, partial(recall_score, average='macro'))]
+    # create metrics
+    metrics=['accuracy']
+    model=train_model(train_gen, model, optimizer, loss, epochs,
+                      None, metrics, callbacks, path_to_save_results='results')
+
 
 

@@ -167,7 +167,7 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
         os.makedirs(path_to_save_results)
     # compile model
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator)
+    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=2)
     return model
 
 
@@ -177,17 +177,17 @@ if __name__ == '__main__':
     resize=(224,224)
     extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
     # params
-    path_to_train_frames=r'D:\Databases\DAiSEE\DAiSEE\train_preprocessed\sorted_faces'
-    path_to_train_labels=r'D:\Databases\DAiSEE\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev_frames=r'D:\Databases\DAiSEE\DAiSEE\dev_preprocessed\sorted_faces'
-    path_to_dev_labels=r'D:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_train_frames=r'C:\Databases\DAiSEE\train_preprocessed\extracted_faces'
+    path_to_train_labels=r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev_frames=r'C:\Databases\DAiSEE\dev_preprocessed\extracted_faces'
+    path_to_dev_labels=r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
     '''output_path=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
     sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
                                       path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
     num_classes=4
-    batch_size=64
-    epochs=20
+    batch_size=72
+    epochs=30
     lr=0.0001
     momentum=0.9
     optimizer=tf.keras.optimizers.SGD(lr, momentum=momentum)
@@ -199,11 +199,12 @@ if __name__ == '__main__':
     labels_train=form_dataframe_of_relative_paths_to_data_with_labels(path_to_train_frames, dict_labels_train)
     labels_dev=form_dataframe_of_relative_paths_to_data_with_labels(path_to_dev_frames, dict_labels_dev)
     # add full path to them
-    labels_train['filename']=path_to_train_frames+labels_train['filename']
-    labels_dev['filename'] = path_to_dev_frames + labels_dev['filename']
+    labels_train['filename']=path_to_train_frames+'\\'+labels_train['filename']
+    labels_dev['filename'] = path_to_dev_frames +'\\'+ labels_dev['filename']
     labels_train['class']=labels_train['class'].astype('float32')
     labels_dev['class'] = labels_dev['class'].astype('float32')
-    labels_train=labels_train.iloc[:640]
+    #labels_train=labels_train.iloc[:640]
+    #labels_dev = labels_dev.iloc[:640]
     # create generators
     train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
                               preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
@@ -234,12 +235,12 @@ if __name__ == '__main__':
     model=tmp_model(input_shape)
     # create callbacks
     callbacks=[best_weights_setter_callback(dev_gen, partial(recall_score, average='macro')),
-               get_annealing_LRreduce_callback(lr, lr/16., 8)]
+               get_annealing_LRreduce_callback(lr, lr/20., 4)]
     # create metrics
     metrics=['accuracy']
     model=train_model(train_gen, model, optimizer, loss, epochs,
                       None, metrics, callbacks, path_to_save_results='results')
-    model.save_model("results\\model.h5")
+    model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
 
 

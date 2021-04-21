@@ -16,7 +16,7 @@ import tensorflow as tf
 from sklearn.metrics import recall_score
 
 from keras_datagenerators import ImageDataLoader
-from tensorflow_utils.callbacks import best_weights_setter_callback
+from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
@@ -171,8 +171,6 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
     return model
 
 
-
-
 if __name__ == '__main__':
     '''path_to_directory_with_frames=r'D:\Databases\DAiSEE\frames'
     path_to_output_directory=r'D:\Databases\DAiSEE\extracted_faces'
@@ -187,10 +185,12 @@ if __name__ == '__main__':
     sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
                                       path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
+    num_classes=4
     batch_size=64
     epochs=20
-    lr=0.0005
-    optimizer=tf.keras.optimizers.Adam(lr)
+    lr=0.0001
+    momentum=0.9
+    optimizer=tf.keras.optimizers.SGD(lr, momentum=momentum)
     loss=tf.keras.losses.categorical_crossentropy
     # load labels
     dict_labels_train=load_labels_to_dict(path_to_train_labels)
@@ -201,8 +201,13 @@ if __name__ == '__main__':
     # add full path to them
     labels_train['filename']=path_to_train_frames+labels_train['filename']
     labels_dev['filename'] = path_to_dev_frames + labels_dev['filename']
+    labels_train['class']=labels_train['class'].astype('float32')
+    labels_dev['class'] = labels_dev['class'].astype('float32')
+    labels_train=labels_train.iloc[:640]
     # create generators
-    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size, preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
+                              preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+                              num_classes=num_classes,
                  horizontal_flip= 0.1, vertical_flip= None,
                  shift= 0.1,
                  brightness= 0.1, shearing= 0.1, zooming= 0.1,
@@ -211,9 +216,11 @@ if __name__ == '__main__':
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
                  mixup = None,
-                 pool_workers=4)
+                 pool_workers=8)
 
-    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size, preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
+                            preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+                            num_classes=num_classes,
                  horizontal_flip= None, vertical_flip= None,
                  shift= None,
                  brightness= None, shearing= None, zooming= None,
@@ -222,15 +229,18 @@ if __name__ == '__main__':
                  channel_random_noise= None, bluring= None,
                  worse_quality= None,
                  mixup = None,
-                 pool_workers=4)
+                 pool_workers=8)
     # create model
     model=tmp_model(input_shape)
     # create callbacks
-    callbacks=[best_weights_setter_callback(dev_gen, partial(recall_score, average='macro'))]
+    callbacks=[best_weights_setter_callback(dev_gen, partial(recall_score, average='macro')),
+               get_annealing_LRreduce_callback(lr, lr/16., 8)]
     # create metrics
     metrics=['accuracy']
     model=train_model(train_gen, model, optimizer, loss, epochs,
                       None, metrics, callbacks, path_to_save_results='results')
+    model.save_model("results\\model.h5")
+    model.save_weights("results\\model_weights.h5")
 
 
 

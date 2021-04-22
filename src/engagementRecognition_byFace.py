@@ -148,9 +148,9 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
 def tmp_model(input_shape)->tf.keras.Model:
     model_tmp=tf.keras.applications.mobilenet_v2.MobileNetV2(input_shape=input_shape,include_top=False,
                                                              weights='imagenet', pooling='avg')
-    x=tf.keras.layers.Dense(512, activation="relu")(model_tmp.output)
+    x=tf.keras.layers.Dense(512, activation="relu", kernel_regularizer=tf.keras.regularizers.l1_l2(0.0001))(model_tmp.output)
     x = tf.keras.layers.Dropout(0.4)(x)
-    x = tf.keras.layers.Dense(128, activation="relu")(x)
+    x = tf.keras.layers.Dense(128, activation="relu", kernel_regularizer=tf.keras.regularizers.l1_l2(0.0001))(x)
     x = tf.keras.layers.Dense(4, activation="softmax")(x)
     result_model=tf.keras.Model(inputs=model_tmp.inputs, outputs=[x])
     return result_model

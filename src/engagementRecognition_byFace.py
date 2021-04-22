@@ -189,7 +189,7 @@ if __name__ == '__main__':
                                       path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
     num_classes=4
-    batch_size=72
+    batch_size=64
     epochs=30
     highest_lr=0.001
     lowest_lr = 0.00001
@@ -209,6 +209,12 @@ if __name__ == '__main__':
     labels_dev['class'] = labels_dev['class'].astype('float32')
     class_weights=class_weight.compute_class_weight(class_weight='balanced',classes=np.unique(labels_train['class']), y=labels_train['class'].values.reshape((-1,)))
     class_weights=dict((i,class_weights[i]) for i in range(len(class_weights)))
+    labels_train=pd.concat([labels_train[labels_train['class']==0],
+                            labels_train[labels_train['class'] == 1],
+                            labels_train[labels_train['class'] == 2].iloc[::5],
+                            labels_train[labels_train['class'] == 3].iloc[::5]
+                            ])
+
     #labels_train=labels_train.iloc[:640]
     #labels_dev = labels_dev.iloc[:640]
     # create generators

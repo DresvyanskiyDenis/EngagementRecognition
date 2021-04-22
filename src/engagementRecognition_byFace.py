@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd
 import os
 import tensorflow as tf
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, f1_score
+from sklearn.utils import class_weight
 
 from keras_datagenerators import ImageDataLoader
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback
@@ -161,13 +162,15 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
                 val_generator:Iterable[Tuple[np.ndarray, np.ndarray]],
                 metrics:List[tf.keras.metrics.Metric],
                 callbacks:List[tf.keras.callbacks.Callback],
-                path_to_save_results:str)->tf.keras.Model:
+                path_to_save_results:str,
+                class_weights:Optional[Dict[int,float]]=None)->tf.keras.Model:
     # create directory for saving results
     if not os.path.exists(path_to_save_results):
         os.makedirs(path_to_save_results)
     # compile model
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=2)
+    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=2,
+              class_weight=class_weights)
     return model
 
 
@@ -188,9 +191,10 @@ if __name__ == '__main__':
     num_classes=4
     batch_size=72
     epochs=30
-    lr=0.0001
+    highest_lr=0.001
+    lowest_lr = 0.00001
     momentum=0.9
-    optimizer=tf.keras.optimizers.SGD(lr, momentum=momentum)
+    optimizer=tf.keras.optimizers.SGD(highest_lr, momentum=momentum)
     loss=tf.keras.losses.categorical_crossentropy
     # load labels
     dict_labels_train=load_labels_to_dict(path_to_train_labels)
@@ -203,6 +207,8 @@ if __name__ == '__main__':
     labels_dev['filename'] = path_to_dev_frames +'\\'+ labels_dev['filename']
     labels_train['class']=labels_train['class'].astype('float32')
     labels_dev['class'] = labels_dev['class'].astype('float32')
+    class_weights=class_weight.compute_class_weight(class_weight='balanced',classes=np.unique(labels_train['class']), y=labels_train['class'].values.reshape((-1,)))
+    class_weights=dict((i,class_weights[i]) for i in range(len(class_weights)))
     #labels_train=labels_train.iloc[:640]
     #labels_dev = labels_dev.iloc[:640]
     # create generators
@@ -217,7 +223,7 @@ if __name__ == '__main__':
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
                  mixup = None,
-                 pool_workers=8)
+                 pool_workers=10)
 
     dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
                             preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
@@ -230,16 +236,17 @@ if __name__ == '__main__':
                  channel_random_noise= None, bluring= None,
                  worse_quality= None,
                  mixup = None,
-                 pool_workers=8)
+                 pool_workers=10)
     # create model
     model=tmp_model(input_shape)
     # create callbacks
-    callbacks=[best_weights_setter_callback(dev_gen, partial(recall_score, average='macro')),
-               get_annealing_LRreduce_callback(lr, lr/20., 4)]
+    callbacks=[best_weights_setter_callback(dev_gen, partial(f1_score, average='macro')),
+               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
-    metrics=['accuracy']
+    metrics=[tf.keras.metrics.Recall()]
     model=train_model(train_gen, model, optimizer, loss, epochs,
-                      None, metrics, callbacks, path_to_save_results='results')
+                      None, metrics, callbacks, path_to_save_results='results',
+                      class_weights=class_weights)
     model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
 

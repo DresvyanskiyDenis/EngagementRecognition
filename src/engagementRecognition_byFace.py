@@ -13,11 +13,14 @@ import numpy as np
 import pandas as pd
 import os
 import tensorflow as tf
-from sklearn.metrics import recall_score, f1_score
+from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
 from keras_datagenerators import ImageDataLoader
-from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback
+from preprocessing.data_normalizing_utils import VGGFace2_normalization
+from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
+    validation_with_generator_callback
+from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
@@ -144,6 +147,21 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
         df_with_relative_paths_and_labels=df_with_relative_paths_and_labels.append(tmp_df)
     return df_with_relative_paths_and_labels
 
+def form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_data:str, labels_dict:Dict[str,Label])-> pd.DataFrame:
+    # TODO: write description
+    directories_according_path=os.listdir(path_to_data)
+    df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename','class'])
+    for dir in directories_according_path:
+        if not dir in labels_dict.keys():
+            continue
+        img_filenames=os.listdir(os.path.join(path_to_data, dir))
+        img_filenames=[os.path.join(dir, x) for x in img_filenames]
+        label=[labels_dict[dir].engagement, labels_dict[dir].boredom]
+        labels=[[label[0], label[1]] for _ in range(len(img_filenames))]
+        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]).T, columns=['filename', 'engagement', 'boredom'])
+        df_with_relative_paths_and_labels=df_with_relative_paths_and_labels.append(tmp_df)
+    return df_with_relative_paths_and_labels
+
 
 def tmp_model(input_shape)->tf.keras.Model:
     model_tmp=tf.keras.applications.mobilenet_v2.MobileNetV2(input_shape=input_shape,include_top=False,
@@ -190,10 +208,14 @@ if __name__ == '__main__':
     input_shape=(224,224,3)
     num_classes=4
     batch_size=64
-    epochs=30
-    highest_lr=0.001
+    epochs=100
+    highest_lr=0.0005
     lowest_lr = 0.00001
-    momentum=0.9
+    momentum=0.95
+    output_path='results'
+    # create output path
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
     optimizer=tf.keras.optimizers.SGD(highest_lr, momentum=momentum)
     loss=tf.keras.losses.categorical_crossentropy
     # load labels
@@ -209,17 +231,17 @@ if __name__ == '__main__':
     labels_dev['class'] = labels_dev['class'].astype('float32')
     class_weights=class_weight.compute_class_weight(class_weight='balanced',classes=np.unique(labels_train['class']), y=labels_train['class'].values.reshape((-1,)))
     class_weights=dict((i,class_weights[i]) for i in range(len(class_weights)))
+    '''# Make major class less presented
     labels_train=pd.concat([labels_train[labels_train['class']==0],
                             labels_train[labels_train['class'] == 1],
                             labels_train[labels_train['class'] == 2].iloc[::5],
                             labels_train[labels_train['class'] == 3].iloc[::5]
-                            ])
-
+                            ])'''
     #labels_train=labels_train.iloc[:640]
     #labels_dev = labels_dev.iloc[:640]
     # create generators
     train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
-                              preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+                              preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
                  horizontal_flip= 0.1, vertical_flip= 0,
                  shift= 0.1,
@@ -229,33 +251,53 @@ if __name__ == '__main__':
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
                  mixup = 0.5,
-                 prob_factors_for_each_class=(1,1,0.5,0.5),
+                 prob_factors_for_each_class=(1,1,1,1),
                  pool_workers=10)
 
     dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
-                            preprocess_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+                            preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
                  horizontal_flip= 0, vertical_flip= 0,
                  shift= 0,
                  brightness= 0, shearing= 0, zooming= 0,
                  random_cropping_out = 0, rotation = 0,
-                 scaling= 0,
+                 scaling= None,
                  channel_random_noise= 0, bluring= 0,
                  worse_quality= 0,
                  mixup = 0,
-                 pool_workers=10)
+                 pool_workers=8)
     # create model
-    model=tmp_model(input_shape)
+    model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,512),
+                                       dropout=0.5,
+                                       regularization=tf.keras.regularizers.l1_l2(0.0001),
+                                       output_neurons=(num_classes, num_classes), pooling_at_the_end='avg',
+                                       pretrained= True,
+                                       path_to_weights = None)
+    # create logger
+    logger=open('val_logs.txt', mode='a')
+    # write training params:
+    logger.write('# Train params:\n'
+                 'Epochs:%i\n'
+                 'Highest_lr:%f\n'
+                 'Lowest_lr:%f\n'
+                 'Optimizer:%s\n'
+                 'Loss:%s\n'%
+                 (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-    callbacks=[best_weights_setter_callback(dev_gen, partial(f1_score, average='macro')),
+    callbacks=[validation_with_generator_callback(dev_gen, metrics=(partial(f1_score, average='macro'),
+                                                                    accuracy_score,
+                                                                    partial(recall_score, average='macro')),
+                                                  num_metric_to_set_weights=0,
+                                                  logger=logger),
                get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
-    metrics=[tf.keras.metrics.Recall()]
+    metrics=[tf.keras.metrics.Accuracy(),tf.keras.metrics.Recall()]
     model=train_model(train_gen, model, optimizer, loss, epochs,
                       None, metrics, callbacks, path_to_save_results='results',
                       class_weights=class_weights)
     model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
+    logger.close()
 
 
 

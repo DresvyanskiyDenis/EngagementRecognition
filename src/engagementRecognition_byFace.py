@@ -17,6 +17,7 @@ from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
 from keras_datagenerators import ImageDataLoader
+from keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
     validation_with_generator_callback
@@ -150,7 +151,7 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
 def form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_data:str, labels_dict:Dict[str,Label])-> pd.DataFrame:
     # TODO: write description
     directories_according_path=os.listdir(path_to_data)
-    df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename','class'])
+    df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename', 'engagement', 'boredom'])
     for dir in directories_according_path:
         if not dir in labels_dict.keys():
             continue
@@ -158,7 +159,8 @@ def form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_data:str, 
         img_filenames=[os.path.join(dir, x) for x in img_filenames]
         label=[labels_dict[dir].engagement, labels_dict[dir].boredom]
         labels=[[label[0], label[1]] for _ in range(len(img_filenames))]
-        tmp_df=pd.DataFrame(data=np.array([img_filenames, labels]).T, columns=['filename', 'engagement', 'boredom'])
+        tmp_df=pd.DataFrame(data=np.concatenate([np.array(img_filenames).reshape(-1,1), np.array(labels)], axis=-1),
+                            columns=['filename', 'engagement', 'boredom'])
         df_with_relative_paths_and_labels=df_with_relative_paths_and_labels.append(tmp_df)
     return df_with_relative_paths_and_labels
 
@@ -187,7 +189,7 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
         os.makedirs(path_to_save_results)
     # compile model
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=2,
+    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=1,
               class_weight=class_weights)
     return model
 
@@ -222,15 +224,24 @@ if __name__ == '__main__':
     dict_labels_train=load_labels_to_dict(path_to_train_labels)
     dict_labels_dev=load_labels_to_dict(path_to_dev_labels)
     # form dataframes with relative paths and labels
-    labels_train=form_dataframe_of_relative_paths_to_data_with_labels(path_to_train_frames, dict_labels_train)
-    labels_dev=form_dataframe_of_relative_paths_to_data_with_labels(path_to_dev_frames, dict_labels_dev)
+    labels_train=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_train_frames, dict_labels_train)
+    labels_dev=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_dev_frames, dict_labels_dev)
     # add full path to them
     labels_train['filename']=path_to_train_frames+'\\'+labels_train['filename']
     labels_dev['filename'] = path_to_dev_frames +'\\'+ labels_dev['filename']
-    labels_train['class']=labels_train['class'].astype('float32')
-    labels_dev['class'] = labels_dev['class'].astype('float32')
-    class_weights=class_weight.compute_class_weight(class_weight='balanced',classes=np.unique(labels_train['class']), y=labels_train['class'].values.reshape((-1,)))
-    class_weights=dict((i,class_weights[i]) for i in range(len(class_weights)))
+    labels_train['engagement']=labels_train['engagement'].astype('float32')
+    labels_train['boredom'] = labels_train['boredom'].astype('float32')
+    labels_dev['engagement'] = labels_dev['engagement'].astype('float32')
+    labels_dev['boredom'] = labels_dev['boredom'].astype('float32')
+    class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
+                                                               classes=np.unique(labels_train['engagement']),
+                                                               y=labels_train['engagement'].values.reshape((-1,)))
+    class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
+
+    class_weights_boredom = class_weight.compute_class_weight(class_weight='balanced',
+                                                                 classes=np.unique(labels_train['boredom']),
+                                                                 y=labels_train['boredom'].values.reshape((-1,)))
+    class_weights_boredom = dict((i, class_weights_boredom[i]) for i in range(len(class_weights_boredom)))
     '''# Make major class less presented
     labels_train=pd.concat([labels_train[labels_train['class']==0],
                             labels_train[labels_train['class'] == 1],
@@ -240,7 +251,8 @@ if __name__ == '__main__':
     #labels_train=labels_train.iloc[:640]
     #labels_dev = labels_dev.iloc[:640]
     # create generators
-    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
+    train_gen=ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
+                                         class_columns=['engagement','boredom'],
                               preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
                  horizontal_flip= 0.1, vertical_flip= 0,
@@ -254,7 +266,8 @@ if __name__ == '__main__':
                  prob_factors_for_each_class=(1,1,1,1),
                  pool_workers=10)
 
-    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
+    dev_gen=ImageDataLoader_multilabel(paths_with_labels=labels_dev, batch_size=batch_size,
+                                       class_columns=['engagement', 'boredom'],
                             preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
                  horizontal_flip= 0, vertical_flip= 0,
@@ -272,9 +285,10 @@ if __name__ == '__main__':
                                        regularization=tf.keras.regularizers.l1_l2(0.0001),
                                        output_neurons=(num_classes, num_classes), pooling_at_the_end='avg',
                                        pretrained= True,
-                                       path_to_weights = None)
+                                       path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
+    model.summary()
     # create logger
-    logger=open('val_logs.txt', mode='a')
+    logger=open(os.path.join(output_path,'val_logs.txt'), mode='a')
     # write training params:
     logger.write('# Train params:\n'
                  'Epochs:%i\n'
@@ -284,17 +298,16 @@ if __name__ == '__main__':
                  'Loss:%s\n'%
                  (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-    callbacks=[validation_with_generator_callback(dev_gen, metrics=(partial(f1_score, average='macro'),
-                                                                    accuracy_score,
-                                                                    partial(recall_score, average='macro')),
-                                                  num_metric_to_set_weights=0,
-                                                  logger=logger),
-               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
+    '''dev_gen, metrics=(partial(f1_score, average='macro'),
+                                                                        accuracy_score,
+                                                                        partial(recall_score, average='macro')),
+                                                      num_metric_to_set_weights=0,
+                                                      logger=logger)'''
+    callbacks=[get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
-    metrics=[tf.keras.metrics.Accuracy(),tf.keras.metrics.Recall()]
+    metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     model=train_model(train_gen, model, optimizer, loss, epochs,
-                      None, metrics, callbacks, path_to_save_results='results',
-                      class_weights=class_weights)
+                      None, metrics, callbacks, path_to_save_results='results')
     model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
     logger.close()

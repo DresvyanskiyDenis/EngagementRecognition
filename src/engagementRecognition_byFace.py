@@ -20,7 +20,7 @@ from keras_datagenerators import ImageDataLoader
 from keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
-    validation_with_generator_callback
+    validation_with_generator_callback, validation_with_generator_callback_multilabel
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
@@ -189,7 +189,7 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
         os.makedirs(path_to_save_results)
     # compile model
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=1,
+    model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=2,
               class_weight=class_weights)
     return model
 
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     input_shape=(224,224,3)
     num_classes=4
     batch_size=64
-    epochs=100
+    epochs=30
     highest_lr=0.0005
     lowest_lr = 0.00001
     momentum=0.95
@@ -288,6 +288,8 @@ if __name__ == '__main__':
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
     model.summary()
     # create logger
+    logger = open(os.path.join(output_path, 'val_logs.txt'), mode='w')
+    logger.close()
     logger=open(os.path.join(output_path,'val_logs.txt'), mode='a')
     # write training params:
     logger.write('# Train params:\n'
@@ -298,12 +300,14 @@ if __name__ == '__main__':
                  'Loss:%s\n'%
                  (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-    '''dev_gen, metrics=(partial(f1_score, average='macro'),
+
+    callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
+                                                                 num_label_types=2,
                                                       num_metric_to_set_weights=0,
-                                                      logger=logger)'''
-    callbacks=[get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
+                                                      logger=logger)
+        ,get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     model=train_model(train_gen, model, optimizer, loss, epochs,

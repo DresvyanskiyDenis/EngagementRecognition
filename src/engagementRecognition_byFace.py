@@ -151,16 +151,16 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
 def form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_data:str, labels_dict:Dict[str,Label])-> pd.DataFrame:
     # TODO: write description
     directories_according_path=os.listdir(path_to_data)
-    df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename', 'engagement', 'boredom'])
+    df_with_relative_paths_and_labels=pd.DataFrame(columns=['filename', 'engagement', 'boredom', 'confusion','frustration'])
     for dir in directories_according_path:
         if not dir in labels_dict.keys():
             continue
         img_filenames=os.listdir(os.path.join(path_to_data, dir))
         img_filenames=[os.path.join(dir, x) for x in img_filenames]
-        label=[labels_dict[dir].engagement, labels_dict[dir].boredom]
-        labels=[[label[0], label[1]] for _ in range(len(img_filenames))]
+        label=[labels_dict[dir].engagement, labels_dict[dir].boredom, labels_dict[dir].confusion, labels_dict[dir].frustration]
+        labels=[[label[0], label[1],label[2],label[3]] for _ in range(len(img_filenames))]
         tmp_df=pd.DataFrame(data=np.concatenate([np.array(img_filenames).reshape(-1,1), np.array(labels)], axis=-1),
-                            columns=['filename', 'engagement', 'boredom'])
+                            columns=['filename', 'engagement', 'boredom', 'confusion','frustration'])
         df_with_relative_paths_and_labels=df_with_relative_paths_and_labels.append(tmp_df)
     return df_with_relative_paths_and_labels
 
@@ -213,7 +213,7 @@ if __name__ == '__main__':
     epochs=30
     highest_lr=0.0005
     lowest_lr = 0.00001
-    momentum=0.95
+    momentum=0.9
     output_path='results'
     # create output path
     if not os.path.exists(output_path):
@@ -233,6 +233,10 @@ if __name__ == '__main__':
     labels_train['boredom'] = labels_train['boredom'].astype('float32')
     labels_dev['engagement'] = labels_dev['engagement'].astype('float32')
     labels_dev['boredom'] = labels_dev['boredom'].astype('float32')
+    labels_train['confusion']=labels_train['confusion'].astype('float32')
+    labels_train['frustration'] = labels_train['frustration'].astype('float32')
+    labels_dev['confusion'] = labels_dev['confusion'].astype('float32')
+    labels_dev['frustration'] = labels_dev['frustration'].astype('float32')
     class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
                                                                classes=np.unique(labels_train['engagement']),
                                                                y=labels_train['engagement'].values.reshape((-1,)))
@@ -252,7 +256,7 @@ if __name__ == '__main__':
     #labels_dev = labels_dev.iloc[:640]
     # create generators
     train_gen=ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
-                                         class_columns=['engagement','boredom'],
+                                         class_columns=['engagement','boredom', 'confusion', 'frustration'],
                               preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
                  horizontal_flip= 0.1, vertical_flip= 0,
@@ -267,7 +271,7 @@ if __name__ == '__main__':
                  pool_workers=10)
 
     dev_gen=ImageDataLoader_multilabel(paths_with_labels=labels_dev, batch_size=batch_size,
-                                       class_columns=['engagement', 'boredom'],
+                                       class_columns=['engagement','boredom', 'confusion', 'frustration'],
                             preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
                  horizontal_flip= 0, vertical_flip= 0,
@@ -280,12 +284,15 @@ if __name__ == '__main__':
                  mixup = 0,
                  pool_workers=8)
     # create model
-    model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,512),
+    model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,),
                                        dropout=0.5,
                                        regularization=tf.keras.regularizers.l1_l2(0.0001),
-                                       output_neurons=(num_classes, num_classes), pooling_at_the_end='avg',
+                                       output_neurons=(num_classes, num_classes, num_classes, num_classes), pooling_at_the_end='avg',
                                        pretrained= True,
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
+    # freeze model
+    for i in range(141):
+        model.layers[i].trainable=False
     model.summary()
     # create logger
     logger = open(os.path.join(output_path, 'val_logs.txt'), mode='w')
@@ -304,7 +311,7 @@ if __name__ == '__main__':
     callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
-                                                                 num_label_types=2,
+                                                                 num_label_types=4,
                                                       num_metric_to_set_weights=0,
                                                       logger=logger)
         ,get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]

@@ -178,7 +178,7 @@ def tmp_model(input_shape)->tf.keras.Model:
 
 
 def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:tf.keras.Model,
-                optimizer:tf.keras.optimizers.Optimizer, loss:Union[tf.keras.losses.Loss, Dict[str, ]],
+                optimizer:tf.keras.optimizers.Optimizer, loss:tf.keras.losses.Loss,
                 epochs:int,
                 val_generator:Iterable[Tuple[np.ndarray, np.ndarray]],
                 metrics:List[tf.keras.metrics.Metric],
@@ -211,7 +211,7 @@ if __name__ == '__main__':
     input_shape=(224,224,3)
     num_classes=4
     batch_size=64
-    epochs=30
+    epochs=50
     highest_lr=0.0005
     lowest_lr = 0.00001
     momentum=0.9
@@ -284,7 +284,6 @@ if __name__ == '__main__':
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
                  mixup = 0.5,
-                 prob_factors_for_each_class=(1,1,1,1),
                  pool_workers=10)
 
     dev_gen=ImageDataLoader_multilabel(paths_with_labels=labels_dev, batch_size=batch_size,
@@ -327,19 +326,19 @@ if __name__ == '__main__':
     callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
-                                                                 num_label_types=4,
-                                                      num_metric_to_set_weights=0,
-                                                      logger=logger)
-        ,get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
+                                                                        num_label_types=4,
+                                                                        num_metric_to_set_weights=0,
+                                                                        logger=logger),
+               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     # make weighted losses for model
-    losses = {'dense_2_loss':weighted_categorical_crossentropy(class_weights_engagement),
-              'dense_4_loss': weighted_categorical_crossentropy(class_weights_boredom),
-              'dense_6_loss': weighted_categorical_crossentropy(class_weights_confusion),
-              'dense_8_loss': weighted_categorical_crossentropy(class_weights_frustration)
+    losses = {'dense_2':weighted_categorical_crossentropy(class_weights_engagement),
+              'dense_4': weighted_categorical_crossentropy(class_weights_boredom),
+              'dense_6': weighted_categorical_crossentropy(class_weights_confusion),
+              'dense_8': weighted_categorical_crossentropy(class_weights_frustration)
     }
-
+    tf.keras.utils.plot_model(model, 'model.png')
     model=train_model(train_gen, model, optimizer, losses, epochs,
                       None, metrics, callbacks, path_to_save_results='results')
     model.save("results\\model.h5")

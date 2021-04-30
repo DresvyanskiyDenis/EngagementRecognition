@@ -19,6 +19,7 @@ from sklearn.utils import class_weight
 from keras_datagenerators import ImageDataLoader
 from keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
+from tensorflow_utils.Losses import weighted_categorical_crossentropy
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
     validation_with_generator_callback, validation_with_generator_callback_multilabel
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
@@ -177,7 +178,7 @@ def tmp_model(input_shape)->tf.keras.Model:
 
 
 def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:tf.keras.Model,
-                optimizer:tf.keras.optimizers.Optimizer, loss:tf.keras.losses.Loss,
+                optimizer:tf.keras.optimizers.Optimizer, loss:Union[tf.keras.losses.Loss, Dict[str, ]],
                 epochs:int,
                 val_generator:Iterable[Tuple[np.ndarray, np.ndarray]],
                 metrics:List[tf.keras.metrics.Metric],
@@ -237,15 +238,31 @@ if __name__ == '__main__':
     labels_train['frustration'] = labels_train['frustration'].astype('float32')
     labels_dev['confusion'] = labels_dev['confusion'].astype('float32')
     labels_dev['frustration'] = labels_dev['frustration'].astype('float32')
+    # class weights
     class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
                                                                classes=np.unique(labels_train['engagement']),
                                                                y=labels_train['engagement'].values.reshape((-1,)))
-    class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
+    class_weights_engagement/=class_weights_engagement.sum()
+    #class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
 
     class_weights_boredom = class_weight.compute_class_weight(class_weight='balanced',
                                                                  classes=np.unique(labels_train['boredom']),
                                                                  y=labels_train['boredom'].values.reshape((-1,)))
-    class_weights_boredom = dict((i, class_weights_boredom[i]) for i in range(len(class_weights_boredom)))
+    class_weights_boredom /= class_weights_boredom.sum()
+    #class_weights_boredom = dict((i, class_weights_boredom[i]) for i in range(len(class_weights_boredom)))
+
+    class_weights_confusion = class_weight.compute_class_weight(class_weight='balanced',
+                                                                 classes=np.unique(labels_train['confusion']),
+                                                                 y=labels_train['confusion'].values.reshape((-1,)))
+    class_weights_confusion /= class_weights_confusion.sum()
+    #class_weights_confusion = dict((i, class_weights_confusion[i]) for i in range(len(class_weights_confusion)))
+
+    class_weights_frustration = class_weight.compute_class_weight(class_weight='balanced',
+                                                                 classes=np.unique(labels_train['frustration']),
+                                                                 y=labels_train['frustration'].values.reshape((-1,)))
+    class_weights_frustration /= class_weights_frustration.sum()
+    #class_weights_frustration = dict((i, class_weights_frustration[i]) for i in range(len(class_weights_frustration)))
+
     '''# Make major class less presented
     labels_train=pd.concat([labels_train[labels_train['class']==0],
                             labels_train[labels_train['class'] == 1],
@@ -307,7 +324,6 @@ if __name__ == '__main__':
                  'Loss:%s\n'%
                  (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-
     callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
@@ -317,7 +333,14 @@ if __name__ == '__main__':
         ,get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
-    model=train_model(train_gen, model, optimizer, loss, epochs,
+    # make weighted losses for model
+    losses = {'dense_2_loss':weighted_categorical_crossentropy(class_weights_engagement),
+              'dense_4_loss': weighted_categorical_crossentropy(class_weights_boredom),
+              'dense_6_loss': weighted_categorical_crossentropy(class_weights_confusion),
+              'dense_8_loss': weighted_categorical_crossentropy(class_weights_frustration)
+    }
+
+    model=train_model(train_gen, model, optimizer, losses, epochs,
                       None, metrics, callbacks, path_to_save_results='results')
     model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")

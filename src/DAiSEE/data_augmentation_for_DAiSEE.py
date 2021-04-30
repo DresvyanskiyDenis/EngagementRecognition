@@ -20,7 +20,7 @@ from keras_datagenerators import ImageDataLoader
 from keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from preprocessing.data_preprocessing.image_preprocessing_utils import save_image
-from src.engagementRecognition_DAiSEE import load_labels_to_dict, \
+from src.DAiSEE.engagementRecognition_DAiSEE import load_labels_to_dict, \
     form_dataframe_of_relative_paths_to_data_with_multilabels
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
     validation_with_generator_callback, validation_with_generator_callback_multilabel

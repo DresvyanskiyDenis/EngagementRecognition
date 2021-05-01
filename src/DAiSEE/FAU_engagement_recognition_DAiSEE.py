@@ -10,6 +10,7 @@ import os
 import pandas as pd
 import shutil
 import tensorflow as tf
+from sklearn.metrics import accuracy_score, recall_score, f1_score
 from sklearn.utils import class_weight
 
 from preprocessing.data_preprocessing.openFace_utils import extract_openface_FAU_from_images_in_dir
@@ -66,6 +67,10 @@ if __name__=="__main__":
     features=add_labels_to_FAU_features_in_df(features, r'C:\Databases\DAiSEE\Labels\TrainLabels.csv')
     features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_features_with_labels.csv')
     """
+    """path_to_train_features=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_feature_with_labelss.csv'
+    path_to_dev_features = r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_feature_with_labelss.csv'
+    train_features=pd.read_csv(path_to_train_features)
+    dev_features=pd.read_csv(path_to_dev_features)
     # params
     num_classes = 4
     batch_size = 256
@@ -92,9 +97,18 @@ if __name__=="__main__":
     # compute class weights
     # class weights
     class_weights_engagement = class_weight.compute_class_weight(class_weight='balanced',
-                                                                 classes=np.unique(features['engagement']),
-                                                                 y=features['engagement'].values.reshape((-1,)))
+                                                                 classes=np.unique(train_features['engagement']),
+                                                                 y=train_features['engagement'].values.reshape((-1,)))
     class_weights_engagement /= class_weights_engagement.sum()
     class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.fit(x=features.iloc[:-5], y=features['engagement'],epochs=epochs, batch_size=batch_size,callbacks=callbacks)
+    model.fit(x=train_features.iloc[:-5], y=train_features['engagement'], epochs=epochs, 
+              batch_size=batch_size, callbacks=callbacks)
+    
+    # validation
+    val_predictions=model.predict(x=dev_features.iloc[:-5])
+    val_predictions=np.argmax(val_predictions, axis=-1).reshape((-1,1))
+    val_ground_truth=dev_features['engagement'].values.reshape((-1,1))
+    print('val accuracy:', accuracy_score(val_ground_truth, val_predictions))
+    print('val recall:', recall_score(val_ground_truth, val_predictions, average='macro'))
+    print('val f1_score:', f1_score(val_ground_truth, val_predictions, average='macro'))"""

@@ -242,10 +242,10 @@ if __name__ == '__main__':
     class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
                                                                classes=np.unique(labels_train['engagement']),
                                                                y=labels_train['engagement'].values.reshape((-1,)))
-    class_weights_engagement/=class_weights_engagement.sum()
-    #class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
+    #class_weights_engagement/=class_weights_engagement.sum()
+    class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
 
-    class_weights_boredom = class_weight.compute_class_weight(class_weight='balanced',
+    """class_weights_boredom = class_weight.compute_class_weight(class_weight='balanced',
                                                                  classes=np.unique(labels_train['boredom']),
                                                                  y=labels_train['boredom'].values.reshape((-1,)))
     class_weights_boredom /= class_weights_boredom.sum()
@@ -261,7 +261,7 @@ if __name__ == '__main__':
                                                                  classes=np.unique(labels_train['frustration']),
                                                                  y=labels_train['frustration'].values.reshape((-1,)))
     class_weights_frustration /= class_weights_frustration.sum()
-    #class_weights_frustration = dict((i, class_weights_frustration[i]) for i in range(len(class_weights_frustration)))
+    #class_weights_frustration = dict((i, class_weights_frustration[i]) for i in range(len(class_weights_frustration)))"""
 
     '''# Make major class less presented
     labels_train=pd.concat([labels_train[labels_train['class']==0],
@@ -272,8 +272,8 @@ if __name__ == '__main__':
     #labels_train=labels_train.iloc[:640]
     #labels_dev = labels_dev.iloc[:640]
     # create generators
-    train_gen=ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
-                                         class_columns=['engagement','boredom', 'confusion', 'frustration'],
+    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
+                                         #class_columns=['engagement','boredom', 'confusion', 'frustration'],
                               preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
                  horizontal_flip= 0.1, vertical_flip= 0,
@@ -284,10 +284,10 @@ if __name__ == '__main__':
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
                  mixup = 0.5,
-                 pool_workers=10)
+                 pool_workers=12)
 
-    dev_gen=ImageDataLoader_multilabel(paths_with_labels=labels_dev, batch_size=batch_size,
-                                       class_columns=['engagement','boredom', 'confusion', 'frustration'],
+    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
+                                       #class_columns=['engagement','boredom', 'confusion', 'frustration'],
                             preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
                  horizontal_flip= 0, vertical_flip= 0,
@@ -303,7 +303,7 @@ if __name__ == '__main__':
     model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,),
                                        dropout=0.5,
                                        regularization=tf.keras.regularizers.l1_l2(0.0001),
-                                       output_neurons=(num_classes, num_classes, num_classes, num_classes), pooling_at_the_end='avg',
+                                       output_neurons=(num_classes,), pooling_at_the_end='avg',
                                        pretrained= True,
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
     # freeze model
@@ -323,20 +323,20 @@ if __name__ == '__main__':
                  'Loss:%s\n'%
                  (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-    callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
+    callbacks=[validation_with_generator_callback(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
-                                                                        num_label_types=4,
+                                                                        #num_label_types=4,
                                                                         num_metric_to_set_weights=0,
                                                                         logger=logger),
                get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     # make weighted losses for model
-    losses = {'dense_2':weighted_categorical_crossentropy(class_weights_engagement),
-              'dense_4': weighted_categorical_crossentropy(class_weights_boredom),
-              'dense_6': weighted_categorical_crossentropy(class_weights_confusion),
-              'dense_8': weighted_categorical_crossentropy(class_weights_frustration)
+    losses = {'dense_2':weighted_categorical_crossentropy(class_weights_engagement)
+              #'dense_4': weighted_categorical_crossentropy(class_weights_boredom),
+              #'dense_6': weighted_categorical_crossentropy(class_weights_confusion),
+              #'dense_8': weighted_categorical_crossentropy(class_weights_frustration)
     }
     tf.keras.utils.plot_model(model, 'model.png')
     model=train_model(train_gen, model, optimizer, losses, epochs,

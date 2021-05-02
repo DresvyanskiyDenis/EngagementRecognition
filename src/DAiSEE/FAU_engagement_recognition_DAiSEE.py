@@ -50,44 +50,87 @@ def add_labels_to_FAU_features_in_df(features:pd.DataFrame, path_to_labels:str,
     for row_idx in range(features.shape[0]):
         # get filename without frame number (to get access to the labels by filename)
         filename=features.iloc[row_idx]['filename'].split('_')[0]
+        if filename not in labels.keys():
+            continue
         for feature_to_add in features_to_add:
             # add required labels to the row (change from NaN to the label value)
-            features.iloc[row_idx][feature_to_add]=labels[filename][feature_to_add]
+            features[feature_to_add].iloc[row_idx]=labels[filename]._asdict()[feature_to_add]
+        if row_idx%10000==0:
+            print(row_idx)
     return features
+
+class val_callback(tf.keras.callbacks.Callback):
+    """Calculates the recall score at the end of each training epoch and saves the best weights across all the training
+        process. At the end of training process, it will set weights of the model to the best found ones.
+        # TODO: write, which types of metric functions it supports
+    """
+
+    def __init__(self, val_data:pd.DataFrame):
+        super(val_callback, self).__init__()
+        self.val_data = val_data
+
+    def on_train_begin(self, logs=None):
+        # Initialize the best as infinity.
+        self.best_f1 = 0
+        self.best_recall = 0
+        self.best_acc = 0
+
+    def on_train_end(self, logs=None):
+        print('best f1_score on validation:', self.best_f1)
+        print('best recall on validation:', self.best_recall)
+        print('best accuracy on validation:', self.best_acc)
+
+    def on_epoch_end(self, epoch, logs=None):
+        # validation
+        val_predictions = model.predict(x=self.val_data.iloc[:, :-5], batch_size=256)
+        val_predictions = np.argmax(val_predictions, axis=-1).reshape((-1, 1))
+        val_ground_truth = self.val_data['engagement'].values.reshape((-1, 1))
+        acc=accuracy_score(val_ground_truth, val_predictions)
+        recall=recall_score(val_ground_truth, val_predictions,average='macro')
+        f1=f1_score(val_ground_truth, val_predictions, average='macro')
+        print('\nval accuracy:', acc)
+        print('val recall:', recall)
+        print('val f1_score:', f1)
+        if acc>self.best_acc: self.best_acc=acc
+        if recall>self.best_recall: self.best_recall=recall
+        if f1>self.best_f1: self.best_f1=f1
 
 
 if __name__=="__main__":
-    path_to_dir = r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\extracted_faces'
-    path_to_extractor = r'C:\Users\Denis\PycharmProjects\OpenFace\FaceLandmarkImg.exe'
-    features = extract_FAU_features_from_all_subdirectories(path_to_dir, path_to_extractor)
-    features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features.csv', index=False)
-    # !!!! do not forget to rename file!!! you saved train features to the dev_preprocess directory
-    """
-    features=pd.read_scv(r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_features.csv')
-    features=add_labels_to_FAU_features_in_df(features, r'C:\Databases\DAiSEE\Labels\TrainLabels.csv')
-    features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_features_with_labels.csv')
-    """
-    """path_to_train_features=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_feature_with_labelss.csv'
-    path_to_dev_features = r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_feature_with_labelss.csv'
+    """path_to_dir = r'E:\Databases\DAiSEE\DAiSEE\dev_processed\extracted_faces'
+    path_to_extractor = r'C:\\Users\Denis\PycharmProjects\OpenFace\FaceLandmarkImg.exe'"""
+    """features = extract_FAU_features_from_all_subdirectories(path_to_dir, path_to_extractor)
+    features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features.csv', index=False)"""
+
+    """features=pd.read_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features.csv')
+    features=add_labels_to_FAU_features_in_df(features, r'E:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv')
+    features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features_with_labels.csv')"""
+
+    path_to_train_features=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_features_with_labels.csv'
+    path_to_dev_features = r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features_with_labels.csv'
     train_features=pd.read_csv(path_to_train_features)
+    train_features=train_features[~train_features['engagement'].isna()]
+    train_features=train_features.drop(columns=['Unnamed: 0'])
     dev_features=pd.read_csv(path_to_dev_features)
+    dev_features = dev_features[~dev_features['engagement'].isna()]
+    dev_features = dev_features.drop(columns=['Unnamed: 0'])
     # params
     num_classes = 4
-    batch_size = 256
+    batch_size = 512
     epochs = 100
-    highest_lr = 0.001
+    highest_lr = 0.0001
     lowest_lr = 0.0001
     momentum = 0.9
-    optimizer = tf.keras.optimizers.SGD(highest_lr, momentum=momentum)
-    loss = tf.keras.losses.sparse_categorical_crossentropy
-    callbacks = [get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
+    optimizer = tf.keras.optimizers.Adam(highest_lr)
+    loss = tf.keras.losses.categorical_crossentropy
+    callbacks = [val_callback(dev_features)]
     # create metrics
     metrics = [tf.keras.metrics.CategoricalAccuracy(), tf.keras.metrics.Recall()]
 
-    input_shape=(features.shape[1]-5,)
+    input_shape=(train_features.shape[1]-5,)
     model=get_Dense_model(input_shape=input_shape,
-                    dense_neurons=(128,64,32),
-                    activations='relu',
+                    dense_neurons=(256,512,256),
+                    activations='elu',
                     dropout= 0.3,
                     regularization=tf.keras.regularizers.l2(0.0001),
                     output_neurons = 4,
@@ -99,16 +142,15 @@ if __name__=="__main__":
     class_weights_engagement = class_weight.compute_class_weight(class_weight='balanced',
                                                                  classes=np.unique(train_features['engagement']),
                                                                  y=train_features['engagement'].values.reshape((-1,)))
-    class_weights_engagement /= class_weights_engagement.sum()
+    #class_weights_engagement /= class_weights_engagement.sum()
     class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.fit(x=train_features.iloc[:-5], y=train_features['engagement'], epochs=epochs, 
-              batch_size=batch_size, callbacks=callbacks)
-    
-    # validation
-    val_predictions=model.predict(x=dev_features.iloc[:-5])
-    val_predictions=np.argmax(val_predictions, axis=-1).reshape((-1,1))
-    val_ground_truth=dev_features['engagement'].values.reshape((-1,1))
-    print('val accuracy:', accuracy_score(val_ground_truth, val_predictions))
-    print('val recall:', recall_score(val_ground_truth, val_predictions, average='macro'))
-    print('val f1_score:', f1_score(val_ground_truth, val_predictions, average='macro'))"""
+    # shuffle train
+    train_features=train_features.sample(frac=1)
+    model.fit(x=train_features.iloc[:,:-5].values,
+              y=tf.keras.utils.to_categorical(train_features['engagement'].values, num_classes=num_classes),
+              epochs=epochs,
+              batch_size=batch_size, callbacks=callbacks,
+              validation_data=(dev_features.iloc[:,:-5].values,
+                               tf.keras.utils.to_categorical(dev_features['engagement'].values, num_classes=num_classes)),
+              class_weight=class_weights_engagement)

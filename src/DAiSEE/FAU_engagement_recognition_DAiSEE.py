@@ -11,6 +11,7 @@ import pandas as pd
 import shutil
 import tensorflow as tf
 from sklearn.metrics import accuracy_score, recall_score, f1_score
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils import class_weight
 
 from preprocessing.data_preprocessing.openFace_utils import extract_openface_FAU_from_images_in_dir
@@ -116,7 +117,7 @@ if __name__=="__main__":
     dev_features = dev_features.drop(columns=['Unnamed: 0'])
     # params
     num_classes = 4
-    batch_size = 512
+    batch_size = 128
     epochs = 100
     highest_lr = 0.0001
     lowest_lr = 0.0001
@@ -147,10 +148,11 @@ if __name__=="__main__":
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
     # shuffle train
     train_features=train_features.sample(frac=1)
-    model.fit(x=train_features.iloc[:,:-5].values,
+    model.fit(x=StandardScaler().fit_transform(train_features.iloc[:,:-5].values),
               y=tf.keras.utils.to_categorical(train_features['engagement'].values, num_classes=num_classes),
               epochs=epochs,
               batch_size=batch_size, callbacks=callbacks,
-              validation_data=(dev_features.iloc[:,:-5].values,
-                               tf.keras.utils.to_categorical(dev_features['engagement'].values, num_classes=num_classes)),
-              class_weight=class_weights_engagement)
+              validation_data=(StandardScaler().fit_transform(dev_features.iloc[:,:-5].values),
+                               tf.keras.utils.to_categorical(dev_features['engagement'].values, num_classes=num_classes))
+              #class_weight=class_weights_engagement
+              )

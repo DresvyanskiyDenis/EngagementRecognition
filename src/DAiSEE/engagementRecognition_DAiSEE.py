@@ -18,6 +18,7 @@ from sklearn.utils import class_weight
 
 from keras_datagenerators import ImageDataLoader
 from keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
+from keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.Losses import weighted_categorical_crossentropy
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
@@ -194,6 +195,16 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
               class_weight=class_weights)
     return model
 
+def generate_paths_with_labels_from_directory(path_to_dir:str, class_name:str, class_value:int)->pd.DataFrame:
+    # TODO: write description
+    filenames=os.listdir(path_to_dir)
+    filenames=[os.path.join(path_to_dir, filename) for filename in filenames]
+    class_values=[class_value for _ in range(len(filenames))]
+    df=pd.DataFrame(data=np.array([filenames, class_values]).T,
+                    columns=['filename', class_name])
+    df[class_name]=df[class_name].astype('float32')
+    return df
+
 
 if __name__ == '__main__':
     '''path_to_directory_with_frames=r'D:\Databases\DAiSEE\frames'
@@ -201,10 +212,10 @@ if __name__ == '__main__':
     resize=(224,224)
     extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
     # params
-    path_to_train_frames=r'C:\Databases\DAiSEE\train_preprocessed\extracted_faces'
-    path_to_train_labels=r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev_frames=r'C:\Databases\DAiSEE\dev_preprocessed\extracted_faces'
-    path_to_dev_labels=r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_train_frames=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\extracted_faces'
+    path_to_train_labels=r'E:\Databases\DAiSEE\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev_frames=r'E:\Databases\DAiSEE\DAiSEE\dev_processed\extracted_faces'
+    path_to_dev_labels=r'E:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv'
     '''output_path=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
     sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
                                       path_to_labels=path_to_dev_labels)'''
@@ -238,6 +249,18 @@ if __name__ == '__main__':
     labels_train['frustration'] = labels_train['frustration'].astype('float32')
     labels_dev['confusion'] = labels_dev['confusion'].astype('float32')
     labels_dev['frustration'] = labels_dev['frustration'].astype('float32')
+    # add augmentation data and delete all non-engagement class values
+    labels_train=labels_train.drop(columns=['boredom', 'confusion','frustration'])
+    labels_dev = labels_dev.drop(columns=['boredom', 'confusion', 'frustration'])
+    """class_0_augmented=generate_paths_with_labels_from_directory(path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\augmentation\engagement\0',
+                                                                class_name='engagement',
+                                                                class_value=0)
+    class_1_augmented = generate_paths_with_labels_from_directory(
+        path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\augmentation\engagement\1',
+        class_name='engagement',
+        class_value=1)
+    labels_train=pd.concat([labels_train, class_0_augmented, class_1_augmented], axis=0)"""
+
     # class weights
     class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
                                                                classes=np.unique(labels_train['engagement']),
@@ -269,10 +292,12 @@ if __name__ == '__main__':
                             labels_train[labels_train['class'] == 2].iloc[::5],
                             labels_train[labels_train['class'] == 3].iloc[::5]
                             ])'''
-    #labels_train=labels_train.iloc[:640]
-    #labels_dev = labels_dev.iloc[:640]
+    labels_train=labels_train.iloc[:640]
+    labels_dev = labels_dev.iloc[:640]
+    labels_train.columns=['filename', 'class']
+    labels_dev.columns = ['filename', 'class']
     # create generators
-    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
+    train_gen=ImageDataPreprocessor(paths_with_labels=labels_train, batch_size=batch_size,
                                          #class_columns=['engagement','boredom', 'confusion', 'frustration'],
                               preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
@@ -286,7 +311,7 @@ if __name__ == '__main__':
                  mixup = 0.5,
                  pool_workers=12)
 
-    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
+    dev_gen=ImageDataPreprocessor(paths_with_labels=labels_dev, batch_size=batch_size,
                                        #class_columns=['engagement','boredom', 'confusion', 'frustration'],
                             preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
@@ -329,15 +354,16 @@ if __name__ == '__main__':
                                                                         #num_label_types=4,
                                                                         num_metric_to_set_weights=0,
                                                                         logger=logger),
-               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
+               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 50)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     # make weighted losses for model
-    losses = {'dense_2':weighted_categorical_crossentropy(class_weights_engagement)
+    '''losses = {'dense_2':weighted_categorical_crossentropy(class_weights_engagement)
               #'dense_4': weighted_categorical_crossentropy(class_weights_boredom),
               #'dense_6': weighted_categorical_crossentropy(class_weights_confusion),
               #'dense_8': weighted_categorical_crossentropy(class_weights_frustration)
-    }
+    }'''
+    losses=tf.keras.losses.categorical_crossentropy
     tf.keras.utils.plot_model(model, 'model.png')
     model=train_model(train_gen, model, optimizer, losses, epochs,
                       None, metrics, callbacks, path_to_save_results='results')

@@ -16,10 +16,11 @@ import tensorflow as tf
 from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
+from augmentation.oversampling import oversample_by_border_SMOTE
 from tensorflow_utils.keras_datagenerators import ImageDataLoader
 from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
-from preprocessing.data_preprocessing.image_preprocessing_utils import save_image
+from preprocessing.data_preprocessing.image_preprocessing_utils import save_image, load_image
 from src.DAiSEE.engagementRecognition_DAiSEE import load_labels_to_dict, \
     form_dataframe_of_relative_paths_to_data_with_multilabels
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
@@ -35,7 +36,16 @@ def save_batch_of_images(path_to_save:str, images:np.ndarray, names:List[str])->
     for i in range(images.shape[0]):
         save_image(images[i], path_to_output=names[i])
 
-
+def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, ratio_for_minority_classes:float)->Tuple[np.ndarray, np.ndarray]:
+    # load all images
+    image_shape=load_image(paths_with_labels['filename'].iloc[0]).shape
+    images=np.zeros((paths_with_labels.shape[0],)+image_shape)
+    for idx_df in range(paths_with_labels.shape[0]):
+        images[idx_df]=load_image(paths_with_labels.filename.iloc[idx_df])
+    images=images.reshape((images.shape[0],-1))
+    labels=paths_with_labels['engagement'].values.reshape((-1,))
+    images, labels = oversample_by_border_SMOTE(images, labels, ratio_for_minority_classes)
+    return images, labels
 
 if __name__=='__maim__':
     # augment minority classes
@@ -68,7 +78,20 @@ if __name__=='__maim__':
     # only labels with selected class remain
     labels_train=labels_train[labels_train[label_type_to_augment]==selected_class_to_augment]
 
-    generator = ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
+    # augment images by SMOTE
+    # Make major class less presented
+    labels_train = pd.concat([labels_train[labels_train['class'] == 0],
+                              labels_train[labels_train['class'] == 1],
+                              labels_train[labels_train['class'] == 2].iloc[::8],
+                              labels_train[labels_train['class'] == 3].iloc[::8]
+                              ])
+    aug_images, aug_labels=generate_minority_samples_by_SMOTE(labels_train, ratio_for_minority_classes=10.)
+
+
+
+
+    # augment images by generator and affine transformations
+    '''generator = ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
                                            class_columns=['engagement', 'boredom'],
                                            num_classes=num_classes,
                                            horizontal_flip=0.5, vertical_flip=0,
@@ -95,6 +118,5 @@ if __name__=='__maim__':
             index+=1
         names=['image_%i'%(idx) for idx in range(counter, counter+batch_size, 1)]
         names=[os.path.join(output_path, names[i]) for i in range(len(names))]
-        counter+=batch_size
-
-
+        counter+=batch_size'''
+    a=1+2

@@ -3,6 +3,7 @@
 """
 TODO: write description of module
 """
+import gc
 import math
 import shutil
 import time
@@ -46,6 +47,7 @@ def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, sampling_
     images=images.reshape((images.shape[0],-1))
     labels=paths_with_labels['class'].values.reshape((-1,))
     images, labels = oversample_by_border_SMOTE(images, labels, sampling_strategy)
+    images=images.reshape((-1,)+image_shape)
     return images, labels
 
 def generate_several_times_data_by_SMOTE(paths_with_labels:pd.DataFrame, num_times:int,
@@ -62,7 +64,7 @@ def generate_several_times_data_by_SMOTE(paths_with_labels:pd.DataFrame, num_tim
         df_for_further_oversampling=pd.DataFrame(columns=paths_with_labels.columns)
         for class_num, values_in_class in num_classes_every_time.items():
             sampled_values=paths_with_labels[paths_with_labels['class']==class_num].sample(n=values_in_class)
-            df_for_further_oversampling.append(sampled_values)
+            df_for_further_oversampling=df_for_further_oversampling.append(sampled_values)
         df_for_further_oversampling=df_for_further_oversampling.sample(frac=1)
         images, labels = generate_minority_samples_by_SMOTE(df_for_further_oversampling, sampling_strategy='not majority')
         # save generated minority classes
@@ -70,11 +72,16 @@ def generate_several_times_data_by_SMOTE(paths_with_labels:pd.DataFrame, num_tim
             # create dir with such class
             os.makedirs(os.path.join(output_path, str(num_class_to_save)), exist_ok=True)
             # find out indexes of particular class
-            indices=labels.reshape((-1,))==num_classes_to_save
+            indices=labels.reshape((-1,))==num_class_to_save
+            indices=np.where(indices)[0]
             # save images
             for idx_to_save in indices:
                 save_image(img=images[idx_to_save], path_to_output=os.path.join(output_path, str(num_class_to_save), '%i.png'%counter[num_class_to_save]))
                 counter[num_class_to_save]+=1
+        del images
+        del labels
+        del df_for_further_oversampling
+        gc.collect()
 
 
 
@@ -113,11 +120,11 @@ if __name__=='__main__':
     # Make major class less presented
     labels_train=labels_train.drop(columns=['boredom', 'frustration', 'confusion'])
     labels_train.columns=['filename','class']
-    labels_train = pd.concat([labels_train[labels_train['class'] == 0],
+    '''labels_train = pd.concat([labels_train[labels_train['class'] == 0],
                               labels_train[labels_train['class'] == 1],
                               labels_train[labels_train['class'] == 2].iloc[::10],
                               labels_train[labels_train['class'] == 3].iloc[::10]
-                              ])
+                              ])'''
     generate_several_times_data_by_SMOTE(labels_train, num_times=10,
                                         num_classes_every_time={0:500, 1:700, 2:4000, 3:4000},
                                         output_path=r'C:\Databases\DAiSEE\train_preprocessed\SMOTE_images',

@@ -6,6 +6,7 @@ TODO: write description of module
 import math
 import shutil
 import time
+from collections import Counter
 from functools import partial
 from typing import Optional, Tuple, Dict, NamedTuple, Iterable, List
 
@@ -36,7 +37,7 @@ def save_batch_of_images(path_to_save:str, images:np.ndarray, names:List[str])->
     for i in range(images.shape[0]):
         save_image(images[i], path_to_output=names[i])
 
-def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, ratio_for_minority_classes:Dict[int, float])->Tuple[np.ndarray, np.ndarray]:
+def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, sampling_strategy)->Tuple[np.ndarray, np.ndarray]:
     # load all images
     image_shape=load_image(paths_with_labels['filename'].iloc[0]).shape
     images=np.zeros((paths_with_labels.shape[0],)+image_shape, dtype='uint8')
@@ -44,18 +45,38 @@ def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, ratio_for
         images[idx_df]=load_image(paths_with_labels.filename.iloc[idx_df])
     images=images.reshape((images.shape[0],-1))
     labels=paths_with_labels['class'].values.reshape((-1,))
-    images, labels = oversample_by_border_SMOTE(images, labels, ratio_for_minority_classes)
+    images, labels = oversample_by_border_SMOTE(images, labels, sampling_strategy)
     return images, labels
 
 def generate_several_times_data_by_SMOTE(paths_with_labels:pd.DataFrame, num_times:int,
-                                         num_classes_every_time:Dict[int, int], output_path:str)->None:
+                                         num_classes_every_time:Dict[int, int], output_path:str,
+                                         num_classes_to_save:Tuple[int,...])->None:
+    # create counters of generatred images
+    counter= Counter()
     # check if dir exists
     if not os.path.exists(output_path):
         os.makedirs(output_path, exist_ok=True)
     # iterate through num_times
     for time_idx in range(num_times):
         # sample classes from df
-        df_for_further_
+        df_for_further_oversampling=pd.DataFrame(columns=paths_with_labels.columns)
+        for class_num, values_in_class in num_classes_every_time.items():
+            sampled_values=paths_with_labels[paths_with_labels['class']==class_num].sample(n=values_in_class)
+            df_for_further_oversampling.append(sampled_values)
+        df_for_further_oversampling=df_for_further_oversampling.sample(frac=1)
+        images, labels = generate_minority_samples_by_SMOTE(df_for_further_oversampling, sampling_strategy='not majority')
+        # save generated minority classes
+        for num_class_to_save in num_classes_to_save:
+            # create dir with such class
+            os.makedirs(os.path.join(output_path, str(num_class_to_save)), exist_ok=True)
+            # find out indexes of particular class
+            indices=labels.reshape((-1,))==num_classes_to_save
+            # save images
+            for idx_to_save in indices:
+                save_image(img=images[idx_to_save], path_to_output=os.path.join(output_path, str(num_class_to_save), '%i.png'%counter[num_class_to_save]))
+                counter[num_class_to_save]+=1
+
+
 
 
 if __name__=='__main__':
@@ -97,9 +118,10 @@ if __name__=='__main__':
                               labels_train[labels_train['class'] == 2].iloc[::10],
                               labels_train[labels_train['class'] == 3].iloc[::10]
                               ])
-    aug_images, aug_labels=generate_minority_samples_by_SMOTE(labels_train, ratio_for_minority_classes={
-        0:10000,
-    })
+    generate_several_times_data_by_SMOTE(labels_train, num_times=10,
+                                        num_classes_every_time={0:500, 1:700, 2:4000, 3:4000},
+                                        output_path=r'C:\Databases\DAiSEE\train_preprocessed\SMOTE_images',
+                                        num_classes_to_save=(0, 1))
 
 
 

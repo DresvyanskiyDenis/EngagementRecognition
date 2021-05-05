@@ -36,18 +36,29 @@ def save_batch_of_images(path_to_save:str, images:np.ndarray, names:List[str])->
     for i in range(images.shape[0]):
         save_image(images[i], path_to_output=names[i])
 
-def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, ratio_for_minority_classes:float)->Tuple[np.ndarray, np.ndarray]:
+def generate_minority_samples_by_SMOTE(paths_with_labels:pd.DataFrame, ratio_for_minority_classes:Dict[int, float])->Tuple[np.ndarray, np.ndarray]:
     # load all images
     image_shape=load_image(paths_with_labels['filename'].iloc[0]).shape
-    images=np.zeros((paths_with_labels.shape[0],)+image_shape)
+    images=np.zeros((paths_with_labels.shape[0],)+image_shape, dtype='uint8')
     for idx_df in range(paths_with_labels.shape[0]):
         images[idx_df]=load_image(paths_with_labels.filename.iloc[idx_df])
     images=images.reshape((images.shape[0],-1))
-    labels=paths_with_labels['engagement'].values.reshape((-1,))
+    labels=paths_with_labels['class'].values.reshape((-1,))
     images, labels = oversample_by_border_SMOTE(images, labels, ratio_for_minority_classes)
     return images, labels
 
-if __name__=='__maim__':
+def generate_several_times_data_by_SMOTE(paths_with_labels:pd.DataFrame, num_times:int,
+                                         num_classes_every_time:Dict[int, int], output_path:str)->None:
+    # check if dir exists
+    if not os.path.exists(output_path):
+        os.makedirs(output_path, exist_ok=True)
+    # iterate through num_times
+    for time_idx in range(num_times):
+        # sample classes from df
+        df_for_further_
+
+
+if __name__=='__main__':
     # augment minority classes
     # params
     path_to_train_frames = r'C:\Databases\DAiSEE\train_preprocessed\extracted_faces'
@@ -75,23 +86,28 @@ if __name__=='__maim__':
     labels_train['boredom'] = labels_train['boredom'].astype('float32')
     labels_dev['engagement'] = labels_dev['engagement'].astype('float32')
     labels_dev['boredom'] = labels_dev['boredom'].astype('float32')
-    # only labels with selected class remain
-    labels_train=labels_train[labels_train[label_type_to_augment]==selected_class_to_augment]
+
 
     # augment images by SMOTE
     # Make major class less presented
+    labels_train=labels_train.drop(columns=['boredom', 'frustration', 'confusion'])
+    labels_train.columns=['filename','class']
     labels_train = pd.concat([labels_train[labels_train['class'] == 0],
                               labels_train[labels_train['class'] == 1],
-                              labels_train[labels_train['class'] == 2].iloc[::8],
-                              labels_train[labels_train['class'] == 3].iloc[::8]
+                              labels_train[labels_train['class'] == 2].iloc[::10],
+                              labels_train[labels_train['class'] == 3].iloc[::10]
                               ])
-    aug_images, aug_labels=generate_minority_samples_by_SMOTE(labels_train, ratio_for_minority_classes=10.)
+    aug_images, aug_labels=generate_minority_samples_by_SMOTE(labels_train, ratio_for_minority_classes={
+        0:10000,
+    })
 
 
 
 
     # augment images by generator and affine transformations
-    '''generator = ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
+    '''# only labels with selected class remain
+    labels_train=labels_train[labels_train[label_type_to_augment]==selected_class_to_augment]
+    generator = ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
                                            class_columns=['engagement', 'boredom'],
                                            num_classes=num_classes,
                                            horizontal_flip=0.5, vertical_flip=0,

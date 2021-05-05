@@ -16,9 +16,9 @@ import tensorflow as tf
 from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
-from keras_datagenerators import ImageDataLoader
-from keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
-from keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
+from tensorflow_utils.keras_datagenerators import ImageDataLoader
+from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
+from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.Losses import weighted_categorical_crossentropy
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \

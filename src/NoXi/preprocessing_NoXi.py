@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import os
 import cv2
-from PIL.Image import Image
+from PIL import Image
 
 from preprocessing.data_preprocessing.image_preprocessing_utils import save_image
 from preprocessing.data_preprocessing.video_preprocessing_utils import extract_frames_from_videofile
@@ -53,12 +53,12 @@ def extract_faces_from_video(path_to_video:str, path_to_output:str,
             if resize_face and resize_face[0]!=frame.shape[0] and resize_face[1]!=frame.shape[1]:
                 frame=Image.fromarray(frame).resize(resize_face)
             # save extracted face in png format
-            full_path_for_saving = os.path.join(path_to_output, 'frame_%i.png'%str(currentframe))
-            save_image(frame, path_to_output=full_path_for_saving)
+            full_path_for_saving = os.path.join(path_to_output, 'frame_%i.png'%currentframe)
+            frame.save(full_path_for_saving)
         else:
             break
 
-def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple[str], output_path:str)->None:
+def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple[str,...], output_path:str)->None:
     # TODO: TEST IT
     # check if output directory exists
     if not os.path.exists(output_path):
@@ -66,7 +66,7 @@ def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple
     # create face detector
     detector=load_and_prepare_detector_retinaFace()
     for input_path in relative_paths:
-        full_output_path=os.path.join(output_path,input_path)
+        full_output_path=os.path.join(output_path,input_path.split('.')[0])
         full_input_path=os.path.join(path_to_data, input_path)
         extract_faces_from_video(path_to_video=full_input_path, path_to_output=full_output_path,
         detector=detector, every_n_frame = 5, resize_face= (224, 224))
@@ -75,7 +75,9 @@ def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple
 
 if __name__=='__main__':
     # TODO: TEST IT
-    path_to_data=''
+    path_to_data=r'D:\Noxi_extracted\NoXi\Sessions'
     # form relative paths
-    relative_paths=[]
-    output_path=[]
+    relative_paths=os.listdir(path_to_data)
+    relative_paths=tuple(os.path.join(x, 'Expert_video.mp4') for x in relative_paths)
+    output_path=r'D:\Noxi_extracted\NoXi\extracted_faces'
+    extract_faces_from_all_videos_by_paths(path_to_data, relative_paths, output_path)

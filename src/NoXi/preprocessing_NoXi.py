@@ -77,7 +77,10 @@ if __name__=='__main__':
     # TODO: TEST IT
     path_to_data=r'D:\Noxi_extracted\NoXi\Sessions'
     # form relative paths
-    relative_paths=os.listdir(path_to_data)
-    relative_paths=tuple(os.path.join(x, 'Expert_video.mp4') for x in relative_paths)
+    relative_paths_expert=os.listdir(path_to_data)
+    relative_paths_expert=tuple(os.path.join(x, 'Expert_video.mp4') for x in relative_paths_expert)
+    relative_paths_novice=os.listdir(path_to_data)
+    relative_paths_novice=tuple(os.path.join(x, 'Novice_video.mp4') for x in relative_paths_novice)
+    relative_paths=relative_paths_expert+relative_paths_novice
     output_path=r'D:\Noxi_extracted\NoXi\extracted_faces'
     extract_faces_from_all_videos_by_paths(path_to_data, relative_paths, output_path)

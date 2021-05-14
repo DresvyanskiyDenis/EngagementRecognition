@@ -16,7 +16,7 @@ import tensorflow as tf
 from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
-from tensorflow_utils.keras_datagenerators import ImageDataLoader
+from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
@@ -155,18 +155,18 @@ if __name__ == '__main__':
     resize=(224,224)
     extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
     # params
-    path_to_train_frames=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\extracted_faces'
-    path_to_train_labels=r'E:\Databases\DAiSEE\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev_frames=r'E:\Databases\DAiSEE\DAiSEE\dev_processed\extracted_faces'
-    path_to_dev_labels=r'E:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_train_frames=r'C:\Databases\DAiSEE\train_preprocessed\extracted_faces'
+    path_to_train_labels=r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev_frames=r'C:\Databases\DAiSEE\dev_preprocessed\extracted_faces'
+    path_to_dev_labels=r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
     '''output_path=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
     sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
                                       path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
     num_classes=4
     batch_size=64
-    epochs=50
-    highest_lr=0.0005
+    epochs=30
+    highest_lr=0.0001
     lowest_lr = 0.00001
     momentum=0.9
     output_path='results'
@@ -195,14 +195,34 @@ if __name__ == '__main__':
     # add augmentation data and delete all non-engagement class values
     labels_train=labels_train.drop(columns=['boredom', 'confusion','frustration'])
     labels_dev = labels_dev.drop(columns=['boredom', 'confusion', 'frustration'])
-    """class_0_augmented=generate_paths_with_labels_from_directory(path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\augmentation\engagement\0',
+
+    # add augmented images
+    class_0_augmented=generate_paths_with_labels_from_directory(path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\augmentation\engagement\0',
                                                                 class_name='engagement',
                                                                 class_value=0)
     class_1_augmented = generate_paths_with_labels_from_directory(
         path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\augmentation\engagement\1',
         class_name='engagement',
         class_value=1)
-    labels_train=pd.concat([labels_train, class_0_augmented, class_1_augmented], axis=0)"""
+    labels_train=pd.concat([labels_train, class_0_augmented, class_1_augmented], axis=0)
+    # add SMOTE images
+    class_0_SMOTE=generate_paths_with_labels_from_directory(path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\SMOTE_images\0',
+                                                                class_name='engagement',
+                                                                class_value=0)
+    class_1_SMOTE = generate_paths_with_labels_from_directory(
+        path_to_dir=r'C:\Databases\DAiSEE\train_preprocessed\SMOTE_images\1',
+        class_name='engagement',
+        class_value=1)
+    labels_train = pd.concat([labels_train, class_0_SMOTE, class_1_SMOTE], axis=0)
+    # turn 4-class task into 2-class task
+    labels_train.loc[(labels_train['engagement'] == 1),'engagement'] = 0
+    labels_train.loc[(labels_train['engagement'] == 2),'engagement'] = 1
+    labels_train.loc[(labels_train['engagement'] == 3),'engagement'] = 1
+
+    labels_dev.loc[(labels_dev['engagement'] == 1),'engagement'] = 0
+    labels_dev.loc[(labels_dev['engagement'] == 2),'engagement'] = 1
+    labels_dev.loc[(labels_dev['engagement'] == 3),'engagement'] = 1
+    num_classes = 2
 
     # class weights
     class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
@@ -235,26 +255,26 @@ if __name__ == '__main__':
                             labels_train[labels_train['class'] == 2].iloc[::5],
                             labels_train[labels_train['class'] == 3].iloc[::5]
                             ])'''
-    labels_train=labels_train.iloc[:640]
-    labels_dev = labels_dev.iloc[:640]
+    #labels_train=labels_train.iloc[:640]
+    #labels_dev = labels_dev.iloc[:640]
     labels_train.columns=['filename', 'class']
     labels_dev.columns = ['filename', 'class']
     # create generators
-    train_gen=ImageDataPreprocessor(paths_with_labels=labels_train, batch_size=batch_size,
+    train_gen=ImageDataLoader(paths_with_labels=labels_train, batch_size=batch_size,
                                          #class_columns=['engagement','boredom', 'confusion', 'frustration'],
                               preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
-                 horizontal_flip= 0.1, vertical_flip= 0,
-                 shift= 0.1,
-                 brightness= 0.1, shearing= 0.1, zooming= 0.1,
-                 random_cropping_out = 0.1, rotation = 0.1,
+                 horizontal_flip= 0.05, vertical_flip= 0,
+                 shift= 0.05,
+                 brightness= 0.05, shearing= 0.05, zooming= 0.05,
+                 random_cropping_out = 0.05, rotation = 0.05,
                  scaling= None,
-                 channel_random_noise= 0.1, bluring= 0.1,
-                 worse_quality= 0.1,
-                 mixup = 0.5,
+                 channel_random_noise= 0.05, bluring= 0.05,
+                 worse_quality= 0.05,
+                 mixup = 0.3,
                  pool_workers=12)
 
-    dev_gen=ImageDataPreprocessor(paths_with_labels=labels_dev, batch_size=batch_size,
+    dev_gen=ImageDataLoader(paths_with_labels=labels_dev, batch_size=batch_size,
                                        #class_columns=['engagement','boredom', 'confusion', 'frustration'],
                             preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
@@ -270,13 +290,13 @@ if __name__ == '__main__':
     # create model
     model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,),
                                        dropout=0.5,
-                                       regularization=tf.keras.regularizers.l1_l2(0.0001),
+                                       regularization=tf.keras.regularizers.l2(0.0001),
                                        output_neurons=(num_classes,), pooling_at_the_end='avg',
                                        pretrained= True,
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
     # freeze model
-    for i in range(141):
-        model.layers[i].trainable=False
+    #for i in range(141):
+    #    model.layers[i].trainable=False
     model.summary()
     # create logger
     logger = open(os.path.join(output_path, 'val_logs.txt'), mode='w')
@@ -297,7 +317,7 @@ if __name__ == '__main__':
                                                                         #num_label_types=4,
                                                                         num_metric_to_set_weights=0,
                                                                         logger=logger),
-               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 50)]
+               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 30)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     # make weighted losses for model
@@ -309,7 +329,7 @@ if __name__ == '__main__':
     losses=tf.keras.losses.categorical_crossentropy
     tf.keras.utils.plot_model(model, 'model.png')
     model=train_model(train_gen, model, optimizer, losses, epochs,
-                      None, metrics, callbacks, path_to_save_results='results')
+                      None, metrics, callbacks, path_to_save_results='results', class_weights=class_weights_engagement)
     model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
     logger.close()

@@ -4,11 +4,14 @@
 TODO: add description
 """
 import os
+import re
 import time
 from typing import Optional, Tuple, Callable
 
 import tensorflow as tf
 import numpy as np
+import cv2
+from PIL import Image
 
 from feature_extraction.embeddings_extraction import extract_deep_embeddings_from_images_in_dir
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
@@ -19,62 +22,71 @@ from preprocessing.face_recognition_utils import recognize_the_most_confident_pe
 from tensorflow_utils.models.CNN_models import get_EMO_VGGFace2
 
 
-def extract_faces_from_dir(path_to_dir:str, output_dir:str,detector:object, resize:Optional[Tuple[int,int]])->None:
-    # TODO: add description
-    # get filenames of all images in dir
-    image_filenames=os.listdir(path_to_dir)
-    # create, if necessary, output dir
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-    # extract faces from each image
-    for image_filename in image_filenames:
-        # load image by PIL.Image
-        img=load_image(os.path.join(path_to_dir,image_filename))
-        # calculate bounding boxes for the most confident person via provided detector
-        bbox=recognize_the_most_confident_person_retinaFace(img, detector)
-        bbox=tuple(max(0, _) for _ in bbox)
-        if bbox is None or len(bbox)==0:
+def extract_faces_from_video(path_to_video:str, path_to_output:str,
+                             detector:object, every_n_frame:int=1,
+                             resize_face:Tuple[int, int]=(224,224))->None:
+    # TODO: TEST IT
+    # TODO: write description
+    # check if output directory exists
+    if not os.path.exists(path_to_output):
+        os.makedirs(path_to_output, exist_ok=True)
+    # open videofile
+    videofile = cv2.VideoCapture(path_to_video)
+    # counter for frames. It equals to -1, because we will start right from 0 (see below)
+    currentframe=-1
+    filename=re.split(r'\\|/',path_to_video)[-1].split('.')[0]
+    while (True):
+        # reading from frame
+        ret, frame = videofile.read()
+        currentframe += 1
+        # if currentframe is not integer divisible by every_frame, skip it
+        if not currentframe % every_n_frame == 0:
             continue
-        # extract face from image according bbox
-        face_img=extract_face_according_bbox(img, bbox) # it is in RGB format now
-        # resize if needed
-        if not resize is None:
-            face_img=resize_image(face_img, resize)
-        # save
-        save_image(face_img, path_to_output=os.path.join(output_dir, image_filename))
+        if ret:
+            # convert to RGB, because opencv reads in BGR format
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # if video is still left continue detect face and save it
+            frame=np.array(frame)
+            # recognize the face (as the most confident on frame) and get bounding box for it
+            bbox=recognize_the_most_confident_person_retinaFace(frame, detector)
+            # if no face was found
+            if len(bbox)==0:
+                continue
+            # extract face from image according to boundeng box
+            frame=extract_face_according_bbox(frame, bbox)
+            # resize if needed
+            if resize_face and resize_face[0]!=frame.shape[0] and resize_face[1]!=frame.shape[1]:
+                frame=Image.fromarray(frame).resize(resize_face)
+            # save extracted face in png format
+            full_path_for_saving = os.path.join(path_to_output, filename, '%s_%i.png'%(filename,currentframe))
+            frame.save(full_path_for_saving)
+        else:
+            break
+
+
 
 
 def extract_faces_from_all_subdirectories_in_directory(path_to_dir:str, path_to_output:str,
                                                        resize:Optional[Tuple[int,int]])-> None:
-    # TODO: add description
-    # get subdirectories from provided dir
-    subdirectories=os.listdir(path_to_dir)
-    # load retinaFace face detector
-    detector=load_and_prepare_detector_retinaFace('retinaface_mnet025_v2')
-    # create output path, if it is not existed
     if not os.path.exists(path_to_output):
-        os.makedirs(path_to_output, exist_ok=True)
-    # go over all subdirectories
+        os.makedirs(path_to_output)
+    # create face detector
+    detector = load_and_prepare_detector_retinaFace()
+    subdirectories=os.listdir(path_to_dir)
     counter=0
-    overall=len(subdirectories)
-    for subdirectory in subdirectories:
-        # inside every subdirectory the subdirectory_frames subsubdirectory is localed. There are frames extracted
-        # from video and we need to extract faces from every image
-        # construct subdirectory_with_frames variable, which is name of subsubdirectory
-        subdirectory_with_frames=subdirectory+'_frames'
-        # create name of directory and the directory itself, in which the faces of images will be extracted
-        output_dir_name=os.path.join(path_to_output, subdirectory)
-        if not os.path.exists(output_dir_name):
-            os.makedirs(output_dir_name, exist_ok=True)
-        else:
-            counter += 1
-            continue
-        # extract faces from defined subdirectory
-        start=time.time()
-        extract_faces_from_dir(path_to_dir=os.path.join(path_to_dir, subdirectory, subdirectory_with_frames),
-                               output_dir=output_dir_name, detector=detector, resize=resize)
-        print('processed:%i, overall:%i, time:%f'%(counter, overall, time.time()-start))
+    for subdir in subdirectories:
+        subsubdirs=os.listdir(os.path.join(path_to_dir, subdir))
+        # iterate through subsubdirs
+        for subsubdir in subsubdirs:
+            full_path_to_videofilename=os.path.join(path_to_dir, subdir, subsubdir, subsubdir+'.avi')
+            full_output_path=os.path.join(path_to_output, subsubdir)
+            if not os.path.exists(full_output_path):
+                os.makedirs(full_output_path, exist_ok=True)
+            extract_faces_from_video(path_to_video=full_path_to_videofilename, path_to_output=path_to_output,
+            detector=detector, every_n_frame=5, resize_face=resize)
+        print('subdirectory number %i processed. Remains:%i.'%(counter, len(subdirectories)-counter))
         counter+=1
+
 
 def extract_deep_embeddings_from_all_dirs(path_to_dirs:str, extractor:tf.keras.Model,
                                           preprocessing_functions:Tuple[Callable[[np.ndarray], np.ndarray], ...]=None,
@@ -106,13 +118,18 @@ def extract_deep_embeddings_from_all_dirs(path_to_dirs:str, extractor:tf.keras.M
 
 
 if __name__=='__main__':
-    # just for testing
-    path_to_images=r'D:\Databases\DAiSEE\DAiSEE\train_preprocessed\extracted_faces'
+    path_to_data=r"E:\Databases\DAiSEE\DAiSEE\DataSet\Test"
+    path_to_output=r"E:\Databases\DAiSEE\DAiSEE\test_preprocessed"
+    extract_faces_from_all_subdirectories_in_directory(path_to_dir=path_to_data, path_to_output=path_to_output, resize=(224,224))
+    '''# just for testing
+    path_to_images=r'D:\\Databases\\DAiSEE\\DAiSEE\\train_preprocessed\extracted_faces'
     # create model
-    model=get_EMO_VGGFace2(path=r'C:\Users\Dresvyanskiy\Desktop\Projects\EMOVGGFace_model\weights_0_66_37_affectnet_cat.h5')
+    model=get_EMO_VGGFace2(path='C:\\Users\\Dresvyanskiy\\Desktop\\Projects\\EMOVGGFace_model\\weights_0_66_37_affectnet_cat.h5')
     emb_layer=model.get_layer('dense')
     model=tf.keras.Model(inputs=model.inputs, outputs=[emb_layer.output])
     model.compile()
     extract_deep_embeddings_from_all_dirs(path_to_dirs=path_to_images, extractor=model,
                                           preprocessing_functions=(VGGFace2_normalization,),
-                                          output_path=r'D:\Databases\DAiSEE\DAiSEE')
+                                          output_path='D:\\Databases\\DAiSEE\\DAiSEE')
+    '''
+    pass

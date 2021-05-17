@@ -55,7 +55,7 @@ def extract_faces_from_video(path_to_video:str, path_to_output:str,
             # extract face from image according to boundeng box
             frame=extract_face_according_bbox(frame, bbox)
             # resize if needed
-            if resize_face and resize_face[0]!=frame.shape[0] and resize_face[1]!=frame.shape[1]:
+            if resize_face:
                 frame=Image.fromarray(frame).resize(resize_face)
             # save extracted face in png format
             full_path_for_saving = os.path.join(path_to_output, filename, '%s_%i.jpg'%(filename,currentframe))

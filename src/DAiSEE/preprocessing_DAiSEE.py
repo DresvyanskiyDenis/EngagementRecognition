@@ -7,7 +7,6 @@ import os
 import re
 import time
 from typing import Optional, Tuple, Callable
-
 import tensorflow as tf
 import numpy as np
 import cv2
@@ -31,6 +30,8 @@ def extract_faces_from_video(path_to_video:str, path_to_output:str,
     if not os.path.exists(path_to_output):
         os.makedirs(path_to_output, exist_ok=True)
     # open videofile
+    if not os.path.exists(path_to_video):
+        path_to_video=path_to_video.split('.')[0]+'.mp4'
     videofile = cv2.VideoCapture(path_to_video)
     # counter for frames. It equals to -1, because we will start right from 0 (see below)
     currentframe=-1
@@ -49,6 +50,7 @@ def extract_faces_from_video(path_to_video:str, path_to_output:str,
             frame=np.array(frame)
             # recognize the face (as the most confident on frame) and get bounding box for it
             bbox=recognize_the_most_confident_person_retinaFace(frame, detector)
+            bbox=[0 if bbox_element<0 else bbox_element for bbox_element in bbox]
             # if no face was found
             if len(bbox)==0:
                 continue
@@ -80,6 +82,8 @@ def extract_faces_from_all_subdirectories_in_directory(path_to_dir:str, path_to_
         for subsubdir in subsubdirs:
             full_path_to_videofilename=os.path.join(path_to_dir, subdir, subsubdir, subsubdir+'.avi')
             full_output_path=os.path.join(path_to_output, subsubdir)
+            if os.path.exists(full_output_path):
+                continue
             if not os.path.exists(full_output_path):
                 os.makedirs(full_output_path, exist_ok=True)
             extract_faces_from_video(path_to_video=full_path_to_videofilename, path_to_output=path_to_output,

@@ -111,7 +111,7 @@ def extract_deep_embeddings_from_all_dirs(path_to_dirs:str, extractor:tf.keras.M
         curr_df=extract_deep_embeddings_from_images_in_dir(path_to_dir=os.path.join(path_to_dirs, subdirs[subdir_idx]),
                                                          extractor=extractor,
                                                          preprocessing_functions=preprocessing_functions)
-        result_df.append(curr_df)
+        result_df=result_df.append(curr_df)
         end_time=time.time()
         print('Subdirectory %s is processed. Time: %f. Remains:%i'%(subdirs[subdir_idx], end_time-start_time, len(subdirs)-1-counter))
         counter+=1

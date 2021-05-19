@@ -104,6 +104,7 @@ def extract_deep_embeddings_from_all_dirs(path_to_dirs:str, extractor:tf.keras.M
     result_df=extract_deep_embeddings_from_images_in_dir(path_to_dir=os.path.join(path_to_dirs, subdirs[0]),
                                                          extractor=extractor,
                                                          preprocessing_functions=preprocessing_functions)
+    result_df.to_csv(os.path.join(output_path, 'deep_embeddings_from_EMOVGGFace2.csv'), index=False)
     # iterate through all subdirectories
     counter=0
     for subdir_idx in range(1, len(subdirs)):
@@ -111,29 +112,28 @@ def extract_deep_embeddings_from_all_dirs(path_to_dirs:str, extractor:tf.keras.M
         curr_df=extract_deep_embeddings_from_images_in_dir(path_to_dir=os.path.join(path_to_dirs, subdirs[subdir_idx]),
                                                          extractor=extractor,
                                                          preprocessing_functions=preprocessing_functions)
-        result_df=result_df.append(curr_df)
+        curr_df.to_csv(os.path.join(output_path,'deep_embeddings_from_EMOVGGFace2.csv'), index=False, header=False, mode='a')
         end_time=time.time()
         print('Subdirectory %s is processed. Time: %f. Remains:%i'%(subdirs[subdir_idx], end_time-start_time, len(subdirs)-1-counter))
         counter+=1
     # save obtained dataframe
-    result_df.to_csv(os.path.join(output_path,'deep_embeddings_from_EMOVGGFace2.csv'), index=False)
+    #result_df.to_csv(os.path.join(output_path,'deep_embeddings_from_EMOVGGFace2.csv'), index=False)
 
 
 
 
 if __name__=='__main__':
-    path_to_data=r"E:\Databases\DAiSEE\DAiSEE\DataSet\Test"
+    """path_to_data=r"E:\Databases\DAiSEE\DAiSEE\DataSet\Test"
     path_to_output=r"E:\Databases\DAiSEE\DAiSEE\test_preprocessed"
-    extract_faces_from_all_subdirectories_in_directory(path_to_dir=path_to_data, path_to_output=path_to_output, resize=(224,224))
-    '''# just for testing
-    path_to_images=r'D:\\Databases\\DAiSEE\\DAiSEE\\train_preprocessed\extracted_faces'
+    extract_faces_from_all_subdirectories_in_directory(path_to_dir=path_to_data, path_to_output=path_to_output, resize=(224,224))"""
+    # just for testing
+    path_to_images=r'E:\\Databases\\DAiSEE\\DAiSEE\\train_preprocessed\extracted_faces'
     # create model
-    model=get_EMO_VGGFace2(path='C:\\Users\\Dresvyanskiy\\Desktop\\Projects\\EMOVGGFace_model\\weights_0_66_37_affectnet_cat.h5')
+    model=get_EMO_VGGFace2(path=r'C:\Users\Denis\PycharmProjects\EMOVGGFace2_model\weights_0_66_37_affectnet_cat.h5')
     emb_layer=model.get_layer('dense')
     model=tf.keras.Model(inputs=model.inputs, outputs=[emb_layer.output])
     model.compile()
     extract_deep_embeddings_from_all_dirs(path_to_dirs=path_to_images, extractor=model,
                                           preprocessing_functions=(VGGFace2_normalization,),
-                                          output_path='D:\\Databases\\DAiSEE\\DAiSEE')
-    '''
+                                          output_path='E:\\Databases\\DAiSEE\\DAiSEE')
     pass

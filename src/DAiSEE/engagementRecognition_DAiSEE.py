@@ -7,7 +7,7 @@ import math
 import shutil
 import time
 from functools import partial
-from typing import Optional, Tuple, Dict, NamedTuple, Iterable, List
+from typing import Optional, Tuple, Dict, NamedTuple, Iterable, List, Union
 
 import numpy as np
 import pandas as pd
@@ -16,13 +16,14 @@ import tensorflow as tf
 from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
+from tensorflow_utils.Layers import Non_local_block_multi_head
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.Losses import weighted_categorical_crossentropy
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, validation_with_generator_callback_multilabel
-from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
+from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model, _get_pretrained_VGGFace2_model
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
 from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
@@ -109,15 +110,55 @@ def form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_data:str, 
     return df_with_relative_paths_and_labels
 
 
-def tmp_model(input_shape)->tf.keras.Model:
-    model_tmp=tf.keras.applications.mobilenet_v2.MobileNetV2(input_shape=input_shape,include_top=False,
-                                                             weights='imagenet', pooling='avg')
-    x=tf.keras.layers.Dense(512, activation="relu", kernel_regularizer=tf.keras.regularizers.l1_l2(0.0001))(model_tmp.output)
-    x = tf.keras.layers.Dropout(0.4)(x)
-    x = tf.keras.layers.Dense(128, activation="relu", kernel_regularizer=tf.keras.regularizers.l1_l2(0.0001))(x)
-    x = tf.keras.layers.Dense(4, activation="softmax")(x)
-    result_model=tf.keras.Model(inputs=model_tmp.inputs, outputs=[x])
-    return result_model
+def get_modified_VGGFace2_resnet_model(dense_neurons_after_conv: Tuple[int,...],
+                                       dropout: float = 0.3,
+                                       regularization:Optional[tf.keras.regularizers.Regularizer]=None,
+                                       output_neurons: Union[Tuple[int,...], int] = 7, pooling_at_the_end: Optional[str] = None,
+                                       pretrained: bool = True,
+                                       path_to_weights: Optional[str] = None,
+                                       multi_head_attention:bool=True) -> tf.keras.Model:
+    pretrained_VGGFace2 = _get_pretrained_VGGFace2_model(path_to_weights, pretrained=pretrained)
+    x=pretrained_VGGFace2.get_layer('activation_48').output
+    if multi_head_attention:
+        x = Non_local_block_multi_head(num_heads=4,  output_channels=1024,
+                 head_output_channels=None,
+                 downsize_factor=8,
+                 shortcut_connection=True)(x)
+    # take pooling or not
+    if pooling_at_the_end is not None:
+        if pooling_at_the_end=='avg':
+            x=tf.keras.layers.GlobalAveragePooling2D()(x)
+        elif pooling_at_the_end=='max':
+            x=tf.keras.layers.GlobalMaxPooling2D()(x)
+        else:
+            raise AttributeError('Parameter pooling_at_the_end can be either \'avg\' or \'max\'. Got %s.'%(pooling_at_the_end))
+    # create Dense layers
+    for dense_layer_idx in range(len(dense_neurons_after_conv)-1):
+        num_neurons_on_layer=dense_neurons_after_conv[dense_layer_idx]
+        x = tf.keras.layers.Dense(num_neurons_on_layer, activation='relu', kernel_regularizer=regularization)(x)
+        if dropout:
+            x = tf.keras.layers.Dropout(dropout)(x)
+    # pre-last Dense layer
+    num_neurons_on_layer=dense_neurons_after_conv[-1]
+    x = tf.keras.layers.Dense(num_neurons_on_layer, activation='relu')(x)
+    # If outputs should be several, then create several layers, otherwise one
+    if isinstance(output_neurons, tuple):
+        output_layers=[]
+        for num_output_neurons in output_neurons:
+            if dropout:
+                output_layer_i = tf.keras.layers.Dropout(dropout)(x)
+            output_layer_i = tf.keras.layers.Dense(128, activation='relu')(output_layer_i)
+            output_layer_i=tf.keras.layers.Dense(num_output_neurons, activation='softmax')(output_layer_i)
+            #output_layer_i=tf.keras.layers.Reshape((-1, 1))(output_layer_i)
+            output_layers.append(output_layer_i)
+    else:
+        output_layers = tf.keras.layers.Dense(output_neurons, activation='softmax')(x)
+        # in tf.keras.Model it should be always a list (even when it has only 1 element)
+        output_layers = [output_layers]
+    # create model
+    model=tf.keras.Model(inputs=pretrained_VGGFace2.inputs, outputs=output_layers)
+    del pretrained_VGGFace2
+    return model
 
 
 def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:tf.keras.Model,
@@ -296,7 +337,7 @@ if __name__ == '__main__':
                                        pretrained= True,
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
     # freeze model
-    for i in range(len(model.layers)-8):
+    for i in range(141):
         model.layers[i].trainable=False
     model.summary()
     # create logger

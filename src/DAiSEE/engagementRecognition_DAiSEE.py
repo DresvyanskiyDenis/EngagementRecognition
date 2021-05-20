@@ -124,6 +124,7 @@ def get_modified_VGGFace2_resnet_model(dense_neurons_after_conv: Tuple[int,...],
                  head_output_channels=None,
                  downsize_factor=8,
                  shortcut_connection=True)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
     # take pooling or not
     if pooling_at_the_end is not None:
         if pooling_at_the_end=='avg':

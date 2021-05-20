@@ -21,8 +21,7 @@ from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import Ima
 from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.Losses import weighted_categorical_crossentropy
-from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
-    validation_with_generator_callback, validation_with_generator_callback_multilabel
+from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, validation_with_generator_callback_multilabel
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
@@ -128,12 +127,13 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
                 metrics:List[tf.keras.metrics.Metric],
                 callbacks:List[tf.keras.callbacks.Callback],
                 path_to_save_results:str,
-                class_weights:Optional[Dict[int,float]]=None)->tf.keras.Model:
+                class_weights:Optional[Dict[int,float]]=None,
+                loss_weights:Optional[Dict['str', float]]=None)->tf.keras.Model:
     # create directory for saving results
     if not os.path.exists(path_to_save_results):
         os.makedirs(path_to_save_results)
     # compile model
-    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+    model.compile(optimizer=optimizer, loss=loss, metrics=metrics, loss_weights=loss_weights)
     model.fit(train_generator, epochs=epochs, callbacks=callbacks, validation_data=val_generator, verbose=2,
               class_weight=class_weights)
     return model
@@ -255,7 +255,7 @@ if __name__ == '__main__':
                             labels_train[labels_train['class'] == 2].iloc[::5],
                             labels_train[labels_train['class'] == 3].iloc[::5]
                             ])'''
-    #labels_train=labels_train.iloc[:640]
+    #labels_train=labels_train.iloc[:6400]
     #labels_dev = labels_dev.iloc[:640]
     # if we use ImageDataLoader, not multilabel
     #labels_train.columns=['filename', 'class']
@@ -296,7 +296,7 @@ if __name__ == '__main__':
                                        pretrained= True,
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
     # freeze model
-    for i in range(141):
+    for i in range(len(model.layers)-8):
         model.layers[i].trainable=False
     model.summary()
     # create logger
@@ -312,25 +312,31 @@ if __name__ == '__main__':
                  'Loss:%s\n'%
                  (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-    callbacks=[validation_with_generator_callback(dev_gen, metrics=(partial(f1_score, average='macro'),
+    callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
-                                                                        #num_label_types=4,
-                                                                        num_metric_to_set_weights=0,
+                                                                        num_label_types=4,
+                                                                        num_metric_to_set_weights=1,
                                                                         logger=logger),
                get_annealing_LRreduce_callback(highest_lr, lowest_lr, 30)]
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
     # make weighted losses for model
-    '''losses = {'dense_2':weighted_categorical_crossentropy(class_weights_engagement)
-              #'dense_4': weighted_categorical_crossentropy(class_weights_boredom),
-              #'dense_6': weighted_categorical_crossentropy(class_weights_confusion),
-              #'dense_8': weighted_categorical_crossentropy(class_weights_frustration)
-    }'''
-    losses=tf.keras.losses.categorical_crossentropy
+    losses = {'dense_2':tf.keras.losses.categorical_crossentropy,
+              'dense_4':tf.keras.losses.categorical_crossentropy,
+              'dense_6':tf.keras.losses.categorical_crossentropy,
+              'dense_8':tf.keras.losses.categorical_crossentropy
+    }
+    loss_weights={
+        'dense_2': 1.0,
+        'dense_4': 0.33,
+        'dense_6': 0.33,
+        'dense_8': 0.33
+    }
+    #losses=tf.keras.losses.categorical_crossentropy
     tf.keras.utils.plot_model(model, 'model.png')
     model=train_model(train_gen, model, optimizer, losses, epochs,
-                      None, metrics, callbacks, path_to_save_results='results')
+                      None, metrics, callbacks, path_to_save_results='results', loss_weights=loss_weights)
     model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
     logger.close()

@@ -193,7 +193,7 @@ if __name__ == '__main__':
     sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
                                       path_to_labels=path_to_dev_labels)'''
     input_shape = (224, 224, 3)
-    num_classes = 4
+    num_classes = 2
     batch_size = 64
     epochs = 30
     highest_lr = 0.0001
@@ -316,8 +316,9 @@ if __name__ == '__main__':
                             labels_train[labels_train['class'] == 2].iloc[::5],
                             labels_train[labels_train['class'] == 3].iloc[::5]
                             ])'''
-    # labels_train=labels_train.iloc[:6400]
-    # labels_dev = labels_dev.iloc[:640]
+    labels_dev=labels_train.sample(frac=1)
+    labels_train=labels_train.iloc[:640]
+    labels_dev = labels_dev.iloc[:640]
     # if we use ImageDataLoader, not multilabel
     # labels_train.columns=['filename', 'class']
     # labels_dev.columns = ['filename', 'class']
@@ -334,7 +335,7 @@ if __name__ == '__main__':
                                            scaling=None,
                                            channel_random_noise=0.1, bluring=0.1,
                                            worse_quality=0.1,
-                                           mixup=0.4,
+                                           mixup=None,
                                            pool_workers=12)
 
     dev_gen = ImageDataLoader_multilabel(paths_with_labels=labels_dev, batch_size=batch_size,
@@ -348,7 +349,7 @@ if __name__ == '__main__':
                                          scaling=None,
                                          channel_random_noise=0, bluring=0,
                                          worse_quality=0,
-                                         mixup=0,
+                                         mixup=None,
                                          pool_workers=8)
     # create model
     model = get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(128,),
@@ -357,6 +358,8 @@ if __name__ == '__main__':
                                                output_neurons=(num_classes, num_classes, num_classes, num_classes),
                                                pretrained=True,
                                                path_to_weights=r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
+
+
     # freeze model
     for i in range(141):
         model.layers[i].trainable = False

@@ -23,7 +23,7 @@ from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDat
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.Losses import weighted_categorical_crossentropy
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
-    validation_with_generator_callback_multilabel
+    validation_with_generator_callback_multioutput_same_labeltype
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model, _get_pretrained_VGGFace2_model
 
 """from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, save_image, resize_image
@@ -196,7 +196,7 @@ if __name__ == '__main__':
     num_classes = 2
     batch_size = 64
     epochs = 30
-    highest_lr = 0.0001
+    highest_lr = 0.0005
     lowest_lr = 0.00001
     momentum = 0.9
     output_path = 'results'
@@ -316,9 +316,9 @@ if __name__ == '__main__':
                             labels_train[labels_train['class'] == 2].iloc[::5],
                             labels_train[labels_train['class'] == 3].iloc[::5]
                             ])'''
-    labels_dev=labels_train.sample(frac=1)
-    labels_train=labels_train.iloc[:640]
-    labels_dev = labels_dev.iloc[:640]
+    #labels_dev=labels_train.sample(frac=1)
+    #labels_train=labels_train.iloc[:640]
+    #labels_dev = labels_dev.iloc[:640]
     # if we use ImageDataLoader, not multilabel
     # labels_train.columns=['filename', 'class']
     # labels_dev.columns = ['filename', 'class']
@@ -361,7 +361,7 @@ if __name__ == '__main__':
 
 
     # freeze model
-    for i in range(141):
+    for i in range(141):# end of 5th block - 172 (activation), end of 4th block - 141
         model.layers[i].trainable = False
     model.summary()
     tf.keras.utils.plot_model(model, show_shapes=True)
@@ -378,11 +378,11 @@ if __name__ == '__main__':
                  'Loss:%s\n' %
                  (epochs, highest_lr, lowest_lr, optimizer, loss))
     # create callbacks
-    callbacks = [validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
+    callbacks = [validation_with_generator_callback_multioutput_same_labeltype(dev_gen, metrics=(partial(f1_score, average='macro'),
                                                                                  accuracy_score,
                                                                                  partial(recall_score,
                                                                                          average='macro')),
-                                                               num_label_types=4,
+                                                                num_outputs=4,
                                                                num_metric_to_set_weights=1,
                                                                logger=logger),
                  get_annealing_LRreduce_callback(highest_lr, lowest_lr, 30)]
@@ -401,9 +401,8 @@ if __name__ == '__main__':
         'dense_7': 1.0
     }
     # losses=tf.keras.losses.categorical_crossentropy
-    tf.keras.utils.plot_model(model, 'model.png')
+    tf.keras.utils.plot_model(model, 'results\\model.png')
     model = train_model(train_gen, model, optimizer, losses, epochs,
                         None, metrics, callbacks, path_to_save_results='results', loss_weights=loss_weights)
-    model.save("results\\model.h5")
     model.save_weights("results\\model_weights.h5")
-    logger.close()
+    model.save("results\\model.h5")

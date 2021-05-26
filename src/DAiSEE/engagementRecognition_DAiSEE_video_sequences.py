@@ -207,7 +207,7 @@ if __name__ == '__main__':
                                       path_to_labels=path_to_dev_labels)'''
     input_shape=(224,224,3)
     num_classes=4
-    batch_size=64
+    batch_size=8
     epochs=30
     highest_lr=0.0001
     lowest_lr = 0.00001
@@ -306,7 +306,11 @@ if __name__ == '__main__':
     # create generators
     # change labels_tran for class VideoSequenceLoader
     labels_train[['filename', 'frame_num']] = labels_train['filename'].str.rsplit('_',1, expand=True)
-    labels_train['frame_num']=labels_train['frame_num'].str.split('.')[0]
+    labels_train['frame_num']=labels_train['frame_num'].apply(lambda x: x.split('.')[0])
+    labels_train = labels_train.drop(columns=['boredom', 'confusion', 'frustration'])
+    labels_train=labels_train[['filename', 'frame_num', 'engagement']]
+    labels_train.columns=['filename', 'frame_num', 'class']
+    labels_train['frame_num']=labels_train['frame_num'].astype('int32')
 
     train_gen=VideoSequenceLoader(paths_with_labels=labels_train, batch_size=batch_size,
                                   num_frames_in_seq=20, proportion_of_intersection=0.5,
@@ -319,11 +323,11 @@ if __name__ == '__main__':
                  scaling= None,
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
-                 num_pool_workers=12)
+                 num_pool_workers=2)
 
     for x,y in train_gen:
         print(x.shape)
-        print(y)
+        print(y.shape)
 
 
 

@@ -115,7 +115,7 @@ def construct_model(input_shape:Tuple[int,...],path_to_VGGFace_weights:str, num_
     pretrained_VGGFace2 = _get_pretrained_VGGFace2_model(path_to_VGGFace_weights, pretrained=True)
     # stack on top of it non-local block (multi-head local attention)
     x = pretrained_VGGFace2.get_layer('activation_48').output # output from last resnet block
-    x = Non_local_block_multi_head(num_heads=4,  output_channels=512,
+    x = Non_local_block_multi_head(num_heads=4,  output_channels=1024,
                  head_output_channels=None,
                  downsize_factor=8,
                  shortcut_connection=True,
@@ -123,10 +123,13 @@ def construct_model(input_shape:Tuple[int,...],path_to_VGGFace_weights:str, num_
     x = tf.keras.layers.BatchNormalization()(x)
     # construct model from it
     VGGFace_with_local_attention=tf.keras.Model(inputs=pretrained_VGGFace2.inputs, outputs=[x])
+    # freeze parts of model
+    for i in range(141): # freeze up to 4th block
+        VGGFace_with_local_attention.layers[i].trainable = False
     # construct sequence-based model from former model
     input_layer=tf.keras.layers.Input(input_shape)
     time_distributed_local_atten=tf.keras.layers.TimeDistributed(VGGFace_with_local_attention)(input_layer)
-    x = Self_attention_non_local_block(output_channels=512, downsize_factor = 2,
+    x = Self_attention_non_local_block(output_channels=512, downsize_factor = 1,
                  mode='spatio-temporal', name_prefix ="global_attention",
                  relative_position_encoding=False)(time_distributed_local_atten)
     # global average pooling
@@ -172,17 +175,17 @@ def generate_paths_with_labels_from_directory(path_to_dir:str, class_name:str, c
 
 if __name__ == '__main__':
     # params
-    path_to_train_frames=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\extracted_faces'
-    path_to_train_labels=r'E:\Databases\DAiSEE\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev_frames=r'E:\Databases\DAiSEE\DAiSEE\dev_preprocessed\extracted_faces'
-    path_to_dev_labels=r'E:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_train_frames=r'C:\Databases\DAiSEE\train_preprocessed\extracted_faces'
+    path_to_train_labels=r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev_frames=r'C:\Databases\DAiSEE\dev_preprocessed\extracted_faces'
+    path_to_dev_labels=r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
 
     path_to_save_model_and_results='results'
 
     input_shape=(224,224,3)
     num_classes=4
     num_frames_in_seq=20
-    batch_size=8
+    batch_size=14
     epochs=50
     highest_lr=0.0005
     lowest_lr = 0.00005
@@ -242,7 +245,7 @@ if __name__ == '__main__':
                  scaling= None,
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
-                 num_pool_workers=2)
+                 num_pool_workers=12)
 
 
     dev_gen=VideoSequenceLoader(paths_with_labels=labels_dev, batch_size=batch_size,
@@ -256,16 +259,14 @@ if __name__ == '__main__':
                  scaling= None,
                  channel_random_noise= None, bluring= None,
                  worse_quality= None,
-                 num_pool_workers=2)
+                 num_pool_workers=8)
 
     # construct model
     model=construct_model(input_shape=(20,224,224,3),
-                          path_to_VGGFace_weights=r'E:\model_weights\resnet50_softmax_dim512\weights.h5',
+                          path_to_VGGFace_weights=r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5',
                           num_classes=num_classes)
-    # freeze model
-    for i in range(141): # freeze up to 4th block
-        model.layers[i].trainable = False
     model.summary()
+    tf.keras.utils.plot_model(model, os.path.join(path_to_save_model_and_results, 'model_graph.png'), show_shapes=True)
 
     # create logger
     logger = open(os.path.join(path_to_save_model_and_results, 'val_logs.txt'), mode='w')
@@ -284,7 +285,7 @@ if __name__ == '__main__':
                  'Local with global convolutional attention. Local attention consists of multi head non-local blocks, '
                   'Global attention is non-local block with mode spatio-temporal (it makes attention across timeline as well)')
     # create metrics
-    metrics=[tf.keras.metrics.CategoricalAccuracy]
+    metrics=[tf.keras.metrics.CategoricalAccuracy()]
 
     # create callbacks
     callbacks = [validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
@@ -298,15 +299,17 @@ if __name__ == '__main__':
 
 
     # train model
-    train_model(train_generator=train_gen, model=model,
+    model=train_model(train_generator=train_gen, model=model,
     optimizer=optimizer, loss=loss,
     epochs=epochs,
-    val_generator=dev_gen,
+    val_generator=None,
     metrics=metrics,
     callbacks=callbacks,
     path_to_save_results=path_to_save_model_and_results,
     class_weights= None,
     loss_weights= None)
+
+    model.save_weights(os.path.join(path_to_save_model_and_results, "model_weights.h5"))
 
 
 

@@ -22,7 +22,8 @@ from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import Ima
 from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from tensorflow_utils.Losses import weighted_categorical_crossentropy
-from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, validation_with_generator_callback_multilabel
+from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, \
+    validation_with_generator_callback_multilabel, get_reduceLRonPlateau_callback
 from tensorflow_utils.keras_datagenerators.VideoSequenceLoader import VideoSequenceLoader
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model, _get_pretrained_VGGFace2_model
 
@@ -129,15 +130,15 @@ def construct_model(input_shape:Tuple[int,...],path_to_VGGFace_weights:str, num_
     # construct sequence-based model from former model
     input_layer=tf.keras.layers.Input(input_shape)
     time_distributed_local_atten=tf.keras.layers.TimeDistributed(VGGFace_with_local_attention)(input_layer)
-    x = Self_attention_non_local_block(output_channels=512, downsize_factor = 1,
+    x = Self_attention_non_local_block(output_channels=1024, downsize_factor = 1,
                  mode='spatio-temporal', name_prefix ="global_attention",
                  relative_position_encoding=False)(time_distributed_local_atten)
     # global average pooling
     x = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D())(x)
     # now LSTM layers, but it can be simple Dense
-    x = tf.keras.layers.LSTM(256, return_sequences=True)(x)
-    x = tf.keras.layers.LSTM(128, return_sequences=False)(x)
-    x = tf.keras.layers.Dense(128, activation='relu')(x)
+    x = tf.keras.layers.LSTM(128, return_sequences=True, dropout=0.3)(x)
+    x = tf.keras.layers.LSTM(128, return_sequences=False, dropout=0.3)(x)
+    x = tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
     output = tf.keras.layers.Dense(num_classes, activation='softmax')(x)
 
     final_model=tf.keras.Model(inputs=[input_layer], outputs=[output])
@@ -179,6 +180,8 @@ if __name__ == '__main__':
     path_to_train_labels=r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
     path_to_dev_frames=r'C:\Databases\DAiSEE\dev_preprocessed\extracted_faces'
     path_to_dev_labels=r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_test_frames=r'C:\Databases\DAiSEE\test_preprocessed\extracted_faces'
+    path_to_test_labels=r'C:\Databases\DAiSEE\Labels\TestLabels.csv'
 
     path_to_save_model_and_results='results'
 
@@ -187,32 +190,39 @@ if __name__ == '__main__':
     num_frames_in_seq=20
     batch_size=14
     epochs=50
-    highest_lr=0.0005
-    lowest_lr = 0.00005
+    highest_lr=0.001
+    lowest_lr = 0.00001
     momentum=0.9
     # create output path
     if not os.path.exists(path_to_save_model_and_results):
         os.makedirs(path_to_save_model_and_results)
-    optimizer=tf.keras.optimizers.SGD(highest_lr, momentum=momentum)
+    optimizer=tf.keras.optimizers.SGD(highest_lr, momentum=momentum, decay=1e-2/epochs)
     loss=tf.keras.losses.categorical_crossentropy
     # load labels
     dict_labels_train=load_labels_to_dict(path_to_train_labels)
     dict_labels_dev=load_labels_to_dict(path_to_dev_labels)
+    dict_labels_test = load_labels_to_dict(path_to_test_labels)
     # form dataframes with relative paths and labels
     labels_train=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_train_frames, dict_labels_train)
     labels_dev=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_dev_frames, dict_labels_dev)
+    labels_test=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_test_frames, dict_labels_test)
     # add full path to filename
     labels_train['filename']=path_to_train_frames+'\\'+labels_train['filename']
     labels_dev['filename'] = path_to_dev_frames +'\\'+ labels_dev['filename']
+    labels_test['filename'] = path_to_test_frames + '\\' + labels_test['filename']
     # convert labels into float32 type
     labels_train['engagement']=labels_train['engagement'].astype('float32')
     labels_train['boredom'] = labels_train['boredom'].astype('float32')
     labels_dev['engagement'] = labels_dev['engagement'].astype('float32')
     labels_dev['boredom'] = labels_dev['boredom'].astype('float32')
+    labels_test['engagement'] = labels_test['engagement'].astype('float32')
+    labels_test['boredom'] = labels_test['boredom'].astype('float32')
     labels_train['confusion']=labels_train['confusion'].astype('float32')
     labels_train['frustration'] = labels_train['frustration'].astype('float32')
     labels_dev['confusion'] = labels_dev['confusion'].astype('float32')
     labels_dev['frustration'] = labels_dev['frustration'].astype('float32')
+    labels_test['confusion'] = labels_test['confusion'].astype('float32')
+    labels_test['frustration'] = labels_test['frustration'].astype('float32')
 
     #labels_train=labels_train.iloc[:6400]
     #labels_dev = labels_dev.iloc[:640]
@@ -233,6 +243,14 @@ if __name__ == '__main__':
     labels_dev.columns=['filename', 'frame_num', 'class']
     labels_dev['frame_num']=labels_dev['frame_num'].astype('int32')
 
+    # change labels_test to fit for generator VideoSequenceLoader
+    labels_test[['filename', 'frame_num']] = labels_test['filename'].str.rsplit('_',1, expand=True)
+    labels_test['frame_num']=labels_test['frame_num'].apply(lambda x: x.split('.')[0])
+    labels_test = labels_test.drop(columns=['boredom', 'confusion', 'frustration'])
+    labels_test=labels_test[['filename', 'frame_num', 'engagement']]
+    labels_test.columns=['filename', 'frame_num', 'class']
+    labels_test['frame_num']=labels_test['frame_num'].astype('int32')
+
     # create sequence generators
     train_gen=VideoSequenceLoader(paths_with_labels=labels_train, batch_size=batch_size,
                                   num_frames_in_seq=num_frames_in_seq, proportion_of_intersection=0.5,
@@ -245,7 +263,7 @@ if __name__ == '__main__':
                  scaling= None,
                  channel_random_noise= 0.1, bluring= 0.1,
                  worse_quality= 0.1,
-                 num_pool_workers=12)
+                 num_pool_workers=8)
 
 
     dev_gen=VideoSequenceLoader(paths_with_labels=labels_dev, batch_size=batch_size,
@@ -259,7 +277,20 @@ if __name__ == '__main__':
                  scaling= None,
                  channel_random_noise= None, bluring= None,
                  worse_quality= None,
-                 num_pool_workers=8)
+                 num_pool_workers=4)
+
+    test_gen=VideoSequenceLoader(paths_with_labels=labels_test, batch_size=batch_size,
+                                  num_frames_in_seq=num_frames_in_seq, proportion_of_intersection=0.5,
+                              preprocess_function=VGGFace2_normalization,
+                              num_classes=num_classes,
+                 horizontal_flip= None, vertical_flip= None,
+                 shift= None,
+                 brightness= None, shearing= None, zooming= None,
+                 random_cropping_out = None, rotation = None,
+                 scaling= None,
+                 channel_random_noise= None, bluring= None,
+                 worse_quality= None,
+                 num_pool_workers=4)
 
     # construct model
     model=construct_model(input_shape=(20,224,224,3),
@@ -288,21 +319,23 @@ if __name__ == '__main__':
     metrics=[tf.keras.metrics.CategoricalAccuracy()]
 
     # create callbacks
-    callbacks = [validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
+    callbacks = [validation_with_generator_callback_multilabel(test_gen, metrics=(partial(f1_score, average='macro'),
                                                                                  accuracy_score,
                                                                                  partial(recall_score,
                                                                                          average='macro')),
                                                                num_label_types=1,
                                                                num_metric_to_set_weights=1,
                                                                logger=logger),
-                 get_annealing_LRreduce_callback(highest_lr, lowest_lr, 5)]
+                 get_reduceLRonPlateau_callback(monitoring_loss = 'val_loss', reduce_factor = 0.2,
+                                   num_patient_epochs= 2,
+                                   min_lr = lowest_lr)]
 
 
     # train model
     model=train_model(train_generator=train_gen, model=model,
     optimizer=optimizer, loss=loss,
     epochs=epochs,
-    val_generator=None,
+    val_generator=dev_gen,
     metrics=metrics,
     callbacks=callbacks,
     path_to_save_results=path_to_save_model_and_results,

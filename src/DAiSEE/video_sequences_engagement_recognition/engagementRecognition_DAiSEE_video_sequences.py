@@ -183,7 +183,7 @@ if __name__ == '__main__':
     path_to_test_frames=r'C:\Databases\DAiSEE\test_preprocessed\extracted_faces'
     path_to_test_labels=r'C:\Databases\DAiSEE\Labels\TestLabels.csv'
 
-    path_to_save_model_and_results='results'
+    path_to_save_model_and_results= '../results'
 
     input_shape=(224,224,3)
     num_classes=4

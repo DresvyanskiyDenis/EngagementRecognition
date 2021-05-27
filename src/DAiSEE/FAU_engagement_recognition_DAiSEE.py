@@ -14,7 +14,7 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import class_weight
 
-from preprocessing.data_preprocessing.openFace_utils import extract_openface_FAU_from_images_in_dir
+from feature_extraction.openFace_utils import extract_openface_FAU_from_images_in_dir
 from src.DAiSEE.engagementRecognition_DAiSEE import load_labels_to_dict
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback
 from tensorflow_utils.models.Dense_models import get_Dense_model
@@ -83,7 +83,7 @@ class val_callback(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         # validation
-        val_predictions = model.predict(x=self.val_data.iloc[:, :-5], batch_size=256)
+        val_predictions = self.model.predict(x=self.val_data.iloc[:, :-5], batch_size=256)
         val_predictions = np.argmax(val_predictions, axis=-1).reshape((-1, 1))
         val_ground_truth = self.val_data['engagement'].values.reshape((-1, 1))
         acc=accuracy_score(val_ground_truth, val_predictions)
@@ -98,16 +98,16 @@ class val_callback(tf.keras.callbacks.Callback):
 
 
 if __name__=="__main__":
-    """path_to_dir = r'E:\Databases\DAiSEE\DAiSEE\dev_processed\extracted_faces'
-    path_to_extractor = r'C:\\Users\Denis\PycharmProjects\OpenFace\FaceLandmarkImg.exe'"""
-    """features = extract_FAU_features_from_all_subdirectories(path_to_dir, path_to_extractor)
-    features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features.csv', index=False)"""
+    path_to_dir = r'D:\Databases\DAiSEE\DAiSEE\test_preprocessed\extracted_faces'
+    path_to_extractor = r'C:\Users\Dresvyanskiy\Desktop\Projects\OpenFace\FaceLandmarkImg.exe'
+    features = extract_FAU_features_from_all_subdirectories(path_to_dir, path_to_extractor)
+    features.to_csv(r'D:\Databases\DAiSEE\DAiSEE\test_preprocessed\FAU_features.csv', index=False)
 
     """features=pd.read_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features.csv')
     features=add_labels_to_FAU_features_in_df(features, r'E:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv')
     features.to_csv(r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features_with_labels.csv')"""
 
-    path_to_train_features=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_features_with_labels.csv'
+    '''path_to_train_features=r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed\FAU_features_with_labels.csv'
     path_to_dev_features = r'E:\Databases\DAiSEE\DAiSEE\dev_processed\FAU_features_with_labels.csv'
     train_features=pd.read_csv(path_to_train_features)
     train_features=train_features[~train_features['engagement'].isna()]
@@ -155,4 +155,4 @@ if __name__=="__main__":
               validation_data=(StandardScaler().fit_transform(dev_features.iloc[:,:-5].values),
                                tf.keras.utils.to_categorical(dev_features['engagement'].values, num_classes=num_classes))
               #class_weight=class_weights_engagement
-              )
+              )'''

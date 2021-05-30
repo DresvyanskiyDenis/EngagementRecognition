@@ -365,7 +365,7 @@ if __name__ == '__main__':
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
                                                                         num_label_types=4,
-                                                                        num_metric_to_set_weights=1,
+                                                                        num_metric_to_set_weights=2,
                                                                         logger=logger)]
 
     # create metrics

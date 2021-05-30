@@ -16,12 +16,13 @@ import tensorflow as tf
 from sklearn.metrics import recall_score, f1_score, accuracy_score
 from sklearn.utils import class_weight
 
+from preprocessing.class_weights import get_class_weights_Effective_Number_of_Samples
 from tensorflow_utils.Layers import Non_local_block_multi_head
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 from tensorflow_utils.keras_datagenerators.ImageDataLoader_multilabel import ImageDataLoader_multilabel
 from tensorflow_utils.keras_datagenerators.ImageDataPreprocessor import ImageDataPreprocessor
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
-from tensorflow_utils.Losses import weighted_categorical_crossentropy
+from tensorflow_utils.Losses import weighted_categorical_crossentropy, categorical_focal_loss
 from tensorflow_utils.callbacks import best_weights_setter_callback, get_annealing_LRreduce_callback, validation_with_generator_callback_multilabel
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model, _get_pretrained_VGGFace2_model
 
@@ -110,7 +111,7 @@ def form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_data:str, 
     return df_with_relative_paths_and_labels
 
 
-def get_modified_VGGFace2_resnet_model(dense_neurons_after_conv: Tuple[int,...],
+def get_model_with_local_att(dense_neurons_after_conv: Tuple[int,...],
                                        dropout: float = 0.3,
                                        regularization:Optional[tf.keras.regularizers.Regularizer]=None,
                                        output_neurons: Union[Tuple[int,...], int] = 7, pooling_at_the_end: Optional[str] = None,
@@ -170,7 +171,7 @@ def train_model(train_generator:Iterable[Tuple[np.ndarray, np.ndarray]], model:t
                 callbacks:List[tf.keras.callbacks.Callback],
                 path_to_save_results:str,
                 class_weights:Optional[Dict[int,float]]=None,
-                loss_weights:Optional[Dict['str', float]]=None)->tf.keras.Model:
+                loss_weights:Optional[Dict[str, float]]=None)->tf.keras.Model:
     # create directory for saving results
     if not os.path.exists(path_to_save_results):
         os.makedirs(path_to_save_results)
@@ -192,50 +193,57 @@ def generate_paths_with_labels_from_directory(path_to_dir:str, class_name:str, c
 
 
 if __name__ == '__main__':
-    '''path_to_directory_with_frames=r'D:\Databases\DAiSEE\frames'
-    path_to_output_directory=r'D:\Databases\DAiSEE\extracted_faces'
-    resize=(224,224)
-    extract_faces_from_all_subdirectories_in_directory(path_to_directory_with_frames, path_to_output_directory, resize)'''
     # params
     path_to_train_frames=r'C:\Databases\DAiSEE\train_preprocessed\extracted_faces'
     path_to_train_labels=r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
     path_to_dev_frames=r'C:\Databases\DAiSEE\dev_preprocessed\extracted_faces'
     path_to_dev_labels=r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
-    '''output_path=r'D:\Databases\DAiSEE\dev_preprocessed\sorted_faces'
-    sort_images_according_their_class(path_to_images=path_to_dev_frames, output_path=output_path,
-                                      path_to_labels=path_to_dev_labels)'''
+    path_to_test_frames=r'C:\Databases\DAiSEE\test_preprocessed\extracted_faces'
+    path_to_test_labels=r'C:\Databases\DAiSEE\Labels\TestLabels.csv'
+
+    path_to_save_model_and_results= '../results'
+
     input_shape=(224,224,3)
     num_classes=4
     batch_size=64
     epochs=30
-    highest_lr=0.0001
+    highest_lr=0.0005
     lowest_lr = 0.00001
     momentum=0.9
+    weighting_beta=0.99
+    focal_loss_gamma=2
     output_path='results'
     # create output path
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    optimizer=tf.keras.optimizers.SGD(highest_lr, momentum=momentum)
-    loss=tf.keras.losses.categorical_crossentropy
+    optimizer=tf.keras.optimizers.SGD(highest_lr, momentum=momentum, clipnorm=1., decay=1e-6)
     # load labels
-    dict_labels_train=load_labels_to_dict(path_to_train_labels)
-    dict_labels_dev=load_labels_to_dict(path_to_dev_labels)
+    dict_labels_train = load_labels_to_dict(path_to_train_labels)
+    dict_labels_dev = load_labels_to_dict(path_to_dev_labels)
+    dict_labels_test = load_labels_to_dict(path_to_test_labels)
     # form dataframes with relative paths and labels
-    labels_train=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_train_frames, dict_labels_train)
-    labels_dev=form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_dev_frames, dict_labels_dev)
-    # add full path to them
-    labels_train['filename']=path_to_train_frames+'\\'+labels_train['filename']
-    labels_dev['filename'] = path_to_dev_frames +'\\'+ labels_dev['filename']
-    labels_train['engagement']=labels_train['engagement'].astype('float32')
+    labels_train = form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_train_frames, dict_labels_train)
+    labels_dev = form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_dev_frames, dict_labels_dev)
+    labels_test = form_dataframe_of_relative_paths_to_data_with_multilabels(path_to_test_frames, dict_labels_test)
+    # add full path to filename
+    labels_train['filename'] = path_to_train_frames + '\\' + labels_train['filename']
+    labels_dev['filename'] = path_to_dev_frames + '\\' + labels_dev['filename']
+    labels_test['filename'] = path_to_test_frames + '\\' + labels_test['filename']
+    # convert labels into float32 type
+    labels_train['engagement'] = labels_train['engagement'].astype('float32')
     labels_train['boredom'] = labels_train['boredom'].astype('float32')
     labels_dev['engagement'] = labels_dev['engagement'].astype('float32')
     labels_dev['boredom'] = labels_dev['boredom'].astype('float32')
-    labels_train['confusion']=labels_train['confusion'].astype('float32')
+    labels_test['engagement'] = labels_test['engagement'].astype('float32')
+    labels_test['boredom'] = labels_test['boredom'].astype('float32')
+    labels_train['confusion'] = labels_train['confusion'].astype('float32')
     labels_train['frustration'] = labels_train['frustration'].astype('float32')
     labels_dev['confusion'] = labels_dev['confusion'].astype('float32')
     labels_dev['frustration'] = labels_dev['frustration'].astype('float32')
+    labels_test['confusion'] = labels_test['confusion'].astype('float32')
+    labels_test['frustration'] = labels_test['frustration'].astype('float32')
     # add augmentation data and delete all non-engagement class values
-    """labels_train=labels_train.drop(columns=['boredom', 'confusion','frustration'])
+    labels_train=labels_train.drop(columns=['boredom', 'confusion','frustration'])
     labels_dev = labels_dev.drop(columns=['boredom', 'confusion', 'frustration'])
 
     # add augmented images
@@ -256,7 +264,7 @@ if __name__ == '__main__':
         class_name='engagement',
         class_value=1)
     labels_train = pd.concat([labels_train, class_0_SMOTE, class_1_SMOTE], axis=0)
-    # turn 4-class task into 2-class task
+    """# turn 4-class task into 2-class task
     labels_train.loc[(labels_train['engagement'] == 1),'engagement'] = 0
     labels_train.loc[(labels_train['engagement'] == 2),'engagement'] = 1
     labels_train.loc[(labels_train['engagement'] == 3),'engagement'] = 1
@@ -267,31 +275,10 @@ if __name__ == '__main__':
     num_classes = 2"""
 
     # class weights
-    """class_weights_engagement=class_weight.compute_class_weight(class_weight='balanced',
-                                                               classes=np.unique(labels_train['engagement']),
-                                                               y=labels_train['engagement'].values.reshape((-1,)))
-    #class_weights_engagement/=class_weights_engagement.sum()
-    class_weights_engagement=dict((i,class_weights_engagement[i]) for i in range(len(class_weights_engagement)))"""
+    class_weights=get_class_weights_Effective_Number_of_Samples(labels=np.array(labels_train['engagement']).reshape((-1,)),
+                                                                beta=weighting_beta)
 
-    """class_weights_boredom = class_weight.compute_class_weight(class_weight='balanced',
-                                                                 classes=np.unique(labels_train['boredom']),
-                                                                 y=labels_train['boredom'].values.reshape((-1,)))
-    class_weights_boredom /= class_weights_boredom.sum()
-    #class_weights_boredom = dict((i, class_weights_boredom[i]) for i in range(len(class_weights_boredom)))
-
-    class_weights_confusion = class_weight.compute_class_weight(class_weight='balanced',
-                                                                 classes=np.unique(labels_train['confusion']),
-                                                                 y=labels_train['confusion'].values.reshape((-1,)))
-    class_weights_confusion /= class_weights_confusion.sum()
-    #class_weights_confusion = dict((i, class_weights_confusion[i]) for i in range(len(class_weights_confusion)))
-
-    class_weights_frustration = class_weight.compute_class_weight(class_weight='balanced',
-                                                                 classes=np.unique(labels_train['frustration']),
-                                                                 y=labels_train['frustration'].values.reshape((-1,)))
-    class_weights_frustration /= class_weights_frustration.sum()
-    #class_weights_frustration = dict((i, class_weights_frustration[i]) for i in range(len(class_weights_frustration)))"""
-
-    '''# Make major class less presented
+    '''# undersampling
     labels_train=pd.concat([labels_train[labels_train['class']==0],
                             labels_train[labels_train['class'] == 1],
                             labels_train[labels_train['class'] == 2].iloc[::5],
@@ -302,9 +289,10 @@ if __name__ == '__main__':
     # if we use ImageDataLoader, not multilabel
     #labels_train.columns=['filename', 'class']
     #labels_dev.columns = ['filename', 'class']
+
     # create generators
     train_gen=ImageDataLoader_multilabel(paths_with_labels=labels_train, batch_size=batch_size,
-                                         class_columns=['engagement','boredom', 'confusion', 'frustration'],
+                                         class_columns=['engagement'],
                               preprocess_function=VGGFace2_normalization,
                               num_classes=num_classes,
                  horizontal_flip= 0.1, vertical_flip= 0,
@@ -318,69 +306,85 @@ if __name__ == '__main__':
                  pool_workers=12)
 
     dev_gen=ImageDataLoader_multilabel(paths_with_labels=labels_dev, batch_size=batch_size,
-                                       class_columns=['engagement','boredom', 'confusion', 'frustration'],
+                                       class_columns=['engagement'],
                             preprocess_function=VGGFace2_normalization,
                             num_classes=num_classes,
-                 horizontal_flip= 0, vertical_flip= 0,
-                 shift= 0,
-                 brightness= 0, shearing= 0, zooming= 0,
-                 random_cropping_out = 0, rotation = 0,
+                 horizontal_flip= None, vertical_flip= None,
+                 shift= None,
+                 brightness= None, shearing= None, zooming= None,
+                 random_cropping_out = None, rotation = None,
                  scaling= None,
-                 channel_random_noise= 0, bluring= 0,
-                 worse_quality= 0,
-                 mixup = 0,
-                 pool_workers=8)
+                 channel_random_noise= None, bluring= None,
+                 worse_quality= None,
+                 mixup = None,
+                 pool_workers=4)
+
+    test_gen=ImageDataLoader_multilabel(paths_with_labels=labels_test, batch_size=batch_size,
+                                       class_columns=['engagement'],
+                            preprocess_function=VGGFace2_normalization,
+                            num_classes=num_classes,
+                 horizontal_flip= None, vertical_flip= None,
+                 shift= None,
+                 brightness= None, shearing= None, zooming= None,
+                 random_cropping_out = None, rotation = None,
+                 scaling= None,
+                 channel_random_noise= None, bluring= None,
+                 worse_quality= None,
+                 mixup = None,
+                 pool_workers=4)
+
     # create model
-    model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,),
+    model=get_modified_VGGFace2_resnet_model(dense_neurons_after_conv=(1024,512),
                                        dropout=0.5,
                                        regularization=tf.keras.regularizers.l2(0.0001),
-                                       output_neurons=(num_classes,num_classes,num_classes,num_classes), pooling_at_the_end='avg',
+                                       output_neurons=(num_classes,), pooling_at_the_end='avg',
                                        pretrained= True,
                                        path_to_weights = r'D:\PycharmProjects\Denis\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
-    # freeze model
+    # freeze model up to 4th block
     for i in range(141):
         model.layers[i].trainable=False
     model.summary()
+
     # create logger
-    logger = open(os.path.join(output_path, 'val_logs.txt'), mode='w')
+    logger = open(os.path.join(path_to_save_model_and_results, 'val_logs.txt'), mode='w')
     logger.close()
-    logger=open(os.path.join(output_path,'val_logs.txt'), mode='a')
-    # write training params:
-    logger.write('# Train params:\n'
-                 'Epochs:%i\n'
-                 'Highest_lr:%f\n'
-                 'Lowest_lr:%f\n'
-                 'Optimizer:%s\n'
-                 'Loss:%s\n'%
-                 (epochs, highest_lr, lowest_lr, optimizer, loss))
+    logger = open(os.path.join(path_to_save_model_and_results, 'val_logs.txt'), mode='a')
+    # write training params and all important information:
+    logger.write('# Train params:\n')
+    logger.write('Database:%s\n' % "DAiSEE")
+    logger.write('Epochs:%i\n' % epochs)
+    logger.write('Highest_lr:%f\n' % highest_lr)
+    logger.write('Lowest_lr:%f\n' % lowest_lr)
+    logger.write('Optimizer:%s\n' % optimizer)
+    logger.write('Loss:%s\n' % 'focal loss (gamma=2)')
+    logger.write('Additional info:%s\n' %
+                 'VGGFace2 model with 1024-512-128-4 dense layers. Engagement recognition task with 4 classes.')
+
     # create callbacks
-    callbacks=[validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
+    callbacks=[validation_with_generator_callback_multilabel(test_gen, metrics=(partial(f1_score, average='macro'),
                                                                         accuracy_score,
                                                                         partial(recall_score, average='macro')),
                                                                         num_label_types=4,
                                                                         num_metric_to_set_weights=1,
-                                                                        logger=logger),
-               get_annealing_LRreduce_callback(highest_lr, lowest_lr, 30)]
+                                                                        logger=logger)]
+
     # create metrics
     metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.Recall()]
-    # make weighted losses for model
-    losses = {'dense_2':tf.keras.losses.categorical_crossentropy,
-              'dense_4':tf.keras.losses.categorical_crossentropy,
-              'dense_6':tf.keras.losses.categorical_crossentropy,
-              'dense_8':tf.keras.losses.categorical_crossentropy
+
+    # define focal loss
+    losses = {'dense_3':categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma),
     }
-    loss_weights={
+    """loss_weights={
         'dense_2': 1.0,
         'dense_4': 0.33,
         'dense_6': 0.33,
         'dense_8': 0.33
-    }
+    }"""
     #losses=tf.keras.losses.categorical_crossentropy
     tf.keras.utils.plot_model(model, 'model.png')
     model=train_model(train_gen, model, optimizer, losses, epochs,
-                      None, metrics, callbacks, path_to_save_results='results', loss_weights=loss_weights)
-    model.save("results\\model.h5")
-    model.save_weights("results\\model_weights.h5")
+                      dev_gen, metrics, callbacks, path_to_save_results='results')
+    model.save_weights(os.path.join(path_to_save_model_and_results, "model_weights.h5"))
     logger.close()
 
 

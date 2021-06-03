@@ -1,10 +1,11 @@
 import os
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import tensorflow as tf
 import numpy as np
 import pandas as pd
 from scipy.stats import mode
+from sklearn.preprocessing import StandardScaler
 from tensorflow.python.keras.utils.data_utils import Sequence
 
 
@@ -20,7 +21,7 @@ class SequenceLoader(Sequence):
 
     def __init__(self, features:pd.DataFrame,labels:pd.DataFrame, batch_size:int,
                  num_classes:int, num_frames_in_seq:int,
-                 proportion_of_intersection:float, class_label:str,scaling:bool=False):
+                 proportion_of_intersection:float, class_label:str,scaling:bool=False, scaler:Optional[object]=None):
         self.features=features
         self.batch_size=batch_size
         self.num_classes=num_classes
@@ -28,12 +29,22 @@ class SequenceLoader(Sequence):
         self.proportion_of_intersection=proportion_of_intersection
         self.labels=labels
         self.scaling=scaling
+        self.scaler=scaler
         self.class_label=class_label
 
         if 'filename' not in self.features.columns.to_list():
             raise AttributeError('Features dataframe should contain filename column in format filename_frame.')
         if 'filename' not in self.labels.columns.to_list():
             raise AttributeError('Labels dataframe should contain filename column in format filename_frame.')
+        if self.scaling:
+            if self.scaler is None:
+                self.scaler=StandardScaler()
+            columns=list(self.features.columns)
+            columns.remove('filename')
+            columns.insert(0,'filename')
+            self.features=self.features[columns]
+            normalized_data=self.scaler.fit_transform(np.array(self.features.drop('filename')))
+            self.features.iloc[:,1:]=normalized_data
 
         self._prepare_dataframe_for_sequence_extraction()
 
@@ -143,6 +154,10 @@ if __name__=="__main__":
 
     num_classes = 4
     batch_size = 64
+    num_frames_in_seq=30
+    proportion_of_intersection=0.25
+    class_label=['engagement']
+
     epochs = 30
     highest_lr = 0.0005
     lowest_lr = 0.00001
@@ -156,91 +171,107 @@ if __name__=="__main__":
     optimizer = tf.keras.optimizers.Adam(highest_lr, clipnorm=1.)
     # loading features and labels
 
-    #FAU_train=pd.read_csv(os.path.join(path_to_train, "FAU_features_with_labels.csv")).drop(columns=['Unnamed: 0'])
+    FAU_train=pd.read_csv(os.path.join(path_to_train, "FAU_features_with_labels.csv")).drop(columns=['Unnamed: 0'])
     FAU_dev = pd.read_csv(os.path.join(path_to_dev, "FAU_features_with_labels.csv")).drop(columns=['Unnamed: 0'])
-    #FAU_test = pd.read_csv(os.path.join(path_to_test, "FAU_features_with_labels.csv")).drop(columns=['Unnamed: 0'])
+    FAU_test = pd.read_csv(os.path.join(path_to_test, "FAU_features_with_labels.csv")).drop(columns=['Unnamed: 0'])
     # labels
-    #labels_train = FAU_train[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
-    #labels_train=labels_train.dropna()
+    labels_train = FAU_train[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
+    labels_train=labels_train.dropna()
     labels_dev = FAU_dev[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
     labels_dev = labels_dev.dropna()
-    #labels_test = FAU_test[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
-    #labels_test = labels_test.dropna()
+    labels_test = FAU_test[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
+    labels_test = labels_test.dropna()
     # EMOVGGFace2 embeddings
-    #EMO_deep_emb_train=pd.read_csv(os.path.join(path_to_train,"deep_embeddings_from_EMOVGGFace2.csv" ))
+    EMO_deep_emb_train=pd.read_csv(os.path.join(path_to_train,"deep_embeddings_from_EMOVGGFace2.csv" ))
     EMO_deep_emb_dev = pd.read_csv(os.path.join(path_to_dev, "deep_embeddings_from_EMOVGGFace2.csv"))
-    #EMO_deep_emb_test = pd.read_csv(os.path.join(path_to_test, "deep_embeddings_from_EMOVGGFace2.csv"))
+    EMO_deep_emb_test = pd.read_csv(os.path.join(path_to_test, "deep_embeddings_from_EMOVGGFace2.csv"))
 
     # AttVGGFace2 embeddings
-    #Att_deep_emb_train=pd.read_csv(os.path.join(path_to_train,"deep_embeddings_from_AttVGGFace2.csv" ))
+    Att_deep_emb_train=pd.read_csv(os.path.join(path_to_train,"deep_embeddings_from_AttVGGFace2.csv" ))
     Att_deep_emb_dev = pd.read_csv(os.path.join(path_to_dev, "deep_embeddings_from_AttVGGFace2.csv"))
-    #Att_deep_emb_test = pd.read_csv(os.path.join(path_to_test, "deep_embeddings_from_AttVGGFace2.csv"))
+    Att_deep_emb_test = pd.read_csv(os.path.join(path_to_test, "deep_embeddings_from_AttVGGFace2.csv"))
     print('loaded')
     # split filenames to fit FAU filenames
-    #EMO_deep_emb_train['filename'] = EMO_deep_emb_train['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
+    EMO_deep_emb_train['filename'] = EMO_deep_emb_train['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
     EMO_deep_emb_dev['filename'] = EMO_deep_emb_dev['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
-    #EMO_deep_emb_test['filename'] = EMO_deep_emb_test['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
-    #Att_deep_emb_train['filename'] = Att_deep_emb_train['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
+    EMO_deep_emb_test['filename'] = EMO_deep_emb_test['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
+    Att_deep_emb_train['filename'] = Att_deep_emb_train['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
     Att_deep_emb_dev['filename'] = Att_deep_emb_dev['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
     #Att_deep_emb_test['filename'] = Att_deep_emb_test['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
 
     # prepare features for concatenation
-    #FAU_train.set_index('filename', inplace=True)
+    FAU_train.set_index('filename', inplace=True)
     FAU_dev.set_index('filename', inplace=True)
-    #FAU_test.set_index('filename', inplace=True)
-    #EMO_deep_emb_train.set_index('filename', inplace=True)
+    FAU_test.set_index('filename', inplace=True)
+    EMO_deep_emb_train.set_index('filename', inplace=True)
     EMO_deep_emb_dev.set_index('filename', inplace=True)
-    #EMO_deep_emb_test.set_index('filename', inplace=True)
-    #Att_deep_emb_train.set_index('filename', inplace=True)
+    EMO_deep_emb_test.set_index('filename', inplace=True)
+    Att_deep_emb_train.set_index('filename', inplace=True)
     Att_deep_emb_dev.set_index('filename', inplace=True)
-    #Att_deep_emb_test.set_index('filename', inplace=True)
+    Att_deep_emb_test.set_index('filename', inplace=True)
 
     # concatenate it
-    #concatenated_train=pd.merge(FAU_train, EMO_deep_emb_train,
-    #                            left_index=True, right_index=True).merge(Att_deep_emb_train, left_index=True, right_index=True)
+    concatenated_train=pd.merge(FAU_train, EMO_deep_emb_train,
+                                left_index=True, right_index=True).merge(Att_deep_emb_train, left_index=True, right_index=True)
     concatenated_dev=pd.merge(FAU_dev, EMO_deep_emb_dev,
                                 left_index=True, right_index=True).merge(Att_deep_emb_dev, left_index=True, right_index=True)
-    #concatenated_test=pd.merge(FAU_test, EMO_deep_emb_test,
-    #                            left_index=True, right_index=True).merge(Att_deep_emb_test, left_index=True, right_index=True)
+    concatenated_test=pd.merge(FAU_test, EMO_deep_emb_test,
+                                left_index=True, right_index=True).merge(Att_deep_emb_test, left_index=True, right_index=True)
     print('merged')
     # prepare labels
-    #labels_train.set_index('filename', inplace=True)
+    labels_train.set_index('filename', inplace=True)
     labels_dev.set_index('filename', inplace=True)
-    #labels_test.set_index('filename', inplace=True)
+    labels_test.set_index('filename', inplace=True)
 
     # delete rows which is not in labels
-    #concatenated_train=concatenated_train.iloc[concatenated_train.index.isin(labels_train.index)]
+    concatenated_train=concatenated_train.iloc[concatenated_train.index.isin(labels_train.index)]
     concatenated_dev = concatenated_dev.iloc[concatenated_dev.index.isin(labels_dev.index)]
-    #concatenated_test = concatenated_test.iloc[concatenated_test.index.isin(labels_test.index)]
+    concatenated_test = concatenated_test.iloc[concatenated_test.index.isin(labels_test.index)]
 
 
     # sort features and labels to make them in the same order
-    #labels_train.sort_index(inplace=True)
+    labels_train.sort_index(inplace=True)
     labels_dev.sort_index(inplace=True)
-    #labels_test.sort_index(inplace=True)
-    #concatenated_train.sort_index(inplace=True)
+    labels_test.sort_index(inplace=True)
+    concatenated_train.sort_index(inplace=True)
     concatenated_dev.sort_index(inplace=True)
-    #concatenated_test.sort_index(inplace=True)
+    concatenated_test.sort_index(inplace=True)
 
     # prepare dataframes before loader
+    concatenated_train=concatenated_train.reset_index()
+    labels_train=labels_train.reset_index()
     concatenated_dev=concatenated_dev.reset_index()
     labels_dev=labels_dev.reset_index()
-    concatenated_dev=concatenated_dev.iloc[:10000]
-    labels_dev = labels_dev.iloc[:10000]
+    concatenated_test=concatenated_test.reset_index()
+    labels_test=labels_test.reset_index()
+
+    # create generators
+    train_gen=SequenceLoader(features=concatenated_train,labels=labels_train, batch_size=batch_size,
+                 num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
+                 proportion_of_intersection=proportion_of_intersection, class_label=class_label,scaling=True)
 
 
     dev_gen=SequenceLoader(features=concatenated_dev,labels=labels_dev, batch_size=batch_size,
-                 num_classes=num_classes, num_frames_in_seq=20,
-                 proportion_of_intersection=0.5, class_label=['engagement'],scaling=True)
+                 num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
+                 proportion_of_intersection=proportion_of_intersection, class_label=class_label,scaling=True,
+                           scaler=train_gen.scaler)
+    test_gen=SequenceLoader(features=concatenated_test,labels=labels_test, batch_size=batch_size,
+                 num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
+                 proportion_of_intersection=1, class_label=class_label,scaling=True,
+                           scaler=train_gen.scaler)
 
-
-    # one-hot encoding for labels
-    labels_dev=tf.keras.utils.to_categorical(np.array(labels_dev['engagement']).reshape((-1,)))
 
     model=tf.keras.Sequential()
-    model.add(tf.keras.layers.LSTM(100, input_shape=(20, 1575,), activation='relu'))
+    model.add(tf.keras.layers.LSTM(512, input_shape=(num_frames_in_seq, 1575), return_sequences=True,
+                                   kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.LSTM(256, input_shape=(num_frames_in_seq, 1575), return_sequences=True,
+                                   kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dense(4, activation='softmax'))
-    model.compile(optimizer="Adam", loss='categorical_crossentropy', metrics=[tf.keras.metrics.CategoricalAccuracy()])
-    model.fit(dev_gen, epochs=100)
+    model.compile(optimizer=tf.keras.optimizers.Adam(0.0005), loss='categorical_crossentropy',
+                  metrics=[tf.keras.metrics.CategoricalAccuracy(), tf.keras.metrics.Recall])
+    model.fit(train_gen, epochs=100, validation_data=dev_gen)
 
 

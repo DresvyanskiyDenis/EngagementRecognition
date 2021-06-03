@@ -6,7 +6,7 @@ TODO: add description
 import os
 import re
 import time
-from typing import Optional, Tuple, Callable
+from typing import Optional, Tuple, Callable, Union
 import tensorflow as tf
 import numpy as np
 import cv2
@@ -16,9 +16,11 @@ from feature_extraction.embeddings_extraction import extract_deep_embeddings_fro
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from preprocessing.data_preprocessing.image_preprocessing_utils import load_image, resize_image, \
     save_image
-from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
+from feature_extraction.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
     extract_face_according_bbox, load_and_prepare_detector_retinaFace
-from tensorflow_utils.models.CNN_models import get_EMO_VGGFace2
+
+from tensorflow_utils.Layers import Non_local_block_multi_head
+from tensorflow_utils.models.CNN_models import get_EMO_VGGFace2, _get_pretrained_VGGFace2_model
 
 
 def extract_faces_from_video(path_to_video:str, path_to_output:str,
@@ -119,7 +121,56 @@ def extract_deep_embeddings_from_all_dirs(path_to_dirs:str, extractor:tf.keras.M
     # save obtained dataframe
     #result_df.to_csv(os.path.join(output_path,'deep_embeddings_from_EMOVGGFace2.csv'), index=False)
 
-
+def get_model_with_local_att(dense_neurons_after_conv: Tuple[int,...],
+                                       dropout: float = 0.3,
+                                       regularization:Optional[tf.keras.regularizers.Regularizer]=None,
+                                       output_neurons: Union[Tuple[int,...], int] = 7, pooling_at_the_end: Optional[str] = None,
+                                       pretrained: bool = True,
+                                       path_to_weights: Optional[str] = None,
+                                       multi_head_attention:bool=True) -> tf.keras.Model:
+    pretrained_VGGFace2 = _get_pretrained_VGGFace2_model(path_to_weights, pretrained=pretrained)
+    x=pretrained_VGGFace2.get_layer('activation_48').output
+    if multi_head_attention:
+        x = Non_local_block_multi_head(num_heads=4,  output_channels=1024,
+                 head_output_channels=None,
+                 downsize_factor=8,
+                 shortcut_connection=True)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+    # take pooling or not
+    if pooling_at_the_end is not None:
+        if pooling_at_the_end=='avg':
+            x=tf.keras.layers.GlobalAveragePooling2D()(x)
+        elif pooling_at_the_end=='max':
+            x=tf.keras.layers.GlobalMaxPooling2D()(x)
+        else:
+            raise AttributeError('Parameter pooling_at_the_end can be either \'avg\' or \'max\'. Got %s.'%(pooling_at_the_end))
+    # create Dense layers
+    for dense_layer_idx in range(len(dense_neurons_after_conv)-1):
+        num_neurons_on_layer=dense_neurons_after_conv[dense_layer_idx]
+        x = tf.keras.layers.Dense(num_neurons_on_layer, activation='relu', kernel_regularizer=regularization)(x)
+        if dropout:
+            x = tf.keras.layers.Dropout(dropout)(x)
+    # pre-last Dense layer
+    num_neurons_on_layer=dense_neurons_after_conv[-1]
+    x = tf.keras.layers.Dense(num_neurons_on_layer, activation='relu')(x)
+    # If outputs should be several, then create several layers, otherwise one
+    if isinstance(output_neurons, tuple):
+        output_layers=[]
+        for num_output_neurons in output_neurons:
+            if dropout:
+                output_layer_i = tf.keras.layers.Dropout(dropout)(x)
+            output_layer_i = tf.keras.layers.Dense(128, activation='relu')(output_layer_i)
+            output_layer_i=tf.keras.layers.Dense(num_output_neurons, activation='softmax')(output_layer_i)
+            #output_layer_i=tf.keras.layers.Reshape((-1, 1))(output_layer_i)
+            output_layers.append(output_layer_i)
+    else:
+        output_layers = tf.keras.layers.Dense(output_neurons, activation='softmax')(x)
+        # in tf.keras.Model it should be always a list (even when it has only 1 element)
+        output_layers = [output_layers]
+    # create model
+    model=tf.keras.Model(inputs=pretrained_VGGFace2.inputs, outputs=output_layers)
+    del pretrained_VGGFace2
+    return model
 
 
 if __name__=='__main__':
@@ -127,13 +178,19 @@ if __name__=='__main__':
     path_to_output=r"E:\Databases\DAiSEE\DAiSEE\test_preprocessed"
     extract_faces_from_all_subdirectories_in_directory(path_to_dir=path_to_data, path_to_output=path_to_output, resize=(224,224))"""
     # just for testing
-    path_to_images=r'E:\\Databases\\DAiSEE\\DAiSEE\\train_preprocessed\extracted_faces'
+    path_to_images=r'E:\\Databases\\DAiSEE\\DAiSEE\\test_preprocessed\extracted_faces'
     # create model
-    model=get_EMO_VGGFace2(path=r'C:\Users\Denis\PycharmProjects\EMOVGGFace2_model\weights_0_66_37_affectnet_cat.h5')
+    model=get_model_with_local_att(dense_neurons_after_conv=(1024,),
+                                               dropout=0.5,
+                                               regularization=tf.keras.regularizers.l2(0.0001),
+                                               output_neurons=(4,), pooling_at_the_end='avg',
+                                               pretrained=True,
+                                               path_to_weights=r'C:\Users\Denis\PycharmProjects\vggface2_Keras\vggface2_Keras\model\resnet50_softmax_dim512\weights.h5')
+    model.summary()
+    #model=get_EMO_VGGFace2(path=r'C:\Users\Denis\PycharmProjects\EMOVGGFace2_model\weights_0_66_37_affectnet_cat.h5')
     emb_layer=model.get_layer('dense')
     model=tf.keras.Model(inputs=model.inputs, outputs=[emb_layer.output])
     model.compile()
     extract_deep_embeddings_from_all_dirs(path_to_dirs=path_to_images, extractor=model,
                                           preprocessing_functions=(VGGFace2_normalization,),
                                           output_path='E:\\Databases\\DAiSEE\\DAiSEE')
-    pass

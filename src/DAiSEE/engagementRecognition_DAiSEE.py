@@ -87,6 +87,8 @@ def form_dataframe_of_relative_paths_to_data_with_labels(path_to_data:str, label
         if not dir in labels_dict.keys():
             continue
         img_filenames=os.listdir(os.path.join(path_to_data, dir))
+        if len(img_filenames)==0:
+            continue
         img_filenames=[os.path.join(dir, x) for x in img_filenames]
         label=labels_dict[dir].engagement
         labels=[label for _ in range(len(img_filenames))]

@@ -39,7 +39,9 @@ class SequenceLoader(Sequence):
 
     def _prepare_features_and_labels_dataframes(self):
         self.features[['filename', 'frame_num']] = self.features['filename'].str.rsplit('_', 1, expand=True)
+        self.features['frame_num']=self.features['frame_num'].astype('int32')
         self.labels[['filename', 'frame_num']] = self.labels['filename'].str.rsplit('_', 1, expand=True)
+        self.labels['frame_num'] = self.labels['frame_num'].astype('int32')
 
     def _prepare_dataframe_for_sequence_extraction(self) -> None:
         # convert filename_frame format to separate columns
@@ -96,18 +98,25 @@ class SequenceLoader(Sequence):
         # choose needed
         feature_sequences=self.feature_sequences[index*batch_size:(index+1)*batch_size]
         labels_sequences = self.labels_sequences[index * batch_size:(index + 1) * batch_size]
+        # transform sequences by dleting columns
+        feature_sequences=[np.array(item.drop(columns=['filename', 'frame_num']))[np.newaxis,...] for item in feature_sequences]
+        labels_sequences=[np.array(item[self.class_label])[np.newaxis,...] for item in labels_sequences]
         # concat it
+        feature_sequences=np.concatenate(feature_sequences, axis=0)
+        labels_sequences = np.concatenate(labels_sequences, axis=0)
+        """# concat it
         feature_sequences=pd.concat(feature_sequences, ignore_index=True)
         labels_sequences = pd.concat(labels_sequences, ignore_index=True)
         # take np.ndarray
-        feature_sequences=np.array(feature_sequences.drop('filename'))
-        labels_sequences = np.array(labels_sequences[self.class_label]).reshape((-1,1))
+        feature_sequences=np.array(feature_sequences.drop(columns=['filename', 'frame_num']))
+        labels_sequences = np.array(labels_sequences[self.class_label]).reshape((-1,1))"""
         return feature_sequences, labels_sequences
 
 
     def __getitem__(self, index) -> Tuple[np.ndarray, np.ndarray]:
         feature_sequences, labels_sequences = self._load_and_preprocess_batch(index)
         # turn into sequence-to-one labeling
+        labels_sequences=labels_sequences.squeeze()
         labels_sequences=self._sequence_to_one_transformation(labels_sequences)
         # one-hot encoding
         labels_sequences = self._one_hot_encoding(labels_sequences)
@@ -123,12 +132,12 @@ class SequenceLoader(Sequence):
 
 if __name__=="__main__":
     # params
-    path_to_train = r'E:\Databases\DAiSEE\DAiSEE\train_preprocessed'
-    path_to_train_labels = r'E:\Databases\DAiSEE\DAiSEE\Labels\TrainLabels.csv'
-    path_to_dev = r'E:\Databases\DAiSEE\DAiSEE\dev_preprocessed'
-    path_to_dev_labels = r'E:\Databases\DAiSEE\DAiSEE\Labels\ValidationLabels.csv'
-    path_to_test = r'E:\Databases\DAiSEE\DAiSEE\test_preprocessed'
-    path_to_test_labels = r'E:\Databases\DAiSEE\DAiSEE\Labels\TestLabels.csv'
+    path_to_train = r'C:\Databases\DAiSEE\train_preprocessed'
+    path_to_train_labels = r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
+    path_to_dev = r'C:\Databases\DAiSEE\dev_preprocessed'
+    path_to_dev_labels = r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
+    path_to_test = r'C:\Databases\DAiSEEE\test_preprocessed'
+    path_to_test_labels = r'C:\Databases\DAiSEE\Labels\TestLabels.csv'
 
     path_to_save_model_and_results = '../results'
 
@@ -224,16 +233,14 @@ if __name__=="__main__":
                  num_classes=num_classes, num_frames_in_seq=20,
                  proportion_of_intersection=0.5, class_label=['engagement'],scaling=True)
 
-    for x,y in dev_gen:
-        a=1+2
 
     # one-hot encoding for labels
     labels_dev=tf.keras.utils.to_categorical(np.array(labels_dev['engagement']).reshape((-1,)))
 
     model=tf.keras.Sequential()
-    model.add(tf.keras.layers.Dense(100, input_shape=(concatenated_dev.shape[1],), activation='relu'))
+    model.add(tf.keras.layers.LSTM(100, input_shape=(20, 1575,), activation='relu'))
     model.add(tf.keras.layers.Dense(4, activation='softmax'))
     model.compile(optimizer="Adam", loss='categorical_crossentropy', metrics=[tf.keras.metrics.CategoricalAccuracy()])
-    model.fit(concatenated_dev, labels_dev, epochs=100, validation_data=(concatenated_dev, labels_dev))
+    model.fit(dev_gen, epochs=100)
 
 

@@ -352,8 +352,8 @@ if __name__=="__main__":
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dense(4, activation='softmax'))
-    model.compile(optimizer=tf.keras.optimizers.Adam(0.0005), loss='categorical_crossentropy',
-                  metrics=[tf.keras.metrics.CategoricalAccuracy(), tf.keras.metrics.Recall])
-    model.fit(train_gen, epochs=100, validation_data=dev_gen)
+    model.compile(optimizer=optimizer, loss=losses,
+                  metrics=metrics)
+    model.fit(train_gen, epochs=100, callbacks=callbacks)
 
 

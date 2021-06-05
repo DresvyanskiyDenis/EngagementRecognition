@@ -1,12 +1,19 @@
+import gc
 import os
+from functools import partial
 from typing import Tuple, List, Optional
 
 import tensorflow as tf
 import numpy as np
 import pandas as pd
 from scipy.stats import mode
+from sklearn.metrics import f1_score, accuracy_score, recall_score
 from sklearn.preprocessing import StandardScaler
 from tensorflow.python.keras.utils.data_utils import Sequence
+
+from preprocessing.class_weights import get_class_weights_Effective_Number_of_Samples
+from tensorflow_utils.Losses import categorical_focal_loss
+from tensorflow_utils.callbacks import validation_with_generator_callback_multilabel, get_annealing_LRreduce_callback
 
 
 class SequenceLoader(Sequence):
@@ -47,6 +54,10 @@ class SequenceLoader(Sequence):
             self.features.iloc[:,1:]=normalized_data
 
         self._prepare_dataframe_for_sequence_extraction()
+        # clear RAM
+        del self.features
+        self.features=None
+        gc.collect()
 
     def _prepare_features_and_labels_dataframes(self):
         self.features[['filename', 'frame_num']] = self.features['filename'].str.rsplit('_', 1, expand=True)
@@ -159,10 +170,10 @@ if __name__=="__main__":
     class_label=['engagement']
 
     epochs = 30
-    highest_lr = 0.0005
+    highest_lr = 0.001
     lowest_lr = 0.00001
     momentum = 0.9
-    weighting_beta = 0.99
+    weighting_beta = 0.9999
     focal_loss_gamma = 2
     output_path = 'results'
     # create output path
@@ -181,6 +192,14 @@ if __name__=="__main__":
     labels_dev = labels_dev.dropna()
     labels_test = FAU_test[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
     labels_test = labels_test.dropna()
+    # class weights
+    class_weights = get_class_weights_Effective_Number_of_Samples(
+        labels=np.array(labels_train['engagement']).reshape((-1,)),
+        beta=weighting_beta)
+    tmp_weights = np.zeros((len(class_weights, )))
+    for key, value in class_weights.items():
+        tmp_weights[key] = value
+    class_weights = tmp_weights
     # EMOVGGFace2 embeddings
     EMO_deep_emb_train=pd.read_csv(os.path.join(path_to_train,"deep_embeddings_from_EMOVGGFace2.csv" ))
     EMO_deep_emb_dev = pd.read_csv(os.path.join(path_to_dev, "deep_embeddings_from_EMOVGGFace2.csv"))
@@ -245,6 +264,8 @@ if __name__=="__main__":
     concatenated_test=concatenated_test.reset_index()
     labels_test=labels_test.reset_index()
 
+
+
     # create generators
     train_gen=SequenceLoader(features=concatenated_train,labels=labels_train, batch_size=batch_size,
                  num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
@@ -259,6 +280,67 @@ if __name__=="__main__":
                  num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
                  proportion_of_intersection=1, class_label=class_label,scaling=True,
                            scaler=train_gen.scaler)
+    # clear RAM
+    del concatenated_train, concatenated_dev, concatenated_test
+    del FAU_train, FAU_dev, FAU_test
+    del EMO_deep_emb_train, EMO_deep_emb_dev, EMO_deep_emb_test
+    del Att_deep_emb_train, Att_deep_emb_dev, Att_deep_emb_test
+    gc.collect()
+    # callbacks and metrics
+    # create logger
+    logger_dev = open(os.path.join(path_to_save_model_and_results, 'val_logs.txt'), mode='w')
+    logger_dev.close()
+    logger_dev = open(os.path.join(path_to_save_model_and_results, 'val_logs.txt'), mode='a')
+    # write training params and all important information:
+    logger_dev.write('# Train params:\n')
+    logger_dev.write('Database:%s\n' % "DAiSEE")
+    logger_dev.write('Epochs:%i\n' % epochs)
+    logger_dev.write('Highest_lr:%f\n' % highest_lr)
+    logger_dev.write('Lowest_lr:%f\n' % lowest_lr)
+    logger_dev.write('Optimizer:%s\n' % optimizer)
+    logger_dev.write('Loss:%s\n' % 'focal loss (gamma=2)')
+    logger_dev.write('Additional info:%s\n' %
+                     'AttVGGFace2 and EMOVGGFace2 embeddings + FAU, then - 2 LSTMs with attention. 4 engagement classes with focal loss')
+
+    # create logger
+    logger_test = open(os.path.join(path_to_save_model_and_results, 'test_logs.txt'), mode='w')
+    logger_test.close()
+    logger_test = open(os.path.join(path_to_save_model_and_results, 'test_logs.txt'), mode='a')
+    # write training params and all important information:
+    logger_test.write('# Train params:\n')
+    logger_test.write('Database:%s\n' % "DAiSEE")
+    logger_test.write('Epochs:%i\n' % epochs)
+    logger_test.write('Highest_lr:%f\n' % highest_lr)
+    logger_test.write('Lowest_lr:%f\n' % lowest_lr)
+    logger_test.write('Optimizer:%s\n' % optimizer)
+    logger_test.write('Loss:%s\n' % 'focal loss (gamma=2)')
+    logger_test.write('Additional info:%s\n' %
+                      'AttVGGFace2 and EMOVGGFace2 embeddings + FAU, then - 2 LSTMs with attention. 4 engagement classes with focal loss')
+
+    # create callbacks
+    callbacks = [validation_with_generator_callback_multilabel(dev_gen, metrics=(partial(f1_score, average='macro'),
+                                                                                 accuracy_score,
+                                                                                 partial(recall_score,
+                                                                                         average='macro')),
+                                                               num_label_types=1,
+                                                               num_metric_to_set_weights=None,
+                                                               logger=logger_dev),
+                 validation_with_generator_callback_multilabel(test_gen, metrics=(partial(f1_score, average='macro'),
+                                                                                  accuracy_score,
+                                                                                  partial(recall_score,
+                                                                                          average='macro')),
+                                                               num_label_types=1,
+                                                               num_metric_to_set_weights=2,
+                                                               logger=logger_test),
+                 get_annealing_LRreduce_callback(highest_lr, lowest_lr, epochs)]
+
+    # create metrics
+    metrics = [tf.keras.metrics.CategoricalAccuracy(), tf.keras.metrics.Recall()]
+
+    # loss
+    # define focal loss
+    losses = {'dense_2': categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma),
+              }
 
 
     model=tf.keras.Sequential()

@@ -1,5 +1,6 @@
 import gc
 import os
+import random
 from functools import partial
 from typing import Tuple, List, Optional
 
@@ -149,6 +150,11 @@ class SequenceLoader(Sequence):
         num_batches = int(np.ceil(len(self.feature_sequences) / self.batch_size))
         return num_batches
 
+    def on_epoch_end(self):
+        # shuffle sequences
+        c = list(zip(self.feature_sequences, self.labels_sequences))
+        random.shuffle(c)
+        self.feature_sequences, self.labels_sequences = zip(*c)
 
 
 
@@ -192,6 +198,13 @@ if __name__=="__main__":
     labels_dev = labels_dev.dropna()
     labels_test = FAU_test[["filename", "engagement", "boredom", "frustration", "confusion"]].copy()
     labels_test = labels_test.dropna()
+    # drop labels from FAU
+    FAU_train.drop(columns=["engagement", "boredom", "frustration", "confusion"], inplace=True)
+    FAU_dev.drop(columns=["engagement", "boredom", "frustration", "confusion"], inplace=True)
+    FAU_test.drop(columns=["engagement", "boredom", "frustration", "confusion"], inplace=True)
+    print(FAU_test.columns)
+    print(FAU_dev.columns)
+    print(FAU_train.columns)
     # class weights
     class_weights = get_class_weights_Effective_Number_of_Samples(
         labels=np.array(labels_train['engagement']).reshape((-1,)),
@@ -354,15 +367,15 @@ if __name__=="__main__":
 
     # loss
     # define focal loss
-    losses = {'dense_1': tf.keras.losses.categorical_crossentropy()#categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma),
+    losses = {'dense_1': categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma),
               }
 
 
     model=tf.keras.Sequential()
-    model.add(tf.keras.layers.LSTM(512, input_shape=(num_frames_in_seq, 1575), return_sequences=True,
+    model.add(tf.keras.layers.LSTM(512, input_shape=(num_frames_in_seq, 1571), return_sequences=True,
                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.LSTM(256, input_shape=(num_frames_in_seq, 1575), return_sequences=False,
+    model.add(tf.keras.layers.LSTM(256, return_sequences=False,
                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001)))

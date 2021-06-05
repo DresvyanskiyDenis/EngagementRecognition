@@ -44,14 +44,15 @@ class SequenceLoader(Sequence):
         if 'filename' not in self.labels.columns.to_list():
             raise AttributeError('Labels dataframe should contain filename column in format filename_frame.')
         if self.scaling:
+            print('start scaling')
             if self.scaler is None:
                 self.scaler=StandardScaler()
             columns=list(self.features.columns)
             columns.remove('filename')
             columns.insert(0,'filename')
             self.features=self.features[columns]
-            normalized_data=self.scaler.fit_transform(np.array(self.features.drop(columns=['filename'])))
-            self.features.iloc[:,1:]=normalized_data
+            self.features.iloc[:,1:]=self.scaler.fit_transform(np.array(self.features.drop(columns=['filename']))).astype('float32')
+            print('end scaling')
 
         self._prepare_dataframe_for_sequence_extraction()
         # clear RAM
@@ -164,9 +165,9 @@ if __name__=="__main__":
     path_to_save_model_and_results = '../results'
 
     num_classes = 4
-    batch_size = 64
+    batch_size = 128
     num_frames_in_seq=30
-    proportion_of_intersection=0.25
+    proportion_of_intersection=0.5
     class_label=['engagement']
 
     epochs = 30
@@ -175,10 +176,9 @@ if __name__=="__main__":
     momentum = 0.9
     weighting_beta = 0.9999
     focal_loss_gamma = 2
-    output_path = 'results'
     # create output path
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
+    if not os.path.exists(path_to_save_model_and_results):
+        os.makedirs(path_to_save_model_and_results)
     optimizer = tf.keras.optimizers.Adam(highest_lr, clipnorm=1.)
     # loading features and labels
 
@@ -216,7 +216,7 @@ if __name__=="__main__":
     EMO_deep_emb_test['filename'] = EMO_deep_emb_test['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
     Att_deep_emb_train['filename'] = Att_deep_emb_train['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
     Att_deep_emb_dev['filename'] = Att_deep_emb_dev['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
-    #Att_deep_emb_test['filename'] = Att_deep_emb_test['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
+    Att_deep_emb_test['filename'] = Att_deep_emb_test['filename'].apply(lambda x: x.split('\\')[-1].split('.')[0])
 
     # prepare features for concatenation
     FAU_train.set_index('filename', inplace=True)
@@ -232,10 +232,17 @@ if __name__=="__main__":
     # concatenate it
     concatenated_train=pd.merge(FAU_train, EMO_deep_emb_train,
                                 left_index=True, right_index=True).merge(Att_deep_emb_train, left_index=True, right_index=True)
+    concatenated_train=concatenated_train.astype('float32')
     concatenated_dev=pd.merge(FAU_dev, EMO_deep_emb_dev,
                                 left_index=True, right_index=True).merge(Att_deep_emb_dev, left_index=True, right_index=True)
+    concatenated_dev = concatenated_dev.astype('float32')
     concatenated_test=pd.merge(FAU_test, EMO_deep_emb_test,
                                 left_index=True, right_index=True).merge(Att_deep_emb_test, left_index=True, right_index=True)
+    concatenated_test = concatenated_test.astype('float32')
+    del FAU_train, FAU_dev, FAU_test
+    del EMO_deep_emb_train, EMO_deep_emb_dev, EMO_deep_emb_test
+    del Att_deep_emb_train, Att_deep_emb_dev, Att_deep_emb_test
+    gc.collect()
     print('merged')
     # prepare labels
     labels_train.set_index('filename', inplace=True)
@@ -264,29 +271,37 @@ if __name__=="__main__":
     concatenated_test=concatenated_test.reset_index()
     labels_test=labels_test.reset_index()
 
+    """concatenated_train=concatenated_train.iloc[:3000]
+    concatenated_dev = concatenated_dev.iloc[:3000]
+    concatenated_test = concatenated_test.iloc[:3000]
+    labels_train=labels_train.iloc[:3000]
+    labels_dev = labels_dev.iloc[:3000]
+    labels_test = labels_test.iloc[:3000]"""
 
 
     # create generators
+    print('start train gen')
     train_gen=SequenceLoader(features=concatenated_train,labels=labels_train, batch_size=batch_size,
                  num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
                  proportion_of_intersection=proportion_of_intersection, class_label=class_label,scaling=True)
-
-
+    print('end train gen')
+    del concatenated_train
+    gc.collect()
+    print('start dev gen')
     dev_gen=SequenceLoader(features=concatenated_dev,labels=labels_dev, batch_size=batch_size,
                  num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
-                 proportion_of_intersection=proportion_of_intersection, class_label=class_label,scaling=True,
-                           scaler=train_gen.scaler)
+                 proportion_of_intersection=1, class_label=class_label,scaling=True, scaler=train_gen.scaler
+                           )
+    print('end dev gen')
+    del concatenated_dev
+    gc.collect()
+    print('start test gen')
     test_gen=SequenceLoader(features=concatenated_test,labels=labels_test, batch_size=batch_size,
                  num_classes=num_classes, num_frames_in_seq=num_frames_in_seq,
-                 proportion_of_intersection=1, class_label=class_label,scaling=True,
-                           scaler=train_gen.scaler)
-    # clear RAM
-    del concatenated_train, concatenated_dev, concatenated_test
-    del FAU_train, FAU_dev, FAU_test
-    del EMO_deep_emb_train, EMO_deep_emb_dev, EMO_deep_emb_test
-    del Att_deep_emb_train, Att_deep_emb_dev, Att_deep_emb_test
+                 proportion_of_intersection=1, class_label=class_label,scaling=True, scaler=train_gen.scaler)
+    print('end test gen')
+    del concatenated_test
     gc.collect()
-    # callbacks and metrics
     # create logger
     logger_dev = open(os.path.join(path_to_save_model_and_results, 'val_logs.txt'), mode='w')
     logger_dev.close()
@@ -323,14 +338,14 @@ if __name__=="__main__":
                                                                                  partial(recall_score,
                                                                                          average='macro')),
                                                                num_label_types=1,
-                                                               num_metric_to_set_weights=None,
+                                                               num_metric_to_set_weights=2,
                                                                logger=logger_dev),
                  validation_with_generator_callback_multilabel(test_gen, metrics=(partial(f1_score, average='macro'),
                                                                                   accuracy_score,
                                                                                   partial(recall_score,
                                                                                           average='macro')),
                                                                num_label_types=1,
-                                                               num_metric_to_set_weights=2,
+                                                               num_metric_to_set_weights=None,
                                                                logger=logger_test),
                  get_annealing_LRreduce_callback(highest_lr, lowest_lr, epochs)]
 
@@ -339,7 +354,7 @@ if __name__=="__main__":
 
     # loss
     # define focal loss
-    losses = {'dense_2': categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma),
+    losses = {'dense_1': tf.keras.losses.categorical_crossentropy()#categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma),
               }
 
 
@@ -347,13 +362,15 @@ if __name__=="__main__":
     model.add(tf.keras.layers.LSTM(512, input_shape=(num_frames_in_seq, 1575), return_sequences=True,
                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.LSTM(256, input_shape=(num_frames_in_seq, 1575), return_sequences=True,
+    model.add(tf.keras.layers.LSTM(256, input_shape=(num_frames_in_seq, 1575), return_sequences=False,
                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dense(4, activation='softmax'))
     model.compile(optimizer=optimizer, loss=losses,
                   metrics=metrics)
+    model.summary()
     model.fit(train_gen, epochs=100, callbacks=callbacks)
+    model.save_weights(os.path.join(path_to_save_model_and_results, "model_weights.h5"))
 
 

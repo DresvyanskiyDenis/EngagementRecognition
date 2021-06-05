@@ -43,7 +43,7 @@ class SequenceLoader(Sequence):
             columns.remove('filename')
             columns.insert(0,'filename')
             self.features=self.features[columns]
-            normalized_data=self.scaler.fit_transform(np.array(self.features.drop('filename')))
+            normalized_data=self.scaler.fit_transform(np.array(self.features.drop(columns=['filename'])))
             self.features.iloc[:,1:]=normalized_data
 
         self._prepare_dataframe_for_sequence_extraction()
@@ -147,7 +147,7 @@ if __name__=="__main__":
     path_to_train_labels = r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
     path_to_dev = r'C:\Databases\DAiSEE\dev_preprocessed'
     path_to_dev_labels = r'C:\Databases\DAiSEE\Labels\ValidationLabels.csv'
-    path_to_test = r'C:\Databases\DAiSEEE\test_preprocessed'
+    path_to_test = r'C:\Databases\DAiSEE\test_preprocessed'
     path_to_test_labels = r'C:\Databases\DAiSEE\Labels\TestLabels.csv'
 
     path_to_save_model_and_results = '../results'

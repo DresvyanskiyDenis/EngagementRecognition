@@ -175,9 +175,9 @@ def train_model(*, path_to_save_model_and_results:str, epochs:int, highest_lr:fl
     logger_dev.write('Epochs:%i\n' % epochs)
     logger_dev.write('Highest_lr:%f\n' % highest_lr)
     logger_dev.write('Lowest_lr:%f\n' % lowest_lr)
-    logger_dev.write('num_frames_in_seq:%f\n' % num_frames_in_seq)
+    logger_dev.write('num_frames_in_seq:%i\n' % num_frames_in_seq)
     logger_dev.write('Loss:%s\n' % 'focal loss (gamma=2)')
-    logger_dev.write('Class_weights:%f\n' % class_weights)
+    logger_dev.write('Class_weights:%s\n' % class_weights)
     logger_dev.write('Additional info:%s\n' %
                      'AttVGGFace2 and EMOVGGFace2 embeddings + FAU, then - 3 LSTMs with self-attention. 4 engagement classes with focal loss')
 
@@ -191,9 +191,9 @@ def train_model(*, path_to_save_model_and_results:str, epochs:int, highest_lr:fl
     logger_test.write('Epochs:%i\n' % epochs)
     logger_test.write('Highest_lr:%f\n' % highest_lr)
     logger_test.write('Lowest_lr:%f\n' % lowest_lr)
-    logger_test.write('num_frames_in_seq:%f\n' % num_frames_in_seq)
+    logger_test.write('num_frames_in_seq:%i\n' % num_frames_in_seq)
     logger_test.write('Loss:%s\n' % 'focal loss (gamma=2)')
-    logger_test.write('Class_weights:%f\n' % class_weights)
+    logger_test.write('Class_weights:%s\n' % class_weights)
     logger_test.write('Additional info:%s\n' %
                       'AttVGGFace2 and EMOVGGFace2 embeddings + FAU, then - 2 LSTMs with attention. 4 engagement classes with focal loss')
 
@@ -247,6 +247,9 @@ def train_model(*, path_to_save_model_and_results:str, epochs:int, highest_lr:fl
 
 if __name__=="__main__":
     # params
+    gpu_devices = tf.config.experimental.list_physical_devices("GPU")
+    for device in gpu_devices:
+        tf.config.experimental.set_memory_growth(device, True)
     path_to_train = r'C:\Databases\DAiSEE\train_preprocessed'
     path_to_train_labels = r'C:\Databases\DAiSEE\Labels\TrainLabels.csv'
     path_to_dev = r'C:\Databases\DAiSEE\dev_preprocessed'
@@ -379,7 +382,7 @@ if __name__=="__main__":
                         tmp_weights[key] = value
                     class_weights = tmp_weights
                     # increase the weight of 1 class
-                    for increase_factor in [2,3]:
+                    for increase_factor in [1, 2, 3]:
                         class_weights_tmp=class_weights.copy()
                         class_weights_tmp[1]*=increase_factor
                         train_model(path_to_save_model_and_results=r"results/results_nf_%i_pof_%.2f_hlr_%.5f_wb_%.5f_if_%i"%

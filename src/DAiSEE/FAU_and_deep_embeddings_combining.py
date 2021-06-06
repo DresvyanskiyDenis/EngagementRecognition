@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from tensorflow.python.keras.utils.data_utils import Sequence
 
 from preprocessing.class_weights import get_class_weights_Effective_Number_of_Samples
+from tensorflow_utils.Layers import _Self_attention_non_local_block_without_shortcut_connection
 from tensorflow_utils.Losses import categorical_focal_loss
 from tensorflow_utils.callbacks import validation_with_generator_callback_multilabel, get_annealing_LRreduce_callback
 
@@ -182,6 +183,7 @@ if __name__=="__main__":
     momentum = 0.9
     weighting_beta = 0.9999
     focal_loss_gamma = 2
+
     # create output path
     if not os.path.exists(path_to_save_model_and_results):
         os.makedirs(path_to_save_model_and_results)
@@ -213,6 +215,8 @@ if __name__=="__main__":
     for key, value in class_weights.items():
         tmp_weights[key] = value
     class_weights = tmp_weights
+    class_weights[1]=class_weights[1]*3
+    print(class_weights)
     # EMOVGGFace2 embeddings
     EMO_deep_emb_train=pd.read_csv(os.path.join(path_to_train,"deep_embeddings_from_EMOVGGFace2.csv" ))
     EMO_deep_emb_dev = pd.read_csv(os.path.join(path_to_dev, "deep_embeddings_from_EMOVGGFace2.csv"))
@@ -375,9 +379,13 @@ if __name__=="__main__":
     model.add(tf.keras.layers.LSTM(512, input_shape=(num_frames_in_seq, 1571), return_sequences=True,
                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.LSTM(256, return_sequences=False,
+    model.add(_Self_attention_non_local_block_without_shortcut_connection(512, mode='1D'))
+    model.add(tf.keras.layers.LSTM(256, return_sequences=True,
                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dropout(0.5))
+    model.add(_Self_attention_non_local_block_without_shortcut_connection(256, mode='1D'))
+    model.add(tf.keras.layers.LSTM(128, return_sequences=False,
+                                   kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.Dense(4, activation='softmax'))
     model.compile(optimizer=optimizer, loss=losses,

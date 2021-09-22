@@ -3,6 +3,13 @@
 """
 TODO: write description of module
 """
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2021"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
 import math
 import shutil
 import time

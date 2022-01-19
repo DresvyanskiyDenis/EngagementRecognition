@@ -10,11 +10,8 @@ __credits__ = ["Denis Dresvyanskiy"]
 __maintainer__ = "Denis Dresvyanskiy"
 __email__ = "denis.dresvyanskiy@uni-ulm.de"
 
-import math
-import shutil
-import time
-from functools import partial
-from typing import Optional, Tuple, Dict, NamedTuple, Iterable, List
+
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -22,10 +19,9 @@ import os
 import cv2
 from PIL import Image
 
-from preprocessing.data_preprocessing.image_preprocessing_utils import save_image
-from preprocessing.data_preprocessing.video_preprocessing_utils import extract_frames_from_videofile
-from preprocessing.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
+from feature_extraction.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
     extract_face_according_bbox, load_and_prepare_detector_retinaFace
+
 
 
 def extract_faces_from_video(path_to_video:str, path_to_output:str,

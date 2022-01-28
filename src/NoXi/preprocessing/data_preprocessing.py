@@ -10,7 +10,7 @@ __credits__ = ["Denis Dresvyanskiy"]
 __maintainer__ = "Denis Dresvyanskiy"
 __email__ = "denis.dresvyanskiy@uni-ulm.de"
 
-
+import glob
 from typing import Tuple
 
 import numpy as np
@@ -73,6 +73,27 @@ def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple
         full_input_path=os.path.join(path_to_data, input_path)
         extract_faces_from_video(path_to_video=full_input_path, path_to_output=full_output_path,
         detector=detector, every_n_frame = 5, resize_face= (224, 224))
+
+def generate_rel_paths_to_images_in_all_dirs(path: str, image_format: str = "jpg") -> pd.DataFrame:
+    """Generates relative paths to all images with specified format.
+       Returns it as a DataFrame
+
+    :param path: str
+            path where all images should be found
+    :return: pd.DataFrame
+            relative paths to images (including filename)
+    """
+    # define pattern for search (in every dir and subdir the image with specified format)
+    pattern = path + r"\**\*." + image_format
+    # searching via this pattern
+    abs_paths = glob.glob(pattern)
+    # find a relative path to it
+    rel_paths = [os.path.relpath(item, path) for item in abs_paths]
+    # create from it a DataFrame
+    paths_to_images = pd.DataFrame(columns=['rel_path'], data=np.array(rel_paths))
+    return paths_to_images
+
+
 
 
 

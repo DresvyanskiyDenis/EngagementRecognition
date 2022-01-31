@@ -65,7 +65,7 @@ def clean_labels(labels: np.ndarray) -> np.ndarray:
     """
     # remove nan values by the mean of array
     means = np.nanmean(labels, axis=0)
-    print("means:", means)
+    #print("means:", means)
     for mean_idx in range(means.shape[0]):
         labels[np.isnan(labels[:, mean_idx]), mean_idx] = means[mean_idx]
 

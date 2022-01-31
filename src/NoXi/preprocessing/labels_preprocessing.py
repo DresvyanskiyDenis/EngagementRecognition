@@ -95,32 +95,8 @@ def average_from_several_labels(labels_list: List[np.ndarray]) -> np.ndarray:
     result_labels = result_labels[..., np.newaxis]
     return result_labels
 
-def load_labels_by_path_to_dir(path: str, file_extension: str = "annotation~") -> pd.DataFrame:
-    """Loads NoXi labels from files with extension annotation~. There can be several annotation files, therefore
-       this function loads all of them and average then.
-       Labels will be presented in pandas DataFrame.
 
-    :param path: str
-            Path to the directory with labels. There could be several label files.
-    :return: pd.DataFrame
-            DataFrame with labels of one file (NoXi database)
-    """
-    # find all files for loading (all with provided extension)
-    files_to_load = glob.glob(os.path.join(path, "*." + file_extension))
-    # load all of them
-    labels = []
-    for file_to_load in files_to_load:
-        label = read_noxi_label_file(os.path.join(path, file_to_load))
-        label = clean_labels(label)
-        labels.append(label)
-    # average ground truth labels (if there are several annotations of one video file)
-    labels = average_from_several_labels(labels)
-    # create from it pandas DataFrame
-    labels = pd.DataFrame(data=labels)
-    return labels
-
-
-def load_all_labels_by_paths(paths: List[str]) -> Dict[str, pd.DataFrame]:
+def load_all_labels_by_paths(paths: List[str]) -> Dict[str, np.ndarray]:
     """Loads labels from all paths provided in list. It will save it as a dict.
        Keys are paths, values are DataFrames with labels
 
@@ -132,7 +108,7 @@ def load_all_labels_by_paths(paths: List[str]) -> Dict[str, pd.DataFrame]:
     """
     labels = {}
     for path in paths:
-        label = load_labels_by_path_to_dir(path)
+        label = read_noxi_label_file(path)
         labels[path] = label
     return labels
 

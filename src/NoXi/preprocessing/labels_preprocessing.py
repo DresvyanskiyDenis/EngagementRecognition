@@ -95,6 +95,19 @@ def average_from_several_labels(labels_list: List[np.ndarray]) -> np.ndarray:
     result_labels = result_labels[..., np.newaxis]
     return result_labels
 
+def generate_paths_to_labels(path_to_labels:str)->List[str,...]:
+    """Generates paths to labels based on the provided path to directory.
+       Normally, the path to train/dev/test directory should be passed.
+
+    :param path_to_labels: str
+            path to the directory with labels separated in different subdirectories.
+    :return: List[str, ...]
+            List of paths found in directories.
+    """
+    pattern=os.path.join(path_to_labels, "**","*.txt")
+    paths_to_labels=glob.glob(pattern)
+    return paths_to_labels
+
 
 def load_all_labels_by_paths(paths: List[str]) -> Dict[str, np.ndarray]:
     """Loads labels from all paths provided in list. It will save it as a dict.
@@ -113,12 +126,12 @@ def load_all_labels_by_paths(paths: List[str]) -> Dict[str, np.ndarray]:
     return labels
 
 
-def transform_all_labels_to_categorical(labels: Dict[str, pd.DataFrame], class_barriers: np.array) -> Dict[
-    str, pd.DataFrame]:
+def transform_all_labels_to_categorical(labels: Dict[str, np.ndarray], class_barriers: np.array) -> Dict[
+    str, np.ndarray]:
     """Transforms all labels in provided dict to categorical ones.
 
-    :param labels: Dict[str, pd.DataFrame]
-            labels in format filename->pd.DataFrame. The values are real numbers.
+    :param labels: Dict[str, np.ndarray]
+            labels in format filename->np.ndarray. The values are real numbers.
     :param class_barriers: np.array
             numpy array with class barries. For example, class_barriers=[0.1, 0.5] will divide
             all labels into three classes - one from all less than 0.1, second from 0.1 to 0.5, and third everything more than 0.5
@@ -126,15 +139,13 @@ def transform_all_labels_to_categorical(labels: Dict[str, pd.DataFrame], class_b
             labels in format filename->pd.DataFrame. The values are categorical.
     """
     for key in labels.keys():
-        # save column names of the dataframe
-        columns = labels[key].columns
-        # transform labels. To do it, we need to extract numpy array from dataframe
-        transformed_labels = transform_time_continuous_to_categorical(labels[key].values, class_barriers)
+        # transform labels
+        transformed_labels = transform_time_continuous_to_categorical(labels[key], class_barriers)
         # assign a new dataframe with transformed labels to the corresponding path
-        labels[key] = pd.DataFrame(columns=columns, data=transformed_labels)
+        labels[key] = transformed_labels
     return labels
 
-def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:pd.DataFrame, frames_step:int=5)->pd.DataFrame:
+def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:np.ndarray, frames_step:int=5)->pd.DataFrame:
     """Combines paths to the images with corresponding labels. The sample rate is needed, since not all the images are taken.
        For example, in the paths dataframe can be only every fifth frame of the video file.
 
@@ -152,13 +163,13 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
     # choose indices for labels based on the provided step of frames
     indices_for_labels=np.arrange(paths.shape[0], step=frames_step)
     labels=labels[indices_for_labels]
-    # copy dataframe for consequent changing without influences on the existing dataframe
-    result_df=copy.deepcopy(paths)
+    # copy np.ndarray for consequent changing without influences on the existing np.ndarray
+    result=copy.deepcopy(paths)
     # combination of chosen labels with filenames
-    result_df['label']=labels
-    return result_df
+    result['label']=labels
+    return result
 
-def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFrame, labels: Dict[str, pd.DataFrame],
+def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFrame, labels: Dict[str, np.ndarray],
                                        sample_rate_annotations: Optional[int] = 25, frame_step:int=5) -> pd.DataFrame:
     """Combines paths to video frames (images) with corresponding to them labels.
        At the end, the fuinction returns pandas DataFrame as follows:

@@ -62,7 +62,6 @@ def extract_faces_from_video(path_to_video:str, path_to_output:str,
             break
 
 def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple[str,...], output_path:str)->None:
-    # TODO: TEST IT
     # check if output directory exists
     if not os.path.exists(output_path):
         os.makedirs(output_path, exist_ok=True)
@@ -84,13 +83,13 @@ def generate_rel_paths_to_images_in_all_dirs(path: str, image_format: str = "jpg
             relative paths to images (including filename)
     """
     # define pattern for search (in every dir and subdir the image with specified format)
-    pattern = path + r"\**\*." + image_format
+    pattern = path + "\\**\\*." + image_format
     # searching via this pattern
     abs_paths = glob.glob(pattern)
     # find a relative path to it
     rel_paths = [os.path.relpath(item, path) for item in abs_paths]
     # create from it a DataFrame
-    paths_to_images = pd.DataFrame(columns=['rel_path'], data=np.array(rel_paths))
+    paths_to_images = pd.DataFrame(columns=['rel_path'], data=np.array(rel_paths)[..., np.newaxis])
     return paths_to_images
 
 

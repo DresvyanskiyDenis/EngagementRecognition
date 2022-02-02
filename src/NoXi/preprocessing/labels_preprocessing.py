@@ -163,10 +163,15 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
     # choose indices for labels based on the provided step of frames
     indices_for_labels=np.arange(labels.shape[0], step=frames_step)
     labels=labels[indices_for_labels]
-    # aligning the labels to the paths length
-
     # copy np.ndarray for consequent changing without influences on the existing np.ndarray
     result=copy.deepcopy(paths)
+    # aligning the labels to the paths length
+    if labels.shape[0] != paths.shape[0]:
+        print("WARNING: labels shape:%i is not equal to image_paths shape:%i. Videofile:%s" % (
+        labels.shape[0], paths.shape[0], paths['rel_path'].iloc[0]))
+        required_length=min(labels.shape[0], result.shape[0])
+        labels, result= labels[:required_length], result[:required_length]
+        print("NEW SHAPES ARE: labels shape:%i, image_paths shape:%i"% (labels.shape[0], result.shape[0]))
     # combination of chosen labels with filenames
     result['label']=labels
     return result
@@ -203,7 +208,7 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
         # change names of columns for further easier processing
         df_paths_labels_one_video.columns=['filename', 'class']
         # append obtained dataframe to the result dataframe (which contains all paths and labels)
-        result_dataframe=result_dataframe.append(df_paths_labels_one_video, axis=0)
+        result_dataframe=result_dataframe.append(df_paths_labels_one_video)
 
     return result_dataframe
 

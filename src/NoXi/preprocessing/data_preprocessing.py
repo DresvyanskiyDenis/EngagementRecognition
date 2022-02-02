@@ -19,7 +19,7 @@ import os
 import cv2
 from PIL import Image
 
-from feature_extraction.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
+"""from feature_extraction.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
     extract_face_according_bbox, load_and_prepare_detector_retinaFace
 
 
@@ -59,7 +59,7 @@ def extract_faces_from_video(path_to_video:str, path_to_output:str,
             full_path_for_saving = os.path.join(path_to_output, 'frame_%i.png'%currentframe)
             frame.save(full_path_for_saving)
         else:
-            break
+            break"""
 
 def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple[str,...], output_path:str)->None:
     # check if output directory exists
@@ -83,13 +83,21 @@ def generate_rel_paths_to_images_in_all_dirs(path: str, image_format: str = "jpg
             relative paths to images (including filename)
     """
     # define pattern for search (in every dir and subdir the image with specified format)
-    pattern = path + "\\**\\*." + image_format
+    pattern = path + "/**/**/*." + image_format
     # searching via this pattern
     abs_paths = glob.glob(pattern)
     # find a relative path to it
     rel_paths = [os.path.relpath(item, path) for item in abs_paths]
     # create from it a DataFrame
     paths_to_images = pd.DataFrame(columns=['rel_path'], data=np.array(rel_paths)[..., np.newaxis])
+    # sort procedure to arrange frames in ascending order within one video
+    paths_to_images['frame_num']=paths_to_images['rel_path'].apply(lambda x: int(x.split(os.path.sep)[-1].split('.')[0].split('_')[-1]))
+    paths_to_images['rel_path']=paths_to_images['rel_path'].apply(lambda x:x[:x.rfind(os.path.sep)])
+    paths_to_images=paths_to_images.sort_values(['rel_path','frame_num'], ascending=(True, True))
+    paths_to_images['rel_path'] = paths_to_images.apply(lambda x: os.path.join(x['rel_path'],"frame_%i.%s"%(x['frame_num'], image_format)), axis=1)
+    paths_to_images=paths_to_images.reset_index(drop=True)
+    paths_to_images.drop(columns=['frame_num'], inplace=True)
+    # done
     return paths_to_images
 
 

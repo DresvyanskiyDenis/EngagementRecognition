@@ -95,7 +95,7 @@ def average_from_several_labels(labels_list: List[np.ndarray]) -> np.ndarray:
     result_labels = result_labels[..., np.newaxis]
     return result_labels
 
-def generate_paths_to_labels(path_to_labels:str)->List[str,...]:
+def generate_paths_to_labels(path_to_labels:str)->List[str]:
     """Generates paths to labels based on the provided path to directory.
        Normally, the path to train/dev/test directory should be passed.
 
@@ -161,8 +161,10 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
             Combined pandas DataFrame with paths and corresponding to them labels.
     """
     # choose indices for labels based on the provided step of frames
-    indices_for_labels=np.arrange(paths.shape[0], step=frames_step)
+    indices_for_labels=np.arange(labels.shape[0], step=frames_step)
     labels=labels[indices_for_labels]
+    # aligning the labels to the paths length
+
     # copy np.ndarray for consequent changing without influences on the existing np.ndarray
     result=copy.deepcopy(paths)
     # combination of chosen labels with filenames
@@ -195,9 +197,9 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
         labels_one_video=labels[path_to_label]
         # TODO: CHECK IT. Check also ranking of filenames (order should be numerical, not lexical)
         # search paths to images in dataframe according to the path to the labels (for example, 031_2016-04-06_Nottingham\\expert)
-        df_with_paths_one_video=paths_with_images[path_to_label in paths_with_images['rel_path']]
+        df_with_paths_one_video=paths_with_images[paths_with_images['rel_path'].str.contains(path_to_label, case=False)]
         # combine labels with corresponding paths to images
-        df_paths_labels_one_video=combine_dataframe_of_paths_with_labels_one_video(paths_with_images, labels_one_video, frame_step)
+        df_paths_labels_one_video=combine_dataframe_of_paths_with_labels_one_video(df_with_paths_one_video, labels_one_video, frame_step)
         # change names of columns for further easier processing
         df_paths_labels_one_video.columns=['filename', 'class']
         # append obtained dataframe to the result dataframe (which contains all paths and labels)

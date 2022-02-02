@@ -57,11 +57,24 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
     train_labels = transform_all_labels_to_categorical(train_labels, class_barriers)
     dev_labels = transform_all_labels_to_categorical(dev_labels, class_barriers)
     test_labels = transform_all_labels_to_categorical(test_labels, class_barriers)
+    # change the keys of train_labels/dev_labels/test_labels to have only the name with pattern name_of_video/novice_or_expert
+    for key in list(train_labels.keys()):
+        new_key=key.split(os.path.sep)[-2]+'/'
+        new_key=new_key+'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key+'novice'
+        train_labels[new_key]=train_labels.pop(key)
+    for key in list(dev_labels.keys()):
+        new_key=key.split(os.path.sep)[-2]+'/'
+        new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
+        dev_labels[new_key]=dev_labels.pop(key)
+    for key in list(test_labels.keys()):
+        new_key=key.split(os.path.sep)[-2]+'/'
+        new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
+        test_labels[new_key]=test_labels.pop(key)
     # combine paths to images (data) with labels
     train_image_paths_and_labels = combine_path_to_images_with_labels_many_videos(paths_with_images=paths_to_images,
                                                                                   labels=train_labels,
                                                                                   sample_rate_annotations=25,
-                                                                                  frame_step=5)
+                                                                                  frame_step=frame_step)
     dev_image_paths_and_labels = combine_path_to_images_with_labels_many_videos(paths_with_images=paths_to_images,
                                                                                 labels=dev_labels,
                                                                                 sample_rate_annotations=25,
@@ -77,9 +90,12 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
 
 
 def main():
-    path_to_data = ""
-    path_to_labels = ""
-    pass
+    path_to_data = "/media/external_hdd_1/Noxi_extracted/NoXi/extracted_faces/"
+    path_to_labels = "/media/external_hdd_1/Noxi_labels_gold_standard/English"
+    class_barriers=np.array([0.45, 0.6, 0.8])
+    frame_step=5
+    train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
+                             class_barriers, frame_step)
 
 
 if __name__ == '__main__':

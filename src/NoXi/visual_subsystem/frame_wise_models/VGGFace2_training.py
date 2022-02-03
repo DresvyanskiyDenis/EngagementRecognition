@@ -94,6 +94,9 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
 
 
 def main():
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
     path_to_data = "/media/external_hdd_1/Noxi_extracted/NoXi/extracted_faces/"
     path_to_labels = "/media/external_hdd_1/Noxi_labels_gold_standard/English"
     class_barriers=np.array([0.45, 0.6, 0.8])
@@ -106,11 +109,12 @@ def main():
     optimizer=tf.keras.optimizers.Adam(0.0001)
     loss=tf.keras.losses.categorical_crossentropy
     metrics=['accuracy']
+    batch_size=110
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
     model.summary()
 
     # create DataLoader (DataGenerator)
-    data_loader=ImageDataLoader(paths_with_labels=train, batch_size=64, preprocess_function=VGGFace2_normalization ,
+    data_loader=ImageDataLoader(paths_with_labels=train, batch_size=batch_size, preprocess_function=VGGFace2_normalization ,
                  num_classes = 4,
                  horizontal_flip = 0.1, vertical_flip = 0.1,
                  shift = 0.1,

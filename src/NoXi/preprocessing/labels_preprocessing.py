@@ -160,11 +160,31 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
     :return: pd.DataFrame
             Combined pandas DataFrame with paths and corresponding to them labels.
     """
-    # choose indices for labels based on the provided step of frames
+    # copy np.ndarray for consequent changing without influences on the existing np.ndarray
+    result = copy.deepcopy(paths)
+    # extract frame numbers to take solely labels for these frames
+    frame_numbers=paths['rel_path'].apply(lambda x: int(x.split(os.path.sep)[-1].split('.')[0].split('_')[-1]))
+    frame_numbers=np.array(frame_numbers)
+    # if for some frames there are no labels, delete these frames from dataframe
+    if frame_numbers[-1]>=labels.shape[0]:
+        mask_for_delete=frame_numbers>=labels.shape[0]
+        frames_for_deleting=frame_numbers[mask_for_delete]
+        result=result[~result['rel_path'].apply(lambda x: int(x.split(os.path.sep)[-1].split('.')[0].split('_')[-1])).isin(frames_for_deleting)]
+        frame_numbers = result['rel_path'].apply(lambda x: int(x.split(os.path.sep)[-1].split('.')[0].split('_')[-1]))
+        frame_numbers = np.array(frame_numbers)
+    # take only needed labels
+    labels = labels[frame_numbers]
+    del frame_numbers
+    # combination of chosen labels with filenames
+    result['label'] = labels
+    return result
+
+
+    '''# choose indices for labels based on the provided step of frames
     indices_for_labels=np.arange(labels.shape[0], step=frames_step)
     labels=labels[indices_for_labels]
     # copy np.ndarray for consequent changing without influences on the existing np.ndarray
-    result=copy.deepcopy(paths)
+    result = copy.deepcopy(paths)
     # aligning the labels to the paths length
     if labels.shape[0] != paths.shape[0]:
         print("WARNING: labels shape:%i is not equal to image_paths shape:%i. Videofile:%s" % (
@@ -174,7 +194,7 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
         print("NEW SHAPES ARE: labels shape:%i, image_paths shape:%i"% (labels.shape[0], result.shape[0]))
     # combination of chosen labels with filenames
     result['label']=labels
-    return result
+    return result'''
 
 def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFrame, labels: Dict[str, np.ndarray],
                                        sample_rate_annotations: Optional[int] = 25, frame_step:int=5) -> pd.DataFrame:
@@ -208,7 +228,7 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
         # change names of columns for further easier processing
         df_paths_labels_one_video.columns=['filename', 'class']
         # append obtained dataframe to the result dataframe (which contains all paths and labels)
-        result_dataframe=result_dataframe.append(df_paths_labels_one_video)
+        result_dataframe=pd.concat([result_dataframe, df_paths_labels_one_video], axis=0, ignore_index=True)
 
     return result_dataframe
 

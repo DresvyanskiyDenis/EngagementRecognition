@@ -7,10 +7,12 @@ import tensorflow as tf
 import os
 import glob
 
+from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
 from src.NoXi.preprocessing.labels_preprocessing import read_noxi_label_file, transform_time_continuous_to_categorical, \
     clean_labels, average_from_several_labels, load_all_labels_by_paths, transform_all_labels_to_categorical, \
     combine_path_to_images_with_labels_many_videos, generate_paths_to_labels
+from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
 
@@ -85,6 +87,8 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
                                                                                  frame_step=5)
     # shuffle train data
     train_image_paths_and_labels = train_image_paths_and_labels.sample(frac=1).reset_index(drop=True)
+    # create abs path for all paths instead of relative (needed for generator)
+    train_image_paths_and_labels['filename']=train_image_paths_and_labels['filename'].apply(lambda x:os.path.join(path_to_data, x))
     # done
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
@@ -96,6 +100,31 @@ def main():
     frame_step=5
     train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
                              class_barriers, frame_step)
+
+    # model initialization and metaparams
+    model=create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5', num_classes=4)
+    optimizer=tf.keras.optimizers.Adam(0.0001)
+    loss=tf.keras.losses.categorical_crossentropy
+    metrics=['accuracy']
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+    model.summary()
+
+    # create DataLoader (DataGenerator)
+    data_loader=ImageDataLoader(paths_with_labels=train, batch_size=64, preprocess_function=VGGFace2_normalization ,
+                 num_classes = 4,
+                 horizontal_flip = 0.1, vertical_flip = 0.1,
+                 shift = 0.1,
+                 brightness = 0.1, shearing = 0.1, zooming = 0.1,
+                 random_cropping_out = 0.1, rotation = 0.1,
+                 scaling = 0.1,
+                 channel_random_noise = 0.1, bluring = 0.1,
+                 worse_quality = 0.1,
+                 mixup = None,
+                 prob_factors_for_each_class= None,
+                 pool_workers= 16)
+
+    # train process
+    model.fit(data_loader, epochs=10)
 
 
 if __name__ == '__main__':

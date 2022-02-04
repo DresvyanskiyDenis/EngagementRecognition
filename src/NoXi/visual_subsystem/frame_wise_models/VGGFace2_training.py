@@ -5,13 +5,18 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import os
+import wandb
 import glob
+
+from keras.callbacks import EarlyStopping
+from wandb.integration.keras import WandbCallback
 
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
 from src.NoXi.preprocessing.labels_preprocessing import read_noxi_label_file, transform_time_continuous_to_categorical, \
     clean_labels, average_from_several_labels, load_all_labels_by_paths, transform_all_labels_to_categorical, \
     combine_path_to_images_with_labels_many_videos, generate_paths_to_labels
+from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
@@ -92,43 +97,136 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
     # done
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
+def train():
+    # metaparams
+    metaparams = {
+        "optimizer": "Adam",  # SGD, Nadam
+        "learning_rate_max": 0.001,  # up to 0.0001
+        "learning_rate_min": 0.00001,  # up to 0.000001
+        "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
+        "annealing_period": 5,
+        "epochs": 1,
+        "batch_size": 110,
+        "augmentation_rate:": 0.1,  # 0.2, 0.3
+        "loss_function": 'categorical_crossentropy',
+        "architecture": "CNN",
+        "dataset": "NoXi"
+    }
+
+    # initialization of Weights and Biases
+    wandb.init(project="VGGFace2_FtF_training", config=metaparams)
+    config = wandb.config
+
+    # loading data
+    path_to_data = "/media/external_hdd_1/Noxi_extracted/NoXi/extracted_faces/"
+    path_to_labels = "/media/external_hdd_1/Noxi_labels_gold_standard/English"
+    class_barriers = np.array([0.45, 0.6, 0.8])
+    frame_step = 5
+    train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
+                                                class_barriers, frame_step)
+
+    # Metaparams initialization
+    metrics = ['accuracy']
+    if config.lr_scheduller=='Cyclic':
+        lr_scheduller = get_annealing_LRreduce_callback(highest_lr=config.learning_rate_max,
+                                                    lowest_lr=config.learning_rate_min,
+                                                    annealing_period=config.annealing_period)
+    elif config.lr_scheduller=='reduceLRonPlateau':
+        lr_scheduller=get_reduceLRonPlateau_callback(monitoring_loss = 'val_loss', reduce_factor = 0.1,
+                                   num_patient_epochs = 3,
+                                   min_lr = config.learning_rate_min)
+    else:
+        raise Exception("You passed wrong lr_scheduller.")
+
+    if config.optimizer == 'Adam':
+        optimizer = tf.keras.optimizers.Adam(config.learning_rate_max)
+    elif config.optimizer == 'Nadam':
+        optimizer = tf.keras.optimizers.Nadam(config.learning_rate_max)
+    elif config.optimizer == 'SGD':
+        optimizer = tf.keras.optimizers.SGD(config.learning_rate_max)
+    else:
+        raise Exception("You passed wrong optimizer name.")
+
+    # model initialization
+    model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
+                                  num_classes=4)
+    model.compile(loss=config.loss_function, optimizer=optimizer, metrics=metrics)
+    model.summary()
+
+    # create DataLoaders (DataGenerator)
+    train_data_loader = ImageDataLoader(paths_with_labels=train, batch_size=config.batch_size,
+                                        preprocess_function=VGGFace2_normalization,
+                                        num_classes=4,
+                                        horizontal_flip=config.augmentation_rate,
+                                        vertical_flip=config.augmentation_rate,
+                                        shift=config.augmentation_rate,
+                                        brightness=config.augmentation_rate, shearing=config.augmentation_rate,
+                                        zooming=config.augmentation_rate,
+                                        random_cropping_out=config.augmentation_rate, rotation=config.augmentation_rate,
+                                        scaling=config.augmentation_rate,
+                                        channel_random_noise=config.augmentation_rate, bluring=config.augmentation_rate,
+                                        worse_quality=config.augmentation_rate,
+                                        mixup=None,
+                                        prob_factors_for_each_class=None,
+                                        pool_workers=16)
+
+    dev_data_loader = ImageDataLoader(paths_with_labels=train, batch_size=config.batch_size,
+                                      preprocess_function=VGGFace2_normalization,
+                                      num_classes=4,
+                                      horizontal_flip=0, vertical_flip=0,
+                                      shift=0,
+                                      brightness=0, shearing=0, zooming=0,
+                                      random_cropping_out=0, rotation=0,
+                                      scaling=0,
+                                      channel_random_noise=0, bluring=0,
+                                      worse_quality=0,
+                                      mixup=None,
+                                      prob_factors_for_each_class=None,
+                                      pool_workers=16)
+
+    # train process
+    model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
+              callbacks=[WandbCallback(),
+                         lr_scheduller,
+                         EarlyStopping(monitor='val_loss', patience=3, verbose=1)])
+
 
 def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
-    path_to_data = "/media/external_hdd_1/Noxi_extracted/NoXi/extracted_faces/"
-    path_to_labels = "/media/external_hdd_1/Noxi_labels_gold_standard/English"
-    class_barriers=np.array([0.45, 0.6, 0.8])
-    frame_step=5
-    train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
-                             class_barriers, frame_step)
 
-    # model initialization and metaparams
-    model=create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5', num_classes=4)
-    optimizer=tf.keras.optimizers.Adam(0.0001)
-    loss=tf.keras.losses.categorical_crossentropy
-    metrics=['accuracy']
-    batch_size=110
-    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.summary()
+    sweep_config= {
+        'method':'random',
+        'metric':{
+            'name':'val_loss',
+            'goal':'minimize'
+        },
+        'parameters': {
+            'optimizer':{
+                'values':['Adam', 'SGD', 'Nadam']
+            },
+            'learning_rate_max':{
+                'distribution': 'uniform',
+                'max':0.001,
+                'min':0.0001
+            },
+            'learning_rate_min':{
+                'distribution': 'uniform',
+                'max': 0.00001,
+                'min': 0.000001
+            },
+            'lr_scheduller': {
+                'values':['Cyclic', 'reduceLRonPlateau']
+            },
+            'augmentation_rate': {
+                'values':[0.1, 0.2, 0.3]
+            }
+        }
+    }
+    sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=train, count=10, project='VGGFace2_FtF_training')
 
-    # create DataLoader (DataGenerator)
-    data_loader=ImageDataLoader(paths_with_labels=train, batch_size=batch_size, preprocess_function=VGGFace2_normalization ,
-                 num_classes = 4,
-                 horizontal_flip = 0.1, vertical_flip = 0.1,
-                 shift = 0.1,
-                 brightness = 0.1, shearing = 0.1, zooming = 0.1,
-                 random_cropping_out = 0.1, rotation = 0.1,
-                 scaling = 0.1,
-                 channel_random_noise = 0.1, bluring = 0.1,
-                 worse_quality = 0.1,
-                 mixup = None,
-                 prob_factors_for_each_class= None,
-                 pool_workers= 16)
-
-    # train process
-    model.fit(data_loader, epochs=10)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,7 @@
+import sys
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+
 import copy
 import gc
 from typing import List, Dict, Optional, Tuple
@@ -11,6 +15,8 @@ import glob
 
 from keras.callbacks import EarlyStopping
 from wandb.integration.keras import WandbCallback
+
+
 
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
@@ -119,7 +125,7 @@ def train():
     config = wandb.config
 
     # loading data
-    path_to_data = "/media/external_hdd_1/Noxi_extracted/NoXi/extracted_faces/"
+    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
     path_to_labels = "/media/external_hdd_1/Noxi_labels_gold_standard/English"
     class_barriers = np.array([0.45, 0.6, 0.8])
     frame_step = 5

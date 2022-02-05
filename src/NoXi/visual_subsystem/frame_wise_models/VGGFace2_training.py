@@ -1,4 +1,5 @@
 import copy
+import gc
 from typing import List, Dict, Optional, Tuple
 
 import numpy as np
@@ -105,7 +106,7 @@ def train():
         "learning_rate_min": 0.00001,  # up to 0.000001
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
-        "epochs": 1,
+        "epochs": 20,
         "batch_size": 110,
         "augmentation_rate:": 0.1,  # 0.2, 0.3
         "loss_function": 'categorical_crossentropy',
@@ -124,7 +125,6 @@ def train():
     frame_step = 5
     train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
                                                 class_barriers, frame_step)
-
     # Metaparams initialization
     metrics = ['accuracy']
     if config.lr_scheduller=='Cyclic':
@@ -170,7 +170,7 @@ def train():
                                         prob_factors_for_each_class=None,
                                         pool_workers=16)
 
-    dev_data_loader = ImageDataLoader(paths_with_labels=train, batch_size=config.batch_size,
+    dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=config.batch_size,
                                       preprocess_function=VGGFace2_normalization,
                                       num_classes=4,
                                       horizontal_flip=0, vertical_flip=0,
@@ -184,12 +184,18 @@ def train():
                                       prob_factors_for_each_class=None,
                                       pool_workers=16)
 
+    print(config.epochs, config.batch_size)
     # train process
     model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
                          EarlyStopping(monitor='val_loss', patience=3, verbose=1)])
-
+    # clear RAM
+    del train, dev, test
+    del train_data_loader, dev_data_loader
+    del model
+    gc.collect()
+    tf.keras.backend.clear_session()
 
 def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -225,7 +231,7 @@ def main():
         }
     }
     sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=train, count=10, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=train, count=20, project='VGGFace2_FtF_training')
 
 
 

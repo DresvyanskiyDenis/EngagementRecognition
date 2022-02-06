@@ -101,6 +101,8 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
     train_image_paths_and_labels = train_image_paths_and_labels.sample(frac=1).reset_index(drop=True)
     # create abs path for all paths instead of relative (needed for generator)
     train_image_paths_and_labels['filename']=train_image_paths_and_labels['filename'].apply(lambda x:os.path.join(path_to_data, x))
+    dev_image_paths_and_labels['filename'] = dev_image_paths_and_labels['filename'].apply(lambda x: os.path.join(path_to_data, x))
+    test_image_paths_and_labels['filename'] = test_image_paths_and_labels['filename'].apply(lambda x: os.path.join(path_to_data, x))
     # done
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
@@ -174,7 +176,7 @@ def train():
                                         worse_quality=config.augmentation_rate,
                                         mixup=None,
                                         prob_factors_for_each_class=None,
-                                        pool_workers=16)
+                                        pool_workers=24)
 
     dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=config.batch_size,
                                       preprocess_function=VGGFace2_normalization,
@@ -191,11 +193,15 @@ def train():
                                       pool_workers=16)
 
     print(config.epochs, config.batch_size)
+    print(dev.shape)
+    print("####################################")
+    print(train.shape)
     # train process
+    print("new configuration")
     model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
-                         EarlyStopping(monitor='val_loss', patience=3, verbose=1)])
+                         EarlyStopping(monitor='val_loss', patience=5, verbose=1)])
     # clear RAM
     del train, dev, test
     del train_data_loader, dev_data_loader

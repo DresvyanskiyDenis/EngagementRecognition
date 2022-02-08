@@ -118,8 +118,8 @@ def train():
         "batch_size": 110,
         "augmentation_rate:": 0.1,  # 0.2, 0.3
         "loss_function": 'categorical_crossentropy',
-        "architecture": "CNN",
-        "dataset": "NoXi"
+        "architecture": "VGGFace2_full_training",
+        "dataset": "NoXi_english"
     }
 
     # initialization of Weights and Biases

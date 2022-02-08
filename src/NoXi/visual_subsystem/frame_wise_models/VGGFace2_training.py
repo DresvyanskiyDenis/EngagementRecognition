@@ -1,4 +1,9 @@
 import sys
+
+from sklearn.metrics import recall_score, precision_score, f1_score
+
+from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -133,6 +138,12 @@ def train():
     frame_step = 5
     train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
                                                 class_barriers, frame_step)
+
+    ################################# DANGER, DELETE IT
+    train=train[:1000]
+    dev=dev[:1000]
+    print(train.shape, dev.shape)
+    ######################################
     # Metaparams initialization
     metrics = ['accuracy']
     if config.lr_scheduller=='Cyclic':
@@ -192,6 +203,16 @@ def train():
                                       prob_factors_for_each_class=None,
                                       pool_workers=16)
 
+    # create Keras Callbacks for monitoring learning rate and metrics on val_set
+    lr_monitor_callback =WandB_LR_log_callback(optimizer)
+    val_metrics={
+        'recall':recall_score,
+        'precision':precision_score,
+        'f1_score:':f1_score
+    }
+    val_metrics_callback=WandB_val_metrics_callback(dev_data_loader, val_metrics)
+    early_stopping_callback=EarlyStopping(monitor='val_loss', patience=5, verbose=1)
+
     print(config.epochs, config.batch_size)
     print(dev.shape)
     print("####################################")
@@ -201,7 +222,9 @@ def train():
     model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
-                         EarlyStopping(monitor='val_loss', patience=5, verbose=1)])
+                         early_stopping_callback,
+                         lr_monitor_callback,
+                         val_metrics_callback])
     # clear RAM
     del train, dev, test
     del train_data_loader, dev_data_loader

@@ -1,13 +1,13 @@
 import sys
-from functools import partial
-
-from sklearn.metrics import recall_score, precision_score, f1_score
-
-from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
+
+from functools import partial
+from sklearn.metrics import recall_score, precision_score, f1_score
+from sklearn.utils import compute_class_weight
+from tensorflow_utils.Losses import categorical_focal_loss
+from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
 import copy
 import gc
 from typing import List, Dict, Optional, Tuple
@@ -123,7 +123,6 @@ def train():
         "epochs": 20,
         "batch_size": 100,
         "augmentation_rate:": 0.1,  # 0.2, 0.3
-        "loss_function": 'categorical_crossentropy',
         "architecture": "VGGFace2_full_training",
         "dataset": "NoXi_english"
     }
@@ -140,11 +139,6 @@ def train():
     train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
                                                 class_barriers, frame_step)
 
-    ################################# DANGER, DELETE IT
-    train=train[:1000]
-    dev=dev[:1000]
-    print(train.shape, dev.shape)
-    ######################################
     # Metaparams initialization
     metrics = ['accuracy']
     if config.lr_scheduller=='Cyclic':
@@ -167,10 +161,18 @@ def train():
     else:
         raise Exception("You passed wrong optimizer name.")
 
+    # class weights
+    class_weights=compute_class_weight(class_weight='balanced', classes=np.unique(train['class']),
+                                       y=train['class'].values.flatten())
+
+    # loss function
+    focal_loss_gamma=2
+    loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
+    wandb.config.update({'loss':loss})
     # model initialization
     model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
                                   num_classes=4)
-    model.compile(loss=config.loss_function, optimizer=optimizer, metrics=metrics)
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
     model.summary()
 
     # create DataLoaders (DataGenerator)
@@ -214,12 +216,8 @@ def train():
     val_metrics_callback=WandB_val_metrics_callback(dev_data_loader, val_metrics)
     early_stopping_callback=EarlyStopping(monitor='val_loss', patience=5, verbose=1)
 
-    print(config.epochs, config.batch_size)
-    print(dev.shape)
-    print("####################################")
-    print(train.shape)
     # train process
-    print("new configuration")
+    print("Focal loss")
     model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
@@ -267,7 +265,7 @@ def main():
         }
     }
     sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=train, count=5, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=train, count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

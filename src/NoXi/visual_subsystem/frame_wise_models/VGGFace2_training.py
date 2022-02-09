@@ -121,7 +121,7 @@ def train():
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 20,
-        "batch_size": 100,
+        "batch_size": 90,
         "augmentation_rate:": 0.1,  # 0.2, 0.3
         "architecture": "VGGFace2_full_training",
         "dataset": "NoXi_english"
@@ -232,9 +232,9 @@ def train():
     tf.keras.backend.clear_session()
 
 def main():
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
+    #gpus = tf.config.experimental.list_physical_devices('GPU')
+    #for gpu in gpus:
+    #    tf.config.experimental.set_memory_growth(gpu, True)
 
     sweep_config= {
         'method':'random',

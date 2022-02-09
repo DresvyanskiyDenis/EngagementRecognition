@@ -1,4 +1,5 @@
 import sys
+from functools import partial
 
 from sklearn.metrics import recall_score, precision_score, f1_score
 
@@ -120,7 +121,7 @@ def train():
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 20,
-        "batch_size": 110,
+        "batch_size": 100,
         "augmentation_rate:": 0.1,  # 0.2, 0.3
         "loss_function": 'categorical_crossentropy',
         "architecture": "VGGFace2_full_training",
@@ -204,11 +205,11 @@ def train():
                                       pool_workers=16)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
-    lr_monitor_callback =WandB_LR_log_callback(optimizer)
+    lr_monitor_callback =WandB_LR_log_callback()
     val_metrics={
-        'recall':recall_score,
-        'precision':precision_score,
-        'f1_score:':f1_score
+        'val_recall':partial(recall_score, average='macro'),
+        'val_precision':partial(precision_score, average='macro'),
+        'val_f1_score:':partial(f1_score, average='macro')
     }
     val_metrics_callback=WandB_val_metrics_callback(dev_data_loader, val_metrics)
     early_stopping_callback=EarlyStopping(monitor='val_loss', patience=5, verbose=1)
@@ -266,7 +267,9 @@ def main():
         }
     }
     sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=train, count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=train, count=5, project='VGGFace2_FtF_training')
+    tf.keras.backend.clear_session()
+    gc.collect()
 
 
 

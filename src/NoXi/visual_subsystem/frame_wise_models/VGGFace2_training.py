@@ -121,7 +121,7 @@ def train():
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 20,
-        "batch_size": 90,
+        "batch_size": 80,
         "augmentation_rate:": 0.1,  # 0.2, 0.3
         "architecture": "VGGFace2_full_training",
         "dataset": "NoXi_english"

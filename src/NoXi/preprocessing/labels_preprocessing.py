@@ -40,19 +40,25 @@ def transform_time_continuous_to_categorical(labels: np.ndarray, class_barriers:
 
 def read_noxi_label_file(path: str) -> np.ndarray:
     """Reads the label file of NoXi database
-       It is initially a bite array (flow).
+       It is initially a bite array (flow). However, if the path to the .txt file is passed,
+       it will read this one as a numpy array.
 
     :param path: str
             path to the file to read
     :return: np.ndarray
             read and saved to the numpy array file
     """
-    # read it as a bite array with ASCII encoding
-    with open(path, 'r', encoding='ASCII') as reader:
-        annotation = reader.read()
-    # convert byte array to numpy array
-    annotation = np.genfromtxt(annotation.splitlines(), dtype=np.float32, delimiter=';')
+    # check if file is a txt file (then it is a gold standard files, can contain already one-hot encodings)
+    if path.split(os.path.sep)[-1].split('.')[-1]=="txt":
+        annotation = np.loadtxt(path)
+    else:
+        # read it as a bite array with ASCII encoding
+        with open(path, 'r', encoding='ASCII') as reader:
+            annotation = reader.read()
+        # convert byte array to numpy array
+        annotation = np.genfromtxt(annotation.splitlines(), dtype=np.float32, delimiter=';')
     return annotation
+
 
 
 def clean_labels(labels: np.ndarray) -> np.ndarray:
@@ -178,7 +184,8 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
     labels = labels[frame_numbers]
     del frame_numbers
     # combination of chosen labels with filenames
-    result['label'] = labels
+    new_columns=["label_%i"%i for i in range(labels.shape[1])]
+    result[new_columns] = labels
     return result
 
 
@@ -219,7 +226,7 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
             Combined paths to frames with corresponding to them labels. All videos are processed.
     """
     # create result dataframe with needed columns
-    result_dataframe=pd.DataFrame(columns=['filename', 'class'])
+    result_dataframe=pd.DataFrame(columns=['filename'])
     for path_to_label in labels.keys():
         labels_one_video=labels[path_to_label]
         # TODO: CHECK IT. Check also ranking of filenames (order should be numerical, not lexical)
@@ -227,8 +234,8 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
         df_with_paths_one_video=paths_with_images[paths_with_images['rel_path'].str.contains(path_to_label, case=False)]
         # combine labels with corresponding paths to images
         df_paths_labels_one_video=combine_dataframe_of_paths_with_labels_one_video(df_with_paths_one_video, labels_one_video, frame_step)
-        # change names of columns for further easier processing
-        df_paths_labels_one_video.columns=['filename', 'class']
+        # rename first columns for convenient processing by DataLoader
+        df_paths_labels_one_video.rename(columns={'rel_path':'filename'}, inplace=True)
         # append obtained dataframe to the result dataframe (which contains all paths and labels)
         result_dataframe=pd.concat([result_dataframe, df_paths_labels_one_video], axis=0, ignore_index=True)
 

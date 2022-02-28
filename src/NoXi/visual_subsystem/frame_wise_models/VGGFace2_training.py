@@ -125,7 +125,7 @@ def train():
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 30,
-        "batch_size": 100,
+        "batch_size": 80,
         "augmentation_rate": 0.1,  # 0.2, 0.3
         "architecture": "VGGFace2_full_training",
         "dataset": "NoXi_english",
@@ -154,7 +154,7 @@ def train():
     test = pd.concat([test_french, test_german, test_english], axis=0)
     # shuffle one more time train data
     train = train.sample(frac=1).reset_index(drop=True)
-
+    del test, test_english, test_german, test_french
     # Metaparams initialization
     metrics = ['accuracy']
     if config.lr_scheduller=='Cyclic':
@@ -236,6 +236,7 @@ def train():
 
     # train process
     print("Weighted crossentropy loss")
+    print("DONE")
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,

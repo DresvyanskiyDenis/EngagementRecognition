@@ -53,8 +53,7 @@ def create_VGGFace2_model(path_to_weights: str, num_classes: Optional[int] = 4) 
     return model
 
 
-def load_and_preprocess_data(path_to_data: str, path_to_labels: str,
-                             class_barriers: np.array, frame_step: int) -> Tuple[
+def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step: int) -> Tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """TODO: complete function
 
@@ -133,12 +132,28 @@ def train():
 
 
     # loading data
-    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    path_to_labels = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
-    class_barriers = np.array([0.45, 0.6, 0.8])
     frame_step = 5
-    train, dev, test = load_and_preprocess_data(path_to_data, path_to_labels,
-                                                class_barriers, frame_step)
+
+    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
+    # french data
+    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
+    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french,
+                                                frame_step)
+    # english data
+    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
+    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german,
+                                                frame_step)
+    # german data
+    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
+    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english,
+                                                frame_step)
+
+    # all data
+    train=pd.concat([train_french, train_german, train_english], axis=0)
+    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
+    test = pd.concat([test_french, test_german, test_english], axis=0)
+    # shuffle one more time train data
+    train=train.sample(frac=1).reset_index(drop=True)
 
     # Metaparams initialization
     metrics = ['accuracy']
@@ -148,7 +163,7 @@ def train():
                                                     annealing_period=metaparams['annealing_period'])
     elif metaparams['lr_scheduller']=='reduceLRonPlateau':
         lr_scheduller=get_reduceLRonPlateau_callback(monitoring_loss = 'val_loss', reduce_factor = 0.1,
-                                   num_patient_epochs = 3,
+                                   num_patient_epochs = 4,
                                    min_lr = metaparams['learning_rate_min'])
     else:
         raise Exception("You passed wrong lr_scheduller.")

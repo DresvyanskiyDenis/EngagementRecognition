@@ -1,4 +1,7 @@
 import sys
+
+import objgraph
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -189,7 +192,7 @@ def train_model(train, dev):
                                         worse_quality=config.augmentation_rate,
                                         mixup=None,
                                         prob_factors_for_each_class=None,
-                                        pool_workers=24)
+                                        pool_workers=16)
 
     dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=config.batch_size,
                                       preprocess_function=VGGFace2_normalization,
@@ -205,12 +208,17 @@ def train_model(train, dev):
                                       prob_factors_for_each_class=None,
                                       pool_workers=16)
 
+    """print("start data loaders----------------------------------------------")
+    objgraph.show_growth()
+
     for i in range(10):
         for iter, (x,y) in enumerate(train_data_loader):
             print('train epoch %i, iter %i'%(i, iter))
         for iter, (x,y) in enumerate(dev_data_loader):
             print('dev epoch %i, iter %i'%(i, iter))
-    """# create Keras Callbacks for monitoring learning rate and metrics on val_set
+        print("epoch ended----------------------------------------------")
+        objgraph.show_growth()"""
+    # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback =WandB_LR_log_callback()
     val_metrics={
         'val_recall':partial(recall_score, average='macro'),
@@ -224,13 +232,13 @@ def train_model(train, dev):
     print("Weighted crossentropy loss")
     print(config.batch_size)
     print("--------------------")
-    model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
+    model.fit(train_data_loader, epochs=config.epochs,
               class_weight={i:class_weights[i] for i in range(config.num_classes)},
               callbacks=[WandbCallback(),
                          lr_scheduller,
                          early_stopping_callback,
                          lr_monitor_callback,
-                         val_metrics_callback])"""
+                         val_metrics_callback])
     # clear RAM
     del train_data_loader, dev_data_loader
     del model

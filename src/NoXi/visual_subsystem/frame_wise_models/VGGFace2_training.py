@@ -116,7 +116,7 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
 
-def train():
+def train_model(train, dev):
     # metaparams
     metaparams = {
         "optimizer": "Adam",  # SGD, Nadam
@@ -136,25 +136,6 @@ def train():
     wandb.init(project="VGGFace2_FtF_training", config=metaparams)
     config = wandb.config
 
-    # loading data
-    frame_step = 5
-    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    # french data
-    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
-    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french, frame_step)
-    # english data
-    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
-    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german, frame_step)
-    # german data
-    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
-    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english, frame_step)
-    # all data
-    train = pd.concat([train_french, train_german, train_english], axis=0)
-    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
-    test = pd.concat([test_french, test_german, test_english], axis=0)
-    # shuffle one more time train data
-    train = train.sample(frac=1).reset_index(drop=True)
-    del test, test_english, test_german, test_french
     # Metaparams initialization
     metrics = ['accuracy']
     if config.lr_scheduller=='Cyclic':
@@ -224,7 +205,12 @@ def train():
                                       prob_factors_for_each_class=None,
                                       pool_workers=16)
 
-    # create Keras Callbacks for monitoring learning rate and metrics on val_set
+    for i in range(10):
+        for iter, (x,y) in enumerate(train_data_loader):
+            print('train epoch %i, iter %i'%(i, iter))
+        for iter, (x,y) in enumerate(dev_data_loader):
+            print('dev epoch %i, iter %i'%(i, iter))
+    """# create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback =WandB_LR_log_callback()
     val_metrics={
         'val_recall':partial(recall_score, average='macro'),
@@ -236,7 +222,6 @@ def train():
 
     # train process
     print("Weighted crossentropy loss")
-    print("DONE")
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs, validation_data=dev_data_loader,
@@ -245,9 +230,8 @@ def train():
                          lr_scheduller,
                          early_stopping_callback,
                          lr_monitor_callback,
-                         val_metrics_callback])
+                         val_metrics_callback])"""
     # clear RAM
-    del train, dev, test
     del train_data_loader, dev_data_loader
     del model
     gc.collect()
@@ -257,6 +241,33 @@ def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
+
+    # loading data
+    frame_step = 5
+    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
+    # french data
+    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
+    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french,
+                                                                     frame_step)
+    # english data
+    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
+    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german,
+                                                                     frame_step)
+    # german data
+    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
+    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english,
+                                                                        frame_step)
+    # all data
+    train = pd.concat([train_french, train_german, train_english], axis=0)
+    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
+    test = pd.concat([test_french, test_german, test_english], axis=0)
+    # shuffle one more time train data
+    train = train.sample(frac=1).reset_index(drop=True)
+    # clear RAM
+    del train_english, train_french, train_german
+    del dev_english, dev_french, dev_german
+    del test, test_english, test_german, test_french
+    gc.collect()
 
     sweep_config= {
         'method':'random',
@@ -286,8 +297,9 @@ def main():
             }
         }
     }
+    print("start")
     sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=train, count=40, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=train_model(train, dev), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

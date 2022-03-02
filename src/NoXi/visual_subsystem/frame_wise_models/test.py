@@ -1,4 +1,7 @@
 import sys
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+
 
 import objgraph
 
@@ -6,8 +9,7 @@ from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 
-sys.path.extend(["/work/home/dsu/datatools/"])
-sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+
 
 import gc
 
@@ -52,10 +54,6 @@ def main():
     test = pd.concat([test_french, test_german, test_english], axis=0)
     # shuffle one more time train data
     train = train.sample(frac=1).reset_index(drop=True)
-    ################
-    train=train.iloc[:50000]
-    dev = dev.iloc[:50000]
-    #############
     # clear RAM
     del train_english, train_french, train_german
     del dev_english, dev_french, dev_german
@@ -103,12 +101,14 @@ def main():
     for i in range(100):
         for iter, (x,y) in enumerate(train_data_loader):
             a=True
-            #print('train epoch %i, iter %i'%(i, iter))
+            print('train epoch %i, iter %i'%(i, iter))
         for iter, (x,y) in enumerate(dev_data_loader):
             a=True
-            #print('dev epoch %i, iter %i'%(i, iter))
+            print('dev epoch %i, iter %i'%(i, iter))
         print("epoch ended----------------------------------------------")
         objgraph.show_growth()
+
+    del train_data_loader, dev_data_loader
 
 
 if __name__ == '__main__':

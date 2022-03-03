@@ -3,10 +3,14 @@ sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
 
+from functools import partial
+from sklearn.metrics import recall_score, precision_score, f1_score
+import tensorflow as tf
+from tensorflow_utils.wandb_callbacks import WandB_val_metrics_callback
 import objgraph
-
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
-from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data
+from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data, \
+    create_VGGFace2_model
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 
 
@@ -98,17 +102,29 @@ def main():
     print("data loaders are created----------------------------------------------")
     objgraph.show_growth()
 
-    for i in range(100):
-        for iter, (x,y) in enumerate(train_data_loader):
-            a=True
-            print('train epoch %i, iter %i'%(i, iter))
-        for iter, (x,y) in enumerate(dev_data_loader):
-            a=True
-            print('dev epoch %i, iter %i'%(i, iter))
-        print("epoch ended----------------------------------------------")
-        objgraph.show_growth()
+    # model initialization
+    model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
+                                  num_classes=metaparams["num_classes"])
+    model.compile(loss='categorical_crossentropy', optimizer='Adam', metrics=['accuracy'])
+    model.summary()
 
+    print("--------------------")
+
+    val_metrics = {
+        'val_recall': partial(recall_score, average='macro'),
+        'val_precision': partial(precision_score, average='macro'),
+        'val_f1_score:': partial(f1_score, average='macro')
+    }
+    val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics)
+
+
+    model.fit(train_data_loader, epochs=100,
+              callbacks=[val_metrics_callback])
+    # clear RAM
     del train_data_loader, dev_data_loader
+    del model
+    gc.collect()
+    tf.keras.backend.clear_session()
 
 
 if __name__ == '__main__':

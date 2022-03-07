@@ -130,8 +130,8 @@ def train_model(train, dev):
         "epochs": 30,
         "batch_size": 80,
         "augmentation_rate": 0.1,  # 0.2, 0.3
-        "architecture": "VGGFace2_full_training",
-        "dataset": "NoXi_english",
+        "architecture": "VGGFace2_frozen_4_blocks",
+        "dataset": "NoXi",
         "num_classes": 5
     }
 
@@ -173,6 +173,11 @@ def train_model(train, dev):
     # model initialization
     model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
                                   num_classes=config.num_classes)
+    # freezing first 4 blocks of the ResNet50
+    for i in range(141):
+        model.layers[i].trainable = False
+
+    # model compilation
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
     model.summary()
 
@@ -208,16 +213,7 @@ def train_model(train, dev):
                                       prob_factors_for_each_class=None,
                                       pool_workers=16)
 
-    """print("start data loaders----------------------------------------------")
-    objgraph.show_growth()
 
-    for i in range(10):
-        for iter, (x,y) in enumerate(train_data_loader):
-            print('train epoch %i, iter %i'%(i, iter))
-        for iter, (x,y) in enumerate(dev_data_loader):
-            print('dev epoch %i, iter %i'%(i, iter))
-        print("epoch ended----------------------------------------------")
-        objgraph.show_growth()"""
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback =WandB_LR_log_callback()
     val_metrics={
@@ -230,6 +226,7 @@ def train_model(train, dev):
 
     # train process
     print("Weighted crossentropy loss")
+    print("FROZEN LAYERS")
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
@@ -249,7 +246,6 @@ def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
-
     # loading data
     frame_step = 5
     path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"

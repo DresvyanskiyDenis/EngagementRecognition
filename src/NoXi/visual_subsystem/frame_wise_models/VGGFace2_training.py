@@ -1,7 +1,4 @@
 import sys
-
-import objgraph
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -231,6 +228,7 @@ def train_model(train, dev):
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
               class_weight={i:class_weights[i] for i in range(config.num_classes)},
+              validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
                          early_stopping_callback,
@@ -301,9 +299,8 @@ def main():
             }
         }
     }
-    print("start")
     sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=train_model(train, dev), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function= lambda: train_model(train, dev), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

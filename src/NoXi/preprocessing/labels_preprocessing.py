@@ -231,13 +231,14 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
         labels_one_video=labels[path_to_label]
         # TODO: CHECK IT. Check also ranking of filenames (order should be numerical, not lexical)
         # search paths to images in dataframe according to the path to the labels (for example, 031_2016-04-06_Nottingham\\expert)
-        df_with_paths_one_video=paths_with_images[paths_with_images['rel_path'].str.contains(path_to_label, case=False)]
+        df_with_paths_one_video=paths_with_images[paths_with_images['rel_path'].str.contains(path_to_label, case=False, regex=False)]
         # combine labels with corresponding paths to images
-        df_paths_labels_one_video=combine_dataframe_of_paths_with_labels_one_video(df_with_paths_one_video, labels_one_video, frame_step)
-        # rename first columns for convenient processing by DataLoader
-        df_paths_labels_one_video.rename(columns={'rel_path':'filename'}, inplace=True)
-        # append obtained dataframe to the result dataframe (which contains all paths and labels)
-        result_dataframe=pd.concat([result_dataframe, df_paths_labels_one_video], axis=0, ignore_index=True)
+        if df_with_paths_one_video.shape[0]!=0:
+            df_paths_labels_one_video=combine_dataframe_of_paths_with_labels_one_video(df_with_paths_one_video, labels_one_video, frame_step)
+            # rename first columns for convenient processing by DataLoader
+            df_paths_labels_one_video.rename(columns={'rel_path':'filename'}, inplace=True)
+            # append obtained dataframe to the result dataframe (which contains all paths and labels)
+            result_dataframe=pd.concat([result_dataframe, df_paths_labels_one_video], axis=0, ignore_index=True)
 
     return result_dataframe
 

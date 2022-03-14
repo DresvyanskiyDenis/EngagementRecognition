@@ -1,4 +1,12 @@
 import sys
+
+from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
+    random_flip_vertical_image, random_flip_horizontal_image, random_crop_image, random_change_brightness_image, \
+    random_change_contrast_image, random_change_saturation_image, random_worse_quality_image, \
+    random_convert_to_grayscale_image
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_image_VGGFace2
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -7,7 +15,6 @@ from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score
 import tensorflow as tf
 from tensorflow_utils.wandb_callbacks import WandB_val_metrics_callback
-import objgraph
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data, \
     create_VGGFace2_model
@@ -35,8 +42,21 @@ def main():
         "dataset": "NoXi_english",
         "num_classes": 5
     }
+
+    augmentation_methods =[
+        partial(random_rotate90_image, probability=metaparams["augmentation_rate"]),
+        partial(random_flip_vertical_image, probability=metaparams["augmentation_rate"]),
+        partial(random_flip_horizontal_image, probability=metaparams["augmentation_rate"]),
+        partial(random_crop_image, probability=metaparams["augmentation_rate"]),
+        partial(random_change_brightness_image, probability=metaparams["augmentation_rate"], min_max_delta=0.35),
+        partial(random_change_contrast_image, probability=metaparams["augmentation_rate"], min_factor=0.5, max_factor=1.5),
+        partial(random_change_saturation_image, probability=metaparams["augmentation_rate"], min_factor=0.5, max_factor=1.5),
+        partial(random_worse_quality_image, probability=metaparams["augmentation_rate"], min_factor=25, max_factor=99),
+        partial(random_convert_to_grayscale_image, probability=metaparams["augmentation_rate"])
+    ]
+
+
     print("start----------------------------------------------")
-    objgraph.show_growth()
 
     frame_step = 5
     path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
@@ -65,25 +85,14 @@ def main():
     gc.collect()
 
     print("data loaded----------------------------------------------")
-    objgraph.show_growth()
 
-    # create DataLoaders (DataGenerator)
-    train_data_loader = ImageDataLoader(paths_with_labels=train, batch_size=metaparams["batch_size"],
-                                        already_one_hot_encoded=True,
-                                        preprocess_function=VGGFace2_normalization,
-                                        num_classes=metaparams["num_classes"],
-                                        horizontal_flip=metaparams["augmentation_rate"],
-                                        vertical_flip=metaparams["augmentation_rate"],
-                                        shift=metaparams["augmentation_rate"],
-                                        brightness=metaparams["augmentation_rate"], shearing=metaparams["augmentation_rate"],
-                                        zooming=metaparams["augmentation_rate"],
-                                        random_cropping_out=metaparams["augmentation_rate"], rotation=metaparams["augmentation_rate"],
-                                        scaling=metaparams["augmentation_rate"],
-                                        channel_random_noise=metaparams["augmentation_rate"], bluring=metaparams["augmentation_rate"],
-                                        worse_quality=metaparams["augmentation_rate"],
-                                        mixup=None,
-                                        prob_factors_for_each_class=None,
-                                        pool_workers=24)
+    # create DataLoaders (data generators)
+
+    train_data_loader = get_tensorflow_generator(paths_and_labels=train, batch_size=metaparams["batch_size"], augmentation=True,
+                             augmentation_methods=augmentation_methods,
+                             preprocessing_function=preprocess_image_VGGFace2,
+                             clip_values=None,
+                             cache_loaded_images=False)
 
     dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=metaparams["batch_size"],
                                       preprocess_function=VGGFace2_normalization,
@@ -100,7 +109,6 @@ def main():
                                       pool_workers=16)
 
     print("data loaders are created----------------------------------------------")
-    objgraph.show_growth()
 
     # model initialization
     model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',

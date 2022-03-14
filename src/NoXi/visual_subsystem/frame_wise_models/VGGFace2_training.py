@@ -1,33 +1,34 @@
 import sys
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
+from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
+    random_flip_vertical_image, random_flip_horizontal_image, random_crop_image, random_change_brightness_image, \
+    random_change_contrast_image, random_change_saturation_image, random_worse_quality_image, \
+    random_convert_to_grayscale_image
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_image_VGGFace2
 
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
-from tensorflow_utils.Losses import categorical_focal_loss
 from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
-import copy
 import gc
-from typing import List, Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import os
 import wandb
-import glob
 
 from keras.callbacks import EarlyStopping
 from wandb.integration.keras import WandbCallback
 
-
-
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
-from src.NoXi.preprocessing.labels_preprocessing import read_noxi_label_file, transform_time_continuous_to_categorical, \
-    clean_labels, average_from_several_labels, load_all_labels_by_paths, transform_all_labels_to_categorical, \
+from src.NoXi.preprocessing.labels_preprocessing import load_all_labels_by_paths, \
     combine_path_to_images_with_labels_many_videos, generate_paths_to_labels
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
@@ -74,17 +75,17 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
     del paths_train_labels, paths_dev_labels, paths_test_labels
     # change the keys of train_labels/dev_labels/test_labels to have only the name with pattern name_of_video/novice_or_expert
     for key in list(train_labels.keys()):
-        new_key=key.split(os.path.sep)[-2]+'/'
-        new_key=new_key+'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key+'novice'
-        train_labels[new_key]=train_labels.pop(key)
+        new_key = key.split(os.path.sep)[-2] + '/'
+        new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
+        train_labels[new_key] = train_labels.pop(key)
     for key in list(dev_labels.keys()):
-        new_key=key.split(os.path.sep)[-2]+'/'
+        new_key = key.split(os.path.sep)[-2] + '/'
         new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
-        dev_labels[new_key]=dev_labels.pop(key)
+        dev_labels[new_key] = dev_labels.pop(key)
     for key in list(test_labels.keys()):
-        new_key=key.split(os.path.sep)[-2]+'/'
+        new_key = key.split(os.path.sep)[-2] + '/'
         new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
-        test_labels[new_key]=test_labels.pop(key)
+        test_labels[new_key] = test_labels.pop(key)
     # combine paths to images (data) with labels
     train_image_paths_and_labels = combine_path_to_images_with_labels_many_videos(paths_with_images=paths_to_images,
                                                                                   labels=train_labels,
@@ -101,17 +102,20 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
     # shuffle train data
     train_image_paths_and_labels = train_image_paths_and_labels.sample(frac=1).reset_index(drop=True)
     # convert dev and test labels to the categories (it is easier to process them like this)
-    dev_labels=np.argmax(dev_image_paths_and_labels.iloc[:,1:].values, axis=1, keepdims=True)
-    dev_image_paths_and_labels=dev_image_paths_and_labels.iloc[:,:1]
-    dev_image_paths_and_labels['class']=dev_labels
+    dev_labels = np.argmax(dev_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
+    dev_image_paths_and_labels = dev_image_paths_and_labels.iloc[:, :1]
+    dev_image_paths_and_labels['class'] = dev_labels
 
-    test_labels=np.argmax(test_image_paths_and_labels.iloc[:,1:].values, axis=1, keepdims=True)
-    test_image_paths_and_labels=test_image_paths_and_labels.iloc[:,:1]
-    test_image_paths_and_labels['class']=test_labels
+    test_labels = np.argmax(test_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
+    test_image_paths_and_labels = test_image_paths_and_labels.iloc[:, :1]
+    test_image_paths_and_labels['class'] = test_labels
     # create abs path for all paths instead of relative (needed for generator)
-    train_image_paths_and_labels['filename']=train_image_paths_and_labels['filename'].apply(lambda x:os.path.join(path_to_data, x))
-    dev_image_paths_and_labels['filename'] = dev_image_paths_and_labels['filename'].apply(lambda x: os.path.join(path_to_data, x))
-    test_image_paths_and_labels['filename'] = test_image_paths_and_labels['filename'].apply(lambda x: os.path.join(path_to_data, x))
+    train_image_paths_and_labels['filename'] = train_image_paths_and_labels['filename'].apply(
+        lambda x: os.path.join(path_to_data, x))
+    dev_image_paths_and_labels['filename'] = dev_image_paths_and_labels['filename'].apply(
+        lambda x: os.path.join(path_to_data, x))
+    test_image_paths_and_labels['filename'] = test_image_paths_and_labels['filename'].apply(
+        lambda x: os.path.join(path_to_data, x))
     # done
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
@@ -132,20 +136,34 @@ def train_model(train, dev):
         "num_classes": 5
     }
 
+    augmentation_methods = [
+        partial(random_rotate90_image, probability=metaparams["augmentation_rate"]),
+        partial(random_flip_vertical_image, probability=metaparams["augmentation_rate"]),
+        partial(random_flip_horizontal_image, probability=metaparams["augmentation_rate"]),
+        partial(random_crop_image, probability=metaparams["augmentation_rate"]),
+        partial(random_change_brightness_image, probability=metaparams["augmentation_rate"], min_max_delta=0.35),
+        partial(random_change_contrast_image, probability=metaparams["augmentation_rate"], min_factor=0.5,
+                max_factor=1.5),
+        partial(random_change_saturation_image, probability=metaparams["augmentation_rate"], min_factor=0.5,
+                max_factor=1.5),
+        partial(random_worse_quality_image, probability=metaparams["augmentation_rate"], min_factor=25, max_factor=99),
+        partial(random_convert_to_grayscale_image, probability=metaparams["augmentation_rate"])
+    ]
+
     # initialization of Weights and Biases
     wandb.init(project="VGGFace2_FtF_training", config=metaparams)
     config = wandb.config
 
     # Metaparams initialization
     metrics = ['accuracy']
-    if config.lr_scheduller=='Cyclic':
+    if config.lr_scheduller == 'Cyclic':
         lr_scheduller = get_annealing_LRreduce_callback(highest_lr=config.learning_rate_max,
-                                                    lowest_lr=config.learning_rate_min,
-                                                    annealing_period=config.annealing_period)
-    elif config.lr_scheduller=='reduceLRonPlateau':
-        lr_scheduller=get_reduceLRonPlateau_callback(monitoring_loss = 'val_loss', reduce_factor = 0.1,
-                                   num_patient_epochs = 4,
-                                   min_lr = config.learning_rate_min)
+                                                        lowest_lr=config.learning_rate_min,
+                                                        annealing_period=config.annealing_period)
+    elif config.lr_scheduller == 'reduceLRonPlateau':
+        lr_scheduller = get_reduceLRonPlateau_callback(monitoring_loss='val_loss', reduce_factor=0.1,
+                                                       num_patient_epochs=4,
+                                                       min_lr=config.learning_rate_min)
     else:
         raise Exception("You passed wrong lr_scheduller.")
 
@@ -159,14 +177,15 @@ def train_model(train, dev):
         raise Exception("You passed wrong optimizer name.")
 
     # class weights
-    class_weights=compute_class_weight(class_weight='balanced', classes=np.unique(np.argmax(train.iloc[:,1:].values, axis=1, keepdims=True)),
-                                       y=np.argmax(train.iloc[:,1:].values, axis=1, keepdims=True).flatten())
+    class_weights = compute_class_weight(class_weight='balanced',
+                                         classes=np.unique(np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True)),
+                                         y=np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True).flatten())
 
     # loss function
-    #focal_loss_gamma=2
-    #loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
-    loss=tf.keras.losses.categorical_crossentropy
-    wandb.config.update({'loss':loss})
+    # focal_loss_gamma=2
+    # loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
+    loss = tf.keras.losses.categorical_crossentropy
+    wandb.config.update({'loss': loss})
     # model initialization
     model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
                                   num_classes=config.num_classes)
@@ -179,22 +198,12 @@ def train_model(train, dev):
     model.summary()
 
     # create DataLoaders (DataGenerator)
-    train_data_loader = ImageDataLoader(paths_with_labels=train, batch_size=config.batch_size,
-                                        already_one_hot_encoded=True,
-                                        preprocess_function=VGGFace2_normalization,
-                                        num_classes=config.num_classes,
-                                        horizontal_flip=config.augmentation_rate,
-                                        vertical_flip=config.augmentation_rate,
-                                        shift=config.augmentation_rate,
-                                        brightness=config.augmentation_rate, shearing=config.augmentation_rate,
-                                        zooming=config.augmentation_rate,
-                                        random_cropping_out=config.augmentation_rate, rotation=config.augmentation_rate,
-                                        scaling=config.augmentation_rate,
-                                        channel_random_noise=config.augmentation_rate, bluring=config.augmentation_rate,
-                                        worse_quality=config.augmentation_rate,
-                                        mixup=None,
-                                        prob_factors_for_each_class=None,
-                                        pool_workers=16)
+    train_data_loader = get_tensorflow_generator(paths_and_labels=train, batch_size=metaparams["batch_size"],
+                                                 augmentation=True,
+                                                 augmentation_methods=augmentation_methods,
+                                                 preprocessing_function=preprocess_image_VGGFace2,
+                                                 clip_values=None,
+                                                 cache_loaded_images=False)
 
     dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=config.batch_size,
                                       preprocess_function=VGGFace2_normalization,
@@ -210,16 +219,15 @@ def train_model(train, dev):
                                       prob_factors_for_each_class=None,
                                       pool_workers=16)
 
-
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
-    lr_monitor_callback =WandB_LR_log_callback()
-    val_metrics={
-        'val_recall':partial(recall_score, average='macro'),
-        'val_precision':partial(precision_score, average='macro'),
-        'val_f1_score:':partial(f1_score, average='macro')
+    lr_monitor_callback = WandB_LR_log_callback()
+    val_metrics = {
+        'val_recall': partial(recall_score, average='macro'),
+        'val_precision': partial(precision_score, average='macro'),
+        'val_f1_score:': partial(f1_score, average='macro')
     }
-    val_metrics_callback=WandB_val_metrics_callback(dev_data_loader, val_metrics)
-    early_stopping_callback=EarlyStopping(monitor='val_loss', patience=7, verbose=1)
+    val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics)
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=7, verbose=1)
 
     # train process
     print("Weighted crossentropy loss")
@@ -227,7 +235,7 @@ def train_model(train, dev):
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
-              class_weight={i:class_weights[i] for i in range(config.num_classes)},
+              class_weight={i: class_weights[i] for i in range(config.num_classes)},
               validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
@@ -239,6 +247,7 @@ def train_model(train, dev):
     del model
     gc.collect()
     tf.keras.backend.clear_session()
+
 
 def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -271,39 +280,38 @@ def main():
     del test, test_english, test_german, test_french
     gc.collect()
 
-    sweep_config= {
-        'method':'random',
-        'metric':{
-            'name':'val_loss',
-            'goal':'minimize'
+    sweep_config = {
+        'method': 'random',
+        'metric': {
+            'name': 'val_loss',
+            'goal': 'minimize'
         },
         'parameters': {
-            'optimizer':{
-                'values':['Adam', 'SGD', 'Nadam']
+            'optimizer': {
+                'values': ['Adam', 'SGD', 'Nadam']
             },
-            'learning_rate_max':{
+            'learning_rate_max': {
                 'distribution': 'uniform',
-                'max':0.001,
-                'min':0.0001
+                'max': 0.001,
+                'min': 0.0001
             },
-            'learning_rate_min':{
+            'learning_rate_min': {
                 'distribution': 'uniform',
                 'max': 0.00001,
                 'min': 0.000001
             },
             'lr_scheduller': {
-                'values':['Cyclic', 'reduceLRonPlateau']
+                'values': ['Cyclic', 'reduceLRonPlateau']
             },
             'augmentation_rate': {
-                'values':[0.1, 0.2, 0.3]
+                'values': [0.1, 0.2, 0.3]
             }
         }
     }
-    sweep_id=wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function= lambda: train_model(train, dev), count=20, project='VGGFace2_FtF_training')
+    sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
-
 
 
 if __name__ == '__main__':

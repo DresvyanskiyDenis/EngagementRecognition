@@ -1,7 +1,9 @@
 import sys
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+
+
+from tensorflow_utils.Losses import categorical_focal_loss
 
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
@@ -129,7 +131,7 @@ def train_model(train, dev):
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 30,
-        "batch_size": 80,
+        "batch_size": 100,
         "augmentation_rate": 0.1,  # 0.2, 0.3
         "architecture": "VGGFace2_frozen_4_blocks",
         "dataset": "NoXi",
@@ -182,9 +184,9 @@ def train_model(train, dev):
                                          y=np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True).flatten())
 
     # loss function
-    # focal_loss_gamma=2
-    # loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
-    loss = tf.keras.losses.categorical_crossentropy
+    focal_loss_gamma=2
+    loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
+    #loss = tf.keras.losses.categorical_crossentropy
     wandb.config.update({'loss': loss})
     # model initialization
     model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
@@ -226,11 +228,12 @@ def train_model(train, dev):
         'val_precision': partial(precision_score, average='macro'),
         'val_f1_score:': partial(f1_score, average='macro')
     }
-    val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics)
+    val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
+                                                      metric_to_monitor='val_recall')
     early_stopping_callback = EarlyStopping(monitor='val_loss', patience=7, verbose=1)
 
     # train process
-    print("Weighted crossentropy loss")
+    print("Focal loss used")
     print("FROZEN LAYERS")
     print(config.batch_size)
     print("--------------------")
@@ -308,6 +311,7 @@ def main():
             }
         }
     }
+
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
     wandb.agent(sweep_id, function=lambda: train_model(train, dev), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()

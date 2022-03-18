@@ -122,7 +122,7 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
 
-def train_model(train, dev):
+def train_model(train, dev, loss_func='categorical_crossentropy'):
     # metaparams
     metaparams = {
         "optimizer": "Adam",  # SGD, Nadam
@@ -131,7 +131,7 @@ def train_model(train, dev):
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 30,
-        "batch_size": 100,
+        "batch_size": 128,
         "augmentation_rate": 0.1,  # 0.2, 0.3
         "architecture": "VGGFace2_frozen_4_blocks",
         "dataset": "NoXi",
@@ -184,9 +184,15 @@ def train_model(train, dev):
                                          y=np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True).flatten())
 
     # loss function
-    focal_loss_gamma=2
-    loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
-    #loss = tf.keras.losses.categorical_crossentropy
+    if loss_func=='categorical_crossentropy':
+        loss = tf.keras.losses.categorical_crossentropy
+        train_class_weights={i: class_weights[i] for i in range(config.num_classes)}
+    elif loss_func=='focal_loss':
+        focal_loss_gamma=2
+        loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
+        train_class_weights=None
+    else:
+        raise AttributeError('Passed name of loss function is not acceptable. Possible variants are categorical_crossentropy or focal_loss.')
     wandb.config.update({'loss': loss})
     # model initialization
     model = create_VGGFace2_model(path_to_weights='/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5',
@@ -230,15 +236,15 @@ def train_model(train, dev):
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall')
-    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=7, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=8, verbose=1)
 
     # train process
-    print("Focal loss used")
+    print("Loss used:%s"%(loss))
     print("FROZEN LAYERS")
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
-              class_weight={i: class_weights[i] for i in range(config.num_classes)},
+              class_weight=train_class_weights,
               validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
@@ -312,8 +318,16 @@ def main():
         }
     }
 
+
+    # categorical crossentropy
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=20, project='VGGFace2_FtF_training')
+    tf.keras.backend.clear_session()
+    gc.collect()
+    # focal loss
+    print("Wandb with focal loss")
+    sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

@@ -29,13 +29,12 @@ import wandb
 from keras.callbacks import EarlyStopping
 from wandb.integration.keras import WandbCallback
 
-from preprocessing.data_normalizing_utils import VGGFace2_normalization, Xception_normalization
+from preprocessing.data_normalizing_utils import Xception_normalization
 from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
 from src.NoXi.preprocessing.labels_preprocessing import load_all_labels_by_paths, \
     combine_path_to_images_with_labels_many_videos, generate_paths_to_labels
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
 from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
-from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
 
 
@@ -166,7 +165,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                         annealing_period=config.annealing_period)
     elif config.lr_scheduller == 'reduceLRonPlateau':
         lr_scheduller = get_reduceLRonPlateau_callback(monitoring_loss='val_loss', reduce_factor=0.1,
-                                                       num_patient_epochs=4,
+                                                       num_patient_epochs=3,
                                                        min_lr=config.learning_rate_min)
     else:
         raise Exception("You passed wrong lr_scheduller.")
@@ -226,7 +225,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                       worse_quality=0,
                                       mixup=None,
                                       prob_factors_for_each_class=None,
-                                      pool_workers=16)
+                                      pool_workers=24)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
@@ -237,7 +236,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall')
-    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=8, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=5, verbose=1)
 
     # train process
     print("Loss used:%s"%(loss))

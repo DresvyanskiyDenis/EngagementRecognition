@@ -225,7 +225,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                       worse_quality=0,
                                       mixup=None,
                                       prob_factors_for_each_class=None,
-                                      pool_workers=24)
+                                      pool_workers=16)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
@@ -321,13 +321,13 @@ def main():
 
     # categorical crossentropy
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=10, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
     # focal loss
     print("Wandb with focal loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=10, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

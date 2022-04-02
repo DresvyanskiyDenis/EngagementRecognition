@@ -132,7 +132,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 30,
-        "batch_size": 32,
+        "batch_size": 128,
         "augmentation_rate": 0.1,  # 0.2, 0.3
         "architecture": "Xception_256_Dense",
         "dataset": "NoXi",
@@ -165,7 +165,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                         annealing_period=config.annealing_period)
     elif config.lr_scheduller == 'reduceLRonPlateau':
         lr_scheduller = get_reduceLRonPlateau_callback(monitoring_loss='val_loss', reduce_factor=0.1,
-                                                       num_patient_epochs=3,
+                                                       num_patient_epochs=4,
                                                        min_lr=config.learning_rate_min)
     else:
         raise Exception("You passed wrong lr_scheduller.")
@@ -198,8 +198,12 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     # model initialization
     model = create_Xception_model(num_classes=config.num_classes)
     # freezing layers?
-    #for i in range(141):
-    #    model.layers[i].trainable = False
+
+    for i, layer in enumerate(model.layers):
+        print("%i:%s"%(i, layer.name))
+
+    for i in range(75): # up to block 8
+        model.layers[i].trainable = False
 
     # model compilation
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
@@ -236,11 +240,11 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall')
-    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=5, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=7, verbose=1)
 
     # train process
     print("Loss used:%s"%(loss))
-    print("XCEPTION ALL LAYERS ARE TRAINABLE")
+    print("XCEPTION LAYERS UP TO 8 BLOCK ARE FROZEN")
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
@@ -259,6 +263,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
 def main():
+    print("START")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
@@ -321,13 +326,13 @@ def main():
 
     # categorical crossentropy
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=10, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
     # focal loss
     print("Wandb with focal loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=10, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

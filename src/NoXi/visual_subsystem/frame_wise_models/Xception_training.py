@@ -132,7 +132,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
         "annealing_period": 5,
         "epochs": 30,
-        "batch_size": 128,
+        "batch_size": 100,
         "augmentation_rate": 0.1,  # 0.2, 0.3
         "architecture": "Xception_256_Dense",
         "dataset": "NoXi",

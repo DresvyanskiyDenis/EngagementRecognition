@@ -216,34 +216,17 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                  preprocessing_function=preprocess_data_MobileNetv3,
                                                  clip_values=None,
                                                  cache_loaded_images=False)
-    # create separate generator for accelarating the processing of validation (wandb needs to monitor validation loss and therefore
-    # validation set will be processed twice: as end of the training step and as a callback)
-    dev_for_keras_validation_set = dev.__deepcopy__()
-    dev_for_keras_validation_set = pd.concat(
-        [dev_for_keras_validation_set, pd.get_dummies(dev_for_keras_validation_set['class'])], axis=1).drop(
-        columns=['class'])
+    # transform labels in dev data to one-hot encodings
+    dev = dev.__deepcopy__()
+    dev = pd.concat([dev, pd.get_dummies(dev['class'])], axis=1).drop(columns=['class'])
 
-    dev_data_loader_for_keras_validation = get_tensorflow_generator(paths_and_labels=dev_for_keras_validation_set,
-                                                                    batch_size=metaparams["batch_size"],
-                                                                    augmentation=False,
-                                                                    augmentation_methods=None,
-                                                                    preprocessing_function=preprocess_data_MobileNetv3,
-                                                                    clip_values=None,
-                                                                    cache_loaded_images=False)
-
-    dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=metaparams["batch_size"],
-                                      preprocess_function=MobileNetv3_normalization,
-                                      num_classes=config.num_classes,
-                                      horizontal_flip=0, vertical_flip=0,
-                                      shift=0,
-                                      brightness=0, shearing=0, zooming=0,
-                                      random_cropping_out=0, rotation=0,
-                                      scaling=0,
-                                      channel_random_noise=0, bluring=0,
-                                      worse_quality=0,
-                                      mixup=None,
-                                      prob_factors_for_each_class=None,
-                                      pool_workers=16)
+    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev,
+                                               batch_size=metaparams["batch_size"],
+                                               augmentation=False,
+                                               augmentation_methods=None,
+                                               preprocessing_function=preprocess_data_MobileNetv3,
+                                               clip_values=None,
+                                               cache_loaded_images=False)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
@@ -263,7 +246,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
               class_weight=train_class_weights,
-              validation_data=dev_data_loader_for_keras_validation,
+              validation_data=dev_data_loader,
               callbacks=[WandbCallback(),
                          lr_scheduller,
                          early_stopping_callback,
@@ -277,7 +260,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
 def main():
-    print("START")
+    print("START ONE TWO THREE")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)

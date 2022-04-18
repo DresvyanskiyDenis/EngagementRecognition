@@ -123,7 +123,7 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
 
-def train_model(train, dev, loss_func='categorical_crossentropy'):
+def train_model(train, dev, loss_func='focal_loss'):
     # metaparams
     metaparams = {
         "optimizer": "Adam",  # SGD, Nadam
@@ -219,7 +219,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
     dev_for_keras_validation_set = dev.__deepcopy__()
-    dev_for_keras_validation_set=pd.concat([dev_for_keras_validation_set, pd.get_dummies(dev_for_keras_validation_set['class'])], axis=1).drop(columns=['class'])
+    dev_for_keras_validation_set=pd.concat([dev_for_keras_validation_set, pd.get_dummies(dev_for_keras_validation_set['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
     dev_data_loader_for_keras_validation = get_tensorflow_generator(paths_and_labels=dev_for_keras_validation_set, batch_size=metaparams["batch_size"],
                                                  augmentation=False,

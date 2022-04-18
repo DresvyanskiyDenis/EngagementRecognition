@@ -218,7 +218,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                  cache_loaded_images=False)
     # transform labels in dev data to one-hot encodings
     dev = dev.__deepcopy__()
-    dev = pd.concat([dev, pd.get_dummies(dev['class'])], axis=1).drop(columns=['class'])
+    dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
     dev_data_loader = get_tensorflow_generator(paths_and_labels=dev,
                                                batch_size=metaparams["batch_size"],
@@ -260,7 +260,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
 def main():
-    print("START ONE TWO THREE")
+    print("START ONE TWO THREE FOUR")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
@@ -322,14 +322,14 @@ def main():
 
 
     # categorical crossentropy
-    sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=20, project='VGGFace2_FtF_training')
-    tf.keras.backend.clear_session()
-    gc.collect()
+    #sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
+    #wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=30, project='VGGFace2_FtF_training')
+    #tf.keras.backend.clear_session()
+    #gc.collect()
     # focal loss
     print("Wandb with focal loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=30, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

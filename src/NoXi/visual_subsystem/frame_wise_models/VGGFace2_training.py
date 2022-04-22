@@ -212,20 +212,17 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                  preprocessing_function=preprocess_image_VGGFace2,
                                                  clip_values=None,
                                                  cache_loaded_images=False)
+    # transform labels in dev data to one-hot encodings
+    dev = dev.__deepcopy__()
+    dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=config.batch_size,
-                                      preprocess_function=VGGFace2_normalization,
-                                      num_classes=config.num_classes,
-                                      horizontal_flip=0, vertical_flip=0,
-                                      shift=0,
-                                      brightness=0, shearing=0, zooming=0,
-                                      random_cropping_out=0, rotation=0,
-                                      scaling=0,
-                                      channel_random_noise=0, bluring=0,
-                                      worse_quality=0,
-                                      mixup=None,
-                                      prob_factors_for_each_class=None,
-                                      pool_workers=16)
+    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev,
+                                               batch_size=metaparams["batch_size"],
+                                               augmentation=False,
+                                               augmentation_methods=None,
+                                               preprocessing_function=preprocess_image_VGGFace2,
+                                               clip_values=None,
+                                               cache_loaded_images=False)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
@@ -236,11 +233,11 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall')
-    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=8, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, verbose=1)
 
     # train process
     print("Loss used:%s"%(loss))
-    print("FROZEN LAYERS")
+    print("FROZEN 4 LAYERS")
     print(config.batch_size)
     print("--------------------")
     model.fit(train_data_loader, epochs=config.epochs,
@@ -259,6 +256,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
 def main():
+    print("START")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
@@ -321,13 +319,13 @@ def main():
 
     # categorical crossentropy
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=30, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
     # focal loss
     print("Wandb with focal loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20, project='VGGFace2_FtF_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=30, project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 

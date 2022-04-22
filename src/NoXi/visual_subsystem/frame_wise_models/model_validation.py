@@ -1,17 +1,20 @@
 import sys
+
+from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
 
 from src.NoXi.visual_subsystem.frame_wise_models.MobileNetv3_training import create_MobileNetv3_model
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
-from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_MobileNetv3
-
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_MobileNetv3, \
+    preprocess_image_VGGFace2, preprocess_data_Xception
 
 from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data, \
     create_VGGFace2_model
 from functools import partial
-from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix
+from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, accuracy_score
 import gc
 import numpy as np
 import pandas as pd
@@ -22,10 +25,11 @@ from preprocessing.data_normalizing_utils import VGGFace2_normalization
 def validate_model(model, generator):
 
     metrics = {
+        'val_accuracy': accuracy_score,
         'val_recall': partial(recall_score, average='macro'),
         'val_precision': partial(precision_score, average='macro'),
         'val_f1_score:': partial(f1_score, average='macro'),
-        'confusion_matrix:': confusion_matrix,
+        'confusion_matrix': confusion_matrix,
     }
     # make predictions for data from generator and save ground truth labels
     total_predictions = np.zeros((0,))
@@ -43,20 +47,22 @@ def validate_model(model, generator):
     # clear RAM
     del total_predictions, total_ground_truth
     gc.collect()
+    conf_m=results.pop('confusion_matrix')
     # print results
     for key, value in results.items():
         print("Metric: %s, result:%f"%(key, value))
     # print confusion matrix separately one more time for better vision
     print("Confusion matrix")
-    print(results['confusion_matrix'])
+    print(conf_m)
 
 
 
 def main():
+    print("43222")
     # params
     frame_step = 5
     path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    path_to_model_weights = ""
+    path_to_model_weights = "/work/home/dsu/weights_of_best_models/experiment8_model_best_val_recall.h5"
 
     # loading data
     # french data
@@ -80,19 +86,34 @@ def main():
     # clear RAM
     del train_english, train_french, train_german
     del dev_english, dev_french, dev_german
-    del test, test_english, test_german, test_french
+    del test_english, test_german, test_french
     gc.collect()
 
-    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev, batch_size=128,
+    # transform labels in dev data to one-hot encodings
+    dev = dev.__deepcopy__()
+    dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
+
+    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev, batch_size=64,
                                                  augmentation=False,
                                                  augmentation_methods=None,
                                                  preprocessing_function=preprocess_data_MobileNetv3,
                                                  clip_values=None,
                                                  cache_loaded_images=False)
 
+    # transform labels in dev data to one-hot encodings
+    test = test.__deepcopy__()
+    test = pd.concat([test, pd.get_dummies(test['class'], dtype="float32")], axis=1).drop(columns=['class'])
+
+    test_data_loader = get_tensorflow_generator(paths_and_labels=test, batch_size=64,
+                                               augmentation=False,
+                                               augmentation_methods=None,
+                                               preprocessing_function=preprocess_data_MobileNetv3,
+                                               clip_values=None,
+                                               cache_loaded_images=False)
 
     # model initialization
-    model = create_MobileNetv3_model(num_classes=5)
+    model = create_MobileNetv3_model(#path_to_weights="/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5",
+                                  num_classes=5)
     # load weights of trained model
     model.load_weights(path_to_model_weights)
     # model compilation
@@ -100,6 +121,8 @@ def main():
     model.summary()
 
     validate_model(model, dev_data_loader)
+    print("----------------------------test--------------------------------")
+    validate_model(model, test_data_loader)
 
 if __name__ == '__main__':
     main()

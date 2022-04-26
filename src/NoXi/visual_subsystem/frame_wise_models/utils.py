@@ -1,3 +1,4 @@
+import gc
 from typing import Tuple, Optional
 
 import pandas as pd

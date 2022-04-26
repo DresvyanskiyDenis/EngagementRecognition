@@ -1,3 +1,4 @@
+from typing import Tuple, Optional
 
 import pandas as pd
 import numpy as np
@@ -10,7 +11,7 @@ from src.NoXi.preprocessing.labels_preprocessing import load_all_labels_by_paths
 
 
 
-def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step: int) -> Tuple[
+def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step: int, shuffle_train:Optional[bool]=False) -> Tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
 
@@ -56,7 +57,8 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
                                                                                  sample_rate_annotations=25,
                                                                                  frame_step=5)
     # shuffle train data
-    train_image_paths_and_labels = train_image_paths_and_labels.sample(frac=1).reset_index(drop=True)
+    if shuffle_train:
+        train_image_paths_and_labels = train_image_paths_and_labels.sample(frac=1).reset_index(drop=True)
     # convert dev and test labels to the categories (it is easier to process them like this)
     dev_labels = np.argmax(dev_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
     dev_image_paths_and_labels = dev_image_paths_and_labels.iloc[:, :1]

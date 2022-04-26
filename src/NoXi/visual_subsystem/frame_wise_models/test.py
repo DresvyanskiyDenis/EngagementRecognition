@@ -1,41 +1,29 @@
 import sys
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
+import gc
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from typing import Optional
 
+from keras.callbacks import EarlyStopping
+from functools import partial
+from sklearn.metrics import recall_score, precision_score, f1_score
+from sklearn.utils import compute_class_weight
+
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data
 from tensorflow_utils.Losses import categorical_focal_loss
-
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
     random_flip_vertical_image, random_flip_horizontal_image, random_crop_image, random_change_brightness_image, \
     random_change_contrast_image, random_change_saturation_image, random_worse_quality_image, \
     random_convert_to_grayscale_image
-from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_image_VGGFace2, \
-    preprocess_data_Xception, preprocess_data_MobileNetv3
-
-from functools import partial
-from sklearn.metrics import recall_score, precision_score, f1_score
-from sklearn.utils import compute_class_weight
 from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
-import gc
-from typing import Optional, Tuple
-
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-import os
-import wandb
-
-from keras.callbacks import EarlyStopping
-from wandb.integration.keras import WandbCallback
-
-from preprocessing.data_normalizing_utils import Xception_normalization, MobileNetv3_normalization
-from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
-from src.NoXi.preprocessing.labels_preprocessing import load_all_labels_by_paths, \
-    combine_path_to_images_with_labels_many_videos, generate_paths_to_labels
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
-from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
-
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_MobileNetv3
 
 
 def create_MobileNetv3_model(num_classes: Optional[int] = 5) -> tf.keras.Model:
@@ -56,71 +44,6 @@ def create_MobileNetv3_model(num_classes: Optional[int] = 5) -> tf.keras.Model:
     tf.keras.backend.clear_session()
     gc.collect()
     return new_model
-
-def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step: int) -> Tuple[
-    pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-
-    :param path_to_data:
-    :param path_to_labels:
-    :return:
-    """
-    # generate paths to images (data)
-    paths_to_images = generate_rel_paths_to_images_in_all_dirs(path_to_data, image_format="png")
-    # generate paths to train/dev/test labels
-    paths_train_labels = generate_paths_to_labels(os.path.join(path_to_labels, "train"))
-    paths_dev_labels = generate_paths_to_labels(os.path.join(path_to_labels, "dev"))
-    paths_test_labels = generate_paths_to_labels(os.path.join(path_to_labels, "test"))
-    # load labels
-    train_labels = load_all_labels_by_paths(paths_train_labels)
-    dev_labels = load_all_labels_by_paths(paths_dev_labels)
-    test_labels = load_all_labels_by_paths(paths_test_labels)
-    del paths_train_labels, paths_dev_labels, paths_test_labels
-    # change the keys of train_labels/dev_labels/test_labels to have only the name with pattern name_of_video/novice_or_expert
-    for key in list(train_labels.keys()):
-        new_key = key.split(os.path.sep)[-2] + '/'
-        new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
-        train_labels[new_key] = train_labels.pop(key)
-    for key in list(dev_labels.keys()):
-        new_key = key.split(os.path.sep)[-2] + '/'
-        new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
-        dev_labels[new_key] = dev_labels.pop(key)
-    for key in list(test_labels.keys()):
-        new_key = key.split(os.path.sep)[-2] + '/'
-        new_key = new_key + 'expert' if 'expert' in key.split(os.path.sep)[-1] else new_key + 'novice'
-        test_labels[new_key] = test_labels.pop(key)
-    # combine paths to images (data) with labels
-    train_image_paths_and_labels = combine_path_to_images_with_labels_many_videos(paths_with_images=paths_to_images,
-                                                                                  labels=train_labels,
-                                                                                  sample_rate_annotations=25,
-                                                                                  frame_step=frame_step)
-    dev_image_paths_and_labels = combine_path_to_images_with_labels_many_videos(paths_with_images=paths_to_images,
-                                                                                labels=dev_labels,
-                                                                                sample_rate_annotations=25,
-                                                                                frame_step=5)
-    test_image_paths_and_labels = combine_path_to_images_with_labels_many_videos(paths_with_images=paths_to_images,
-                                                                                 labels=test_labels,
-                                                                                 sample_rate_annotations=25,
-                                                                                 frame_step=5)
-    # shuffle train data
-    train_image_paths_and_labels = train_image_paths_and_labels.sample(frac=1).reset_index(drop=True)
-    # convert dev and test labels to the categories (it is easier to process them like this)
-    dev_labels = np.argmax(dev_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
-    dev_image_paths_and_labels = dev_image_paths_and_labels.iloc[:, :1]
-    dev_image_paths_and_labels['class'] = dev_labels
-
-    test_labels = np.argmax(test_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
-    test_image_paths_and_labels = test_image_paths_and_labels.iloc[:, :1]
-    test_image_paths_and_labels['class'] = test_labels
-    # create abs path for all paths instead of relative (needed for generator)
-    train_image_paths_and_labels['filename'] = train_image_paths_and_labels['filename'].apply(
-        lambda x: os.path.join(path_to_data, x))
-    dev_image_paths_and_labels['filename'] = dev_image_paths_and_labels['filename'].apply(
-        lambda x: os.path.join(path_to_data, x))
-    test_image_paths_and_labels['filename'] = test_image_paths_and_labels['filename'].apply(
-        lambda x: os.path.join(path_to_data, x))
-    # done
-    return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
 
 def train_model(train, dev, loss_func='focal_loss'):
@@ -154,8 +77,8 @@ def train_model(train, dev, loss_func='focal_loss'):
     ]
 
     # initialization of Weights and Biases
-    #wandb.init(project="VGGFace2_FtF_training", config=metaparams)
-    #config = wandb.config
+    # wandb.init(project="VGGFace2_FtF_training", config=metaparams)
+    # config = wandb.config
 
     # Metaparams initialization
     metrics = ['accuracy']
@@ -185,24 +108,25 @@ def train_model(train, dev, loss_func='focal_loss'):
                                          y=np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True).flatten())
 
     # loss function
-    if loss_func=='categorical_crossentropy':
+    if loss_func == 'categorical_crossentropy':
         loss = tf.keras.losses.categorical_crossentropy
-        train_class_weights={i: class_weights[i] for i in range(metaparams['num_classes'])}
-    elif loss_func=='focal_loss':
-        focal_loss_gamma=2
-        loss=categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
-        train_class_weights=None
+        train_class_weights = {i: class_weights[i] for i in range(metaparams['num_classes'])}
+    elif loss_func == 'focal_loss':
+        focal_loss_gamma = 2
+        loss = categorical_focal_loss(alpha=class_weights, gamma=focal_loss_gamma)
+        train_class_weights = None
     else:
-        raise AttributeError('Passed name of loss function is not acceptable. Possible variants are categorical_crossentropy or focal_loss.')
-    #wandb.config.update({'loss': loss})
+        raise AttributeError(
+            'Passed name of loss function is not acceptable. Possible variants are categorical_crossentropy or focal_loss.')
+    # wandb.config.update({'loss': loss})
     # model initialization
     model = create_MobileNetv3_model(num_classes=metaparams['num_classes'])
     # freezing layers?
 
     for i, layer in enumerate(model.layers):
-        print("%i:%s"%(i, layer.name))
+        print("%i:%s" % (i, layer.name))
 
-    #for i in range(75): # up to block 8
+    # for i in range(75): # up to block 8
     #    model.layers[i].trainable = False
 
     # model compilation
@@ -217,17 +141,18 @@ def train_model(train, dev, loss_func='focal_loss'):
                                                  clip_values=None,
                                                  cache_loaded_images=False)
 
-
     dev_for_keras_validation_set = dev.__deepcopy__()
-    dev_for_keras_validation_set=pd.concat([dev_for_keras_validation_set, pd.get_dummies(dev_for_keras_validation_set['class'], dtype="float32")], axis=1).drop(columns=['class'])
+    dev_for_keras_validation_set = pd.concat(
+        [dev_for_keras_validation_set, pd.get_dummies(dev_for_keras_validation_set['class'], dtype="float32")],
+        axis=1).drop(columns=['class'])
 
-    dev_data_loader_for_keras_validation = get_tensorflow_generator(paths_and_labels=dev_for_keras_validation_set, batch_size=metaparams["batch_size"],
-                                                 augmentation=False,
-                                                 augmentation_methods=None,
-                                                 preprocessing_function=preprocess_data_MobileNetv3,
-                                                 clip_values=None,
-                                                 cache_loaded_images=False)
-
+    dev_data_loader_for_keras_validation = get_tensorflow_generator(paths_and_labels=dev_for_keras_validation_set,
+                                                                    batch_size=metaparams["batch_size"],
+                                                                    augmentation=False,
+                                                                    augmentation_methods=None,
+                                                                    preprocessing_function=preprocess_data_MobileNetv3,
+                                                                    clip_values=None,
+                                                                    cache_loaded_images=False)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
@@ -241,18 +166,18 @@ def train_model(train, dev, loss_func='focal_loss'):
     early_stopping_callback = EarlyStopping(monitor='val_loss', patience=7, verbose=1)
 
     # train process
-    print("Loss used:%s"%(loss))
+    print("Loss used:%s" % (loss))
     print("MobileNetv3, LAYERS ARE NOT FROZEN")
     print(metaparams['batch_size'])
     print("--------------------")
     model.fit(train_data_loader, epochs=metaparams['epochs'],
               class_weight=train_class_weights,
               validation_data=dev_data_loader_for_keras_validation,
-              callbacks=[#WandbCallback(),
-                         lr_scheduller,
-                         early_stopping_callback,
-                         lr_monitor_callback,
-                         val_metrics_callback])
+              callbacks=[  # WandbCallback(),
+                  lr_scheduller,
+                  early_stopping_callback,
+                  lr_monitor_callback,
+                  val_metrics_callback])
     # clear RAM
     del train_data_loader, dev_data_loader_for_keras_validation
     del model
@@ -293,7 +218,6 @@ def main():
     gc.collect()
     print(dev)
     train = train.iloc[:1000]
-
 
     train_model(train, dev)
 

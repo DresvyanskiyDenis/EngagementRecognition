@@ -76,3 +76,28 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
         lambda x: os.path.join(path_to_data, x))
     # done
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
+
+def load_NoXi_data_all_languages():
+    # loading data
+    frame_step = 5
+    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
+    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
+    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
+    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
+    # load french data
+    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french, frame_step)
+    # load english data
+    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german, frame_step)
+    # load german data
+    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english, frame_step)
+    # concatenate all data
+    train = pd.concat([train_french, train_german, train_english], axis=0)
+    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
+    test = pd.concat([test_french, test_german, test_english], axis=0)
+    # clear RAM
+    del train_english, train_french, train_german
+    del dev_english, dev_french, dev_german
+    del test, test_english, test_german, test_french
+    gc.collect()
+
+    return (train, dev, test)

@@ -16,7 +16,7 @@ from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
 
-from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data, load_NoXi_data_all_languages
 from tensorflow_utils.Losses import categorical_focal_loss
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
@@ -198,31 +198,10 @@ def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
-    # loading data
-    frame_step = 5
-    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    # french data
-    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
-    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french,
-                                                                     frame_step)
-    # english data
-    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
-    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german,
-                                                                     frame_step)
-    # german data
-    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
-    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english,
-                                                                        frame_step)
-    # all data
-    train = pd.concat([train_french, train_german, train_english], axis=0)
-    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
-    test = pd.concat([test_french, test_german, test_english], axis=0)
+    # load the data and labels
+    train, dev, test = load_NoXi_data_all_languages()
     # shuffle one more time train data
     train = train.sample(frac=1).reset_index(drop=True)
-    # clear RAM
-    del train_english, train_french, train_german
-    del dev_english, dev_french, dev_german
-    del test, test_english, test_german, test_french
     gc.collect()
 
     sweep_config = {

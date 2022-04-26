@@ -26,7 +26,7 @@ from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations i
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_MobileNetv3
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
 from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
-from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data, load_NoXi_data_all_languages
 
 
 def create_MobileNetv3_model(num_classes: Optional[int] = 5) -> tf.keras.Model:
@@ -191,32 +191,11 @@ def main():
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
-    # loading data
-    frame_step = 5
-    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    # french data
-    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
-    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french,
-                                                                     frame_step)
-    # english data
-    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
-    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german,
-                                                                     frame_step)
-    # german data
-    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
-    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english,
-                                                                        frame_step)
-    # all data
-    train = pd.concat([train_french, train_german, train_english], axis=0)
-    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
-    test = pd.concat([test_french, test_german, test_english], axis=0)
+    # load the data and labels
+    train, dev, test = load_NoXi_data_all_languages()
     # shuffle one more time train data
     train = train.sample(frac=1).reset_index(drop=True)
-    # clear RAM
-    del train_english, train_french, train_german
-    del dev_english, dev_french, dev_german
-    del test, test_english, test_german, test_french
-    gc.collect()
+
 
     sweep_config = {
         'method': 'random',

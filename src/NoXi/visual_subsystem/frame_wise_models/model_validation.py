@@ -58,11 +58,11 @@ def validate_model(model, generator):
 
 
 def main():
-    print("43222")
+    print("234")
     # params
     frame_step = 5
     path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    path_to_model_weights = "/work/home/dsu/weights_of_best_models/experiment8_model_best_val_recall.h5"
+    path_to_model_weights = "/work/home/dsu/weights_of_best_models/ID_9_weeep_30.h5"
 
     # loading data
     # french data
@@ -93,10 +93,10 @@ def main():
     dev = dev.__deepcopy__()
     dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev, batch_size=64,
+    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev, batch_size=128,
                                                  augmentation=False,
                                                  augmentation_methods=None,
-                                                 preprocessing_function=preprocess_data_MobileNetv3,
+                                                 preprocessing_function=preprocess_image_VGGFace2,
                                                  clip_values=None,
                                                  cache_loaded_images=False)
 
@@ -104,15 +104,15 @@ def main():
     test = test.__deepcopy__()
     test = pd.concat([test, pd.get_dummies(test['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    test_data_loader = get_tensorflow_generator(paths_and_labels=test, batch_size=64,
+    test_data_loader = get_tensorflow_generator(paths_and_labels=test, batch_size=128,
                                                augmentation=False,
                                                augmentation_methods=None,
-                                               preprocessing_function=preprocess_data_MobileNetv3,
+                                               preprocessing_function=preprocess_image_VGGFace2,
                                                clip_values=None,
                                                cache_loaded_images=False)
 
     # model initialization
-    model = create_MobileNetv3_model(#path_to_weights="/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5",
+    model = create_VGGFace2_model(path_to_weights="/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5",
                                   num_classes=5)
     # load weights of trained model
     model.load_weights(path_to_model_weights)

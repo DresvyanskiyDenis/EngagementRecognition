@@ -92,7 +92,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                         annealing_period=config.annealing_period)
     elif config.lr_scheduller == 'reduceLRonPlateau':
         lr_scheduller = get_reduceLRonPlateau_callback(monitoring_loss='val_loss', reduce_factor=0.1,
-                                                       num_patient_epochs=4,
+                                                       num_patient_epochs=5,
                                                        min_lr=config.learning_rate_min)
     else:
         raise Exception("You passed wrong lr_scheduller.")
@@ -145,19 +145,16 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                  clip_values=None,
                                                  cache_loaded_images=False)
 
-    dev_data_loader = ImageDataLoader(paths_with_labels=dev, batch_size=config.batch_size,
-                                      preprocess_function=Xception_normalization,
-                                      num_classes=config.num_classes,
-                                      horizontal_flip=0, vertical_flip=0,
-                                      shift=0,
-                                      brightness=0, shearing=0, zooming=0,
-                                      random_cropping_out=0, rotation=0,
-                                      scaling=0,
-                                      channel_random_noise=0, bluring=0,
-                                      worse_quality=0,
-                                      mixup=None,
-                                      prob_factors_for_each_class=None,
-                                      pool_workers=16)
+    # transform labels in dev data to one-hot encodings
+    dev = dev.__deepcopy__()
+    dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
+
+    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev, batch_size=128,
+                                               augmentation=False,
+                                               augmentation_methods=None,
+                                               preprocessing_function=preprocess_data_Xception,
+                                               clip_values=None,
+                                               cache_loaded_images=False)
 
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
@@ -168,7 +165,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall')
-    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=7, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, verbose=1)
 
     # train process
     print("Loss used:%s" % (loss))
@@ -191,7 +188,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
 def main():
-    print("NEW START")
+    print("NEW 222")
     print("NEW START")
     print("NEW START")
     print("ONLY FOCAL LOSS")
@@ -241,7 +238,7 @@ def main():
     # focal loss
     print("Wandb with focal loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20,
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=50,
                 project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()

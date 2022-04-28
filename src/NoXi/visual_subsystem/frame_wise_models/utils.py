@@ -98,7 +98,7 @@ def load_NoXi_data_all_languages():
     # clear RAM
     del train_english, train_french, train_german
     del dev_english, dev_french, dev_german
-    del test, test_english, test_german, test_french
+    del test_english, test_german, test_french
     gc.collect()
 
     return (train, dev, test)

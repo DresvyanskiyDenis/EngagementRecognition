@@ -18,7 +18,7 @@ from sklearn.utils import compute_class_weight
 
 
 from tensorflow_utils.Losses import categorical_focal_loss
-from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
+from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
     random_flip_vertical_image, random_flip_horizontal_image, random_crop_image, random_change_brightness_image, \
     random_change_contrast_image, random_change_saturation_image, random_worse_quality_image, \

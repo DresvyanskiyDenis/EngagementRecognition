@@ -17,7 +17,7 @@ from keras.callbacks import EarlyStopping
 from wandb.integration.keras import WandbCallback
 
 from tensorflow_utils.Losses import categorical_focal_loss
-from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
+from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
     random_flip_vertical_image, random_flip_horizontal_image, random_crop_image, random_change_brightness_image, \
     random_change_contrast_image, random_change_saturation_image, random_worse_quality_image, \
@@ -133,7 +133,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     model.summary()
 
     # create DataLoaders (DataGenerator)
-    train_data_loader = get_tensorflow_generator(paths_and_labels=train, batch_size=metaparams["batch_size"],
+    train_data_loader = get_tensorflow_image_loader(paths_and_labels=train, batch_size=metaparams["batch_size"],
                                                  augmentation=True,
                                                  augmentation_methods=augmentation_methods,
                                                  preprocessing_function=preprocess_image_VGGFace2,
@@ -143,7 +143,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     dev = dev.__deepcopy__()
     dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev,
+    dev_data_loader = get_tensorflow_image_loader(paths_and_labels=dev,
                                                batch_size=metaparams["batch_size"],
                                                augmentation=False,
                                                augmentation_methods=None,

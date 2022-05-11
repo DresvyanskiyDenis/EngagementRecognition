@@ -1,25 +1,17 @@
 import sys
-
-from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
+from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception
 
-from src.NoXi.visual_subsystem.frame_wise_models.MobileNetv3_training import create_MobileNetv3_model
-from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_generator
-from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_MobileNetv3, \
-    preprocess_image_VGGFace2, preprocess_data_Xception
-
-from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data, \
-    create_VGGFace2_model
+from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data
+from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, accuracy_score
 import gc
 import numpy as np
 import pandas as pd
-
-from preprocessing.data_normalizing_utils import VGGFace2_normalization
 
 
 def validate_model(model, generator):
@@ -58,11 +50,11 @@ def validate_model(model, generator):
 
 
 def main():
-    print("234")
+    print("12344")
     # params
     frame_step = 5
     path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    path_to_model_weights = "/work/home/dsu/weights_of_best_models/ID_9_weeep_30.h5"
+    path_to_model_weights = "/work/home/dsu/weights_of_best_models/ID_6.h5"
 
     # loading data
     # french data
@@ -93,10 +85,10 @@ def main():
     dev = dev.__deepcopy__()
     dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    dev_data_loader = get_tensorflow_generator(paths_and_labels=dev, batch_size=128,
+    dev_data_loader = get_tensorflow_image_loader(paths_and_labels=dev, batch_size=128,
                                                  augmentation=False,
                                                  augmentation_methods=None,
-                                                 preprocessing_function=preprocess_image_VGGFace2,
+                                                 preprocessing_function=preprocess_data_Xception,
                                                  clip_values=None,
                                                  cache_loaded_images=False)
 
@@ -104,15 +96,15 @@ def main():
     test = test.__deepcopy__()
     test = pd.concat([test, pd.get_dummies(test['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    test_data_loader = get_tensorflow_generator(paths_and_labels=test, batch_size=128,
+    test_data_loader = get_tensorflow_image_loader(paths_and_labels=test, batch_size=128,
                                                augmentation=False,
                                                augmentation_methods=None,
-                                               preprocessing_function=preprocess_image_VGGFace2,
+                                               preprocessing_function=preprocess_data_Xception,
                                                clip_values=None,
                                                cache_loaded_images=False)
 
     # model initialization
-    model = create_VGGFace2_model(path_to_weights="/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5",
+    model = create_Xception_model(#path_to_weights="/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5",
                                   num_classes=5)
     # load weights of trained model
     model.load_weights(path_to_model_weights)

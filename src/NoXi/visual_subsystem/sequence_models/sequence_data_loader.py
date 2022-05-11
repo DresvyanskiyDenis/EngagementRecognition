@@ -22,12 +22,19 @@ def load_embeddings_from_csv_file(embedding_file_path:str)->pd.DataFrame:
 def split_embeddings_according_to_file_path(embeddings:pd.DataFrame)->Dict[str, pd.DataFrame]:
     """
     Splits the embeddings according to the file path in the first column.
-    Note that originally the first and the second columns are video_filename, frame_id
     :param embeddings: pd.DataFrame
             pandas dataframe containing the embeddings
     :return: Dict[str, pd.DataFrame]
             dictionary containing the embeddings split by file path
     """
+    # split the filename to two columns: video_filename and frame_id
+    embeddings["frame_id"] = embeddings["filename"].apply(lambda x: x.split("/")[-1].split(".")[0].split("_")[-1])
+    embeddings["frame_id"] = embeddings["frame_id"].astype('int32')
+    embeddings.rename(columns={"filename": "video_filename"}, inplace=True)
+    embeddings["video_filename"] = embeddings["video_filename"].apply(lambda x: x[:x.rfind("/")])
+    # rearrange columns so that video_filename and the frame_id will be the first two columns
+    embeddings = embeddings[["video_filename", "frame_id"] + embeddings.columns[2:-1].tolist()]
+
     split_embeddings={}
     for file_path in embeddings['video_filename'].unique():
         split_embeddings[file_path] = embeddings[embeddings['video_filename']==file_path]
@@ -76,9 +83,9 @@ def create_generator_from_pd_dictionary(embeddings_dict:Dict[str, pd.DataFrame],
 
 
 def load_data():
-    path_to_train_embeddings=""
-    path_to_dev_embeddings=""
-    path_to_test_embeddings=""
+    path_to_train_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/train_extracted_deep_embeddings.csv"
+    path_to_dev_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/dev_extracted_deep_embeddings.csv"
+    path_to_test_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/test_extracted_deep_embeddings.csv"
     # load embeddings
     train_embeddings = load_embeddings_from_csv_file(path_to_train_embeddings)
     dev_embeddings = load_embeddings_from_csv_file(path_to_dev_embeddings)

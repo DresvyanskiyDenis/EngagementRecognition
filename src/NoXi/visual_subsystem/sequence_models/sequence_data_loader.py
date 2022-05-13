@@ -33,7 +33,7 @@ def split_embeddings_according_to_file_path(embeddings:pd.DataFrame)->Dict[str, 
     embeddings.rename(columns={"filename": "video_filename"}, inplace=True)
     embeddings["video_filename"] = embeddings["video_filename"].apply(lambda x: x[:x.rfind("/")])
     # rearrange columns so that video_filename and the frame_id will be the first two columns
-    embeddings = embeddings[["video_filename", "frame_id"] + embeddings.columns[2:-1].tolist()]
+    embeddings = embeddings[["video_filename", "frame_id"] + embeddings.columns[1:-1].tolist()]
 
     split_embeddings={}
     for file_path in embeddings['video_filename'].unique():
@@ -83,9 +83,10 @@ def create_generator_from_pd_dictionary(embeddings_dict:Dict[str, pd.DataFrame],
 
 
 def load_data():
-    path_to_train_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/train_extracted_deep_embeddings.csv"
-    path_to_dev_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/dev_extracted_deep_embeddings.csv"
-    path_to_test_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/test_extracted_deep_embeddings.csv"
+    print('Start loading data...')
+    path_to_train_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv"
+    path_to_dev_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/Xception_model/dev_extracted_deep_embeddings.csv"
+    path_to_test_embeddings="/work/home/dsu/NoXi_embeddings/All_languages/Xception_model/test_extracted_deep_embeddings.csv"
     # load embeddings
     train_embeddings = load_embeddings_from_csv_file(path_to_train_embeddings)
     dev_embeddings = load_embeddings_from_csv_file(path_to_dev_embeddings)
@@ -99,4 +100,5 @@ def load_data():
 
 
 if __name__ == '__main__':
-    pass
+    train, dev, test = load_data()
+    print(train)

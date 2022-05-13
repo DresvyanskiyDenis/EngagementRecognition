@@ -3,7 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$" />
     <content url="file://$MODULE_DIR$/../datatools" />
-    <orderEntry type="jdk" jdkName="Remote Python 3.8.12 (sftp://dsu@134.60.124.24:22/work/home/dsu/anaconda3/envs/tf2_env/bin/python3.8)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.7 (Env_with_tf_2) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

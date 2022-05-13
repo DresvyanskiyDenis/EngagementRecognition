@@ -15,15 +15,15 @@ from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all
 
 
 def main():
-    print("111")
+    print("222")
     # parameters for embeddings extraction
-    output_dir="/work/home/dsu/NoXi_embeddings/All_languages/"
+    output_dir=r"/work/home/dsu/NoXi_embeddings/"
     model_weights_path="/work/home/dsu/weights_of_best_models/ID_6.h5"
     model_creation_function=partial(create_Xception_model, num_classes=5)
 
     # load the data and labels. The data is a dataframes with the filename (full path) as a first column - that is
     # what we need
-    train, dev, test = load_NoXi_data_all_languages(labels_as_categories=False)
+    train, dev, test = load_NoXi_data_all_languages()
 
     # create the model and load its weights
     model=model_creation_function()
@@ -34,8 +34,8 @@ def main():
     # TODO: check whether the weights are really loaded ot not
     model.summary()
     # extract the embeddings
-    extract_deep_embeddings_from_images_in_df(paths_to_images=train, extractor=model, output_dir=output_dir, batch_size = 32,
-                      preprocessing_functions= (Xception_normalization,), include_labels=True)
+    extract_deep_embeddings_from_images_in_df(paths_to_images=test, extractor=model, output_dir=output_dir, batch_size = 32,
+                      preprocessing_functions= (Xception_normalization,))
     # should be done
     # TODO: Check it
 

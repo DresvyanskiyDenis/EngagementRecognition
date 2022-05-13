@@ -42,19 +42,19 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         "optimizer": "Adam",  # SGD, Nadam
         "learning_rate_max": 0.001,  # up to 0.0001
         "learning_rate_min": 0.00001,  # up to 0.000001
-        "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
-        "annealing_period": 5,
+        "lr_scheduller": "reduceLRonPlateau",  # "reduceLRonPlateau"
+        "annealing_period": 10,
         "epochs": 100,
-        "batch_size": 8,
+        "batch_size": 4,
         "architecture": "LSTM_no_attention",
         "dataset": "NoXi",
         'type_of_labels':'sequence_to_one',
         "num_classes": 5,
-        'num_embeddings':512,
-        'num_layers': 2,
-        'num_neurons': 128,
-        'window_length':12,
-        'window_shift':6,
+        'num_embeddings':256,
+        'num_layers': 3,
+        'num_neurons': 256,
+        'window_length':40,
+        'window_shift':10,
         'window_stride':1,
     }
 
@@ -82,10 +82,10 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     else:
         raise Exception("You passed wrong optimizer name.")
 
-    # class weights
-    class_weights = compute_class_weight(class_weight='balanced',
-                                         classes=np.unique(np.argmax(train.iloc[:, -metaparams['num_classes']:].values, axis=1, keepdims=True)),
-                                         y=np.argmax(train.iloc[:, -metaparams['num_classes']:].values, axis=1, keepdims=True).flatten())
+    # class weights, as it is computed in sklearn
+    class_weights=pd.concat(train.values(), axis=0).iloc[:, -metaparams['num_classes']:].values.sum(axis=0)
+    class_weights=class_weights.sum()/(metaparams['num_classes']+class_weights)
+    class_weights=class_weights/class_weights.sum()
 
     # loss function
     if loss_func == 'categorical_crossentropy':
@@ -112,7 +112,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     # create DataLoaders (DataGenerator)
     train_data_loader = create_generator_from_pd_dictionary(embeddings_dict=train, num_classes=metaparams['num_classes'],
                                                             type_of_labels=metaparams['type_of_labels'],
-                                        window_length=metaparams['window_length'], window_shift=metaparams['window_length'],
+                                        window_length=metaparams['window_length'], window_shift=metaparams['window_shift'],
                                         window_stride=metaparams['window_stride'],batch_size=metaparams['batch_size'], shuffle=True,
                                         preprocessing_function=None,
                                         clip_values=None,

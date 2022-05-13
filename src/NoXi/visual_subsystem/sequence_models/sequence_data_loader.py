@@ -3,6 +3,8 @@ from typing import Dict, Optional
 import pandas as pd
 import numpy as np
 import tensorflow as tf
+from sklearn.preprocessing import StandardScaler
+
 from tensorflow_utils.tensorflow_datagenerators.sequence_loader_tf2 import Tensorflow_Callable, \
     get_tensorflow_sequence_loader
 
@@ -91,6 +93,14 @@ def load_data():
     train_embeddings = load_embeddings_from_csv_file(path_to_train_embeddings)
     dev_embeddings = load_embeddings_from_csv_file(path_to_dev_embeddings)
     test_embeddings = load_embeddings_from_csv_file(path_to_test_embeddings)
+    # normalization
+    scaler = StandardScaler()
+    scaler=scaler.fit(train_embeddings.iloc[:, 1:-5])
+    train_embeddings.iloc[:, 1:-5] = scaler.transform(train_embeddings.iloc[:, 1:-5])
+    dev_embeddings.iloc[:, 1:-5] = scaler.transform(dev_embeddings.iloc[:, 1:-5])
+    test_embeddings.iloc[:, 1:-5] = scaler.transform(test_embeddings.iloc[:, 1:-5])
+
+
     # split embeddings
     train_embeddings_split = split_embeddings_according_to_file_path(train_embeddings)
     dev_embeddings_split = split_embeddings_according_to_file_path(dev_embeddings)

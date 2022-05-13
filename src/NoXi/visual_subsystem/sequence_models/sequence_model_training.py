@@ -4,6 +4,7 @@ sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
 import gc
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import wandb
 from typing import Optional, Tuple
@@ -41,20 +42,20 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         "optimizer": "Adam",  # SGD, Nadam
         "learning_rate_max": 0.001,  # up to 0.0001
         "learning_rate_min": 0.00001,  # up to 0.000001
-        "lr_scheduller": "Cyclic",  # "reduceLRonPlateau"
-        "annealing_period": 5,
+        "lr_scheduller": "reduceLRonPlateau",  # "reduceLRonPlateau"
+        "annealing_period": 10,
         "epochs": 100,
-        "batch_size": 8,
+        "batch_size": 16,
         "architecture": "LSTM_no_attention",
         "dataset": "NoXi",
-        'type_of_labels':'sequence_to_one',
+        'type_of_labels': 'sequence_to_one',
         "num_classes": 5,
-        'num_embeddings':512,
-        'num_layers': 2,
-        'num_neurons': 128,
-        'window_length':12,
-        'window_shift':6,
-        'window_stride':1,
+        'num_embeddings': 256,
+        'num_layers': 3,
+        'num_neurons': 256,
+        'window_length': 40,
+        'window_shift': 10,
+        'window_stride': 1,
     }
 
     # initialization of Weights and Biases
@@ -69,7 +70,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                         annealing_period=config.annealing_period)
     elif config.lr_scheduller == 'reduceLRonPlateau':
         lr_scheduller = get_reduceLRonPlateau_callback(monitoring_loss='val_loss', reduce_factor=0.1,
-                                                       num_patient_epochs=5,
+                                                       num_patient_epochs=7,
                                                        min_lr=config.learning_rate_min)
     else:
         raise Exception("You passed wrong lr_scheduller.")
@@ -84,9 +85,9 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         raise Exception("You passed wrong optimizer name.")
 
     # class weights
-    class_weights = compute_class_weight(class_weight='balanced',
-                                         classes=np.unique(np.argmax(train.iloc[:, -config.num_classes:].values, axis=1, keepdims=True)),
-                                         y=np.argmax(train.iloc[:, -config.num_classes:].values, axis=1, keepdims=True).flatten())
+    class_weights=pd.concat(train.values(), axis=0).iloc[:, -metaparams['num_classes']:].values.sum(axis=0)
+    class_weights=class_weights.sum()/(metaparams['num_classes']+class_weights)
+    class_weights = class_weights / class_weights.sum()
 
     # loss function
     if loss_func == 'categorical_crossentropy':
@@ -114,7 +115,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     # create DataLoaders (DataGenerator)
     train_data_loader = create_generator_from_pd_dictionary(embeddings_dict=train, num_classes=config.num_classes,
                                                             type_of_labels=config.type_of_labels,
-                                        window_length=config.window_length, window_shift=config.window_length,
+                                        window_length=config.window_length, window_shift=int(np.round(config.window_length*0.33)),
                                         window_stride=config.window_stride,batch_size=config.batch_size, shuffle=True,
                                         preprocessing_function=None,
                                         clip_values=None,
@@ -183,12 +184,12 @@ def main():
             },
             'learning_rate_max': {
                 'distribution': 'uniform',
-                'max': 0.005,
+                'max': 0.01,
                 'min': 0.0001
             },
             'learning_rate_min': {
                 'distribution': 'uniform',
-                'max': 0.00005,
+                'max': 0.0001,
                 'min': 0.000001
             },
             'lr_scheduller': {
@@ -201,14 +202,14 @@ def main():
                 'values': [64, 128, 256, 512]
             },
             'window_length': {
-                'values': [12, 24, 48, 72]
+                'values': [20, 30, 40, 50, 60, 70, 80]
             }
         }
     }
 
     # categorical crossentropy
     sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_emb_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=100, project='NoXi_Seq_emb_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=1000, project='NoXi_Seq_emb_training')
     tf.keras.backend.clear_session()
     gc.collect()
     # focal loss

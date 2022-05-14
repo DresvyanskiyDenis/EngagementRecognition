@@ -1,11 +1,17 @@
 import sys
+
+from src.NoXi.visual_subsystem.frame_wise_models.MobileNetv3_training import create_MobileNetv3_model
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
-from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception, \
+    preprocess_data_MobileNetv3, preprocess_image_VGGFace2
 
-from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data
+from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data, \
+    create_VGGFace2_model
 from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, accuracy_score
@@ -50,62 +56,33 @@ def validate_model(model, generator):
 
 
 def main():
-    print("12344")
+    print("131231")
     # params
-    frame_step = 5
-    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
-    path_to_model_weights = "/work/home/dsu/weights_of_best_models/ID_6.h5"
-
-    # loading data
-    # french data
-    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
-    train_french, dev_french, test_french = load_and_preprocess_data(path_to_data, path_to_labels_french,
-                                                                     frame_step)
-    # english data
-    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
-    train_german, dev_german, test_german = load_and_preprocess_data(path_to_data, path_to_labels_german,
-                                                                     frame_step)
-    # german data
-    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
-    train_english, dev_english, test_english = load_and_preprocess_data(path_to_data, path_to_labels_english,
-                                                                        frame_step)
-    # all data
-    train = pd.concat([train_french, train_german, train_english], axis=0)
-    dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
-    test = pd.concat([test_french, test_german, test_english], axis=0)
-    # shuffle one more time train data
-    train = train.sample(frac=1).reset_index(drop=True)
-    # clear RAM
-    del train_english, train_french, train_german
-    del dev_english, dev_french, dev_german
-    del test_english, test_german, test_french
+    train, dev, test = load_NoXi_data_all_languages(labels_as_categories=False)
+    path_to_model_weights="/work/home/dsu/weights_of_best_models/ID_11_2.h5"
+    preprocess_function = preprocess_data_Xception
+    batch_size = 128
+    model_creation_function = create_Xception_model
     gc.collect()
 
     # transform labels in dev data to one-hot encodings
-    dev = dev.__deepcopy__()
-    dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
-
-    dev_data_loader = get_tensorflow_image_loader(paths_and_labels=dev, batch_size=128,
+    dev_data_loader = get_tensorflow_image_loader(paths_and_labels=dev, batch_size=batch_size,
                                                  augmentation=False,
                                                  augmentation_methods=None,
-                                                 preprocessing_function=preprocess_data_Xception,
+                                                 preprocessing_function=preprocess_function,
                                                  clip_values=None,
                                                  cache_loaded_images=False)
 
     # transform labels in dev data to one-hot encodings
-    test = test.__deepcopy__()
-    test = pd.concat([test, pd.get_dummies(test['class'], dtype="float32")], axis=1).drop(columns=['class'])
-
-    test_data_loader = get_tensorflow_image_loader(paths_and_labels=test, batch_size=128,
+    test_data_loader = get_tensorflow_image_loader(paths_and_labels=test, batch_size=batch_size,
                                                augmentation=False,
                                                augmentation_methods=None,
-                                               preprocessing_function=preprocess_data_Xception,
+                                               preprocessing_function=preprocess_function,
                                                clip_values=None,
                                                cache_loaded_images=False)
 
     # model initialization
-    model = create_Xception_model(#path_to_weights="/work/home/dsu/VGG_model_weights/resnet50_softmax_dim512/weights.h5",
-                                  num_classes=5)
+    model = model_creation_function(num_classes=5)
     # load weights of trained model
     model.load_weights(path_to_model_weights)
     # model compilation

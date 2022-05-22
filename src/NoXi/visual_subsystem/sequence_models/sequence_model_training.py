@@ -87,7 +87,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     # class weights
     class_weights=pd.concat(train.values(), axis=0).iloc[:, -metaparams['num_classes']:].values.sum(axis=0)
     class_weights=class_weights.sum()/(metaparams['num_classes']+class_weights)
-    class_weights = class_weights / class_weights.sum()
+    #class_weights = class_weights / class_weights.sum()
 
     # loss function
     if loss_func == 'categorical_crossentropy':
@@ -115,7 +115,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     # create DataLoaders (DataGenerator)
     train_data_loader = create_generator_from_pd_dictionary(embeddings_dict=train, num_classes=config.num_classes,
                                                             type_of_labels=config.type_of_labels,
-                                        window_length=config.window_length, window_shift=int(np.round(config.window_length*0.33)),
+                                        window_length=config.window_length, window_shift=int(np.round(config.window_length*0.5)),
                                         window_stride=config.window_stride,batch_size=config.batch_size, shuffle=True,
                                         preprocessing_function=None,
                                         clip_values=None,
@@ -163,8 +163,8 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     tf.keras.backend.clear_session()
 
 
-def main():
-    print("START OF SCRIPT")
+def run_sweep(sweep_name:str, window_length:int):
+    print("START OF SCRIPT111111111")
     #gpus = tf.config.experimental.list_physical_devices('GPU')
     #for gpu in gpus:
     #    tf.config.experimental.set_memory_growth(gpu, True)
@@ -173,6 +173,7 @@ def main():
     gc.collect()
 
     sweep_config = {
+        'name':sweep_name,
         'method': 'random',
         'metric': {
             'name': 'val_loss',
@@ -202,23 +203,22 @@ def main():
                 'values': [64, 128, 256, 512]
             },
             'window_length': {
-                'values': [20, 30, 40, 50, 60, 70, 80]
+                'values': [window_length]
             }
         }
     }
 
-    # categorical crossentropy
+    # focal loss
     sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_emb_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'categorical_crossentropy'), count=1000, project='NoXi_Seq_emb_training')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=195, project='NoXi_Seq_emb_training')
     tf.keras.backend.clear_session()
     gc.collect()
-    # focal loss
-    """print("Wandb with focal loss")
-    sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=50,
-                project='VGGFace2_FtF_training')
-    tf.keras.backend.clear_session()
-    gc.collect()"""
+
+
+def main():
+    print("111")
+    run_sweep(sweep_name="Focal_loss_window_length_%i"%(int(sys.argv[1])), window_length=int(sys.argv[1]))
+
 
 
 if __name__ == '__main__':

@@ -1,26 +1,29 @@
 import sys
-
-from src.NoXi.visual_subsystem.frame_wise_models.MobileNetv3_training import create_MobileNetv3_model
-from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
-from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
-from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception, \
-    preprocess_data_MobileNetv3, preprocess_image_VGGFace2
-
-from src.NoXi.visual_subsystem.frame_wise_models.VGGFace2_training import load_and_preprocess_data, \
-    create_VGGFace2_model
-from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
-from functools import partial
-from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, accuracy_score
+import tensorflow as tf
 import gc
 import numpy as np
-import pandas as pd
+from functools import partial
+from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, accuracy_score
+
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
+from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
+from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception
+from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
 
 
-def validate_model(model, generator):
+
+def validate_model(model:tf.Model, generator)->None:
+    """Validates provided model using generator (preferable tf.Dataset).
+       Validation is done applying the following metrics: [accuracy, precision, recall, f1_score, confusion matrix]
+    :param model: tf.Model
+                Tensorflow model
+    :param generator: Iterator
+                Any generator that produces the output as a tuple: (features, labels)
+    :return: None
+    """
 
     metrics = {
         'val_accuracy': accuracy_score,

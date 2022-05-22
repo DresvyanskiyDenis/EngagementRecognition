@@ -1,5 +1,4 @@
 import sys
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -16,7 +15,7 @@ from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
 
-from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data, load_NoXi_data_all_languages
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
 from tensorflow_utils.Losses import categorical_focal_loss
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations import random_rotate90_image, \
@@ -25,12 +24,17 @@ from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations i
     random_convert_to_grayscale_image
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception
 from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
-from preprocessing.data_normalizing_utils import Xception_normalization
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
-from tensorflow_utils.keras_datagenerators.ImageDataLoader import ImageDataLoader
 
 
 def create_Xception_model(num_classes: Optional[int] = 5) -> tf.keras.Model:
+    """ Creates the Xception model with pre-loaded weights.
+
+    :param num_classes: int
+                number of classes to create a last layer of the neural network.
+    :return: tf.Model
+                Xception Keras Tensorflow model.
+    """
     # take model from keras zoo
     model = tf.keras.applications.Xception(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
     # extract last layer
@@ -51,6 +55,22 @@ def create_Xception_model(num_classes: Optional[int] = 5) -> tf.keras.Model:
 
 
 def train_model(train, dev, loss_func='categorical_crossentropy'):
+    """ Creates and trains on the NoXi dataset the Keras Tensorflow model.
+            Here, the model is Xception.
+            During the training all metaparams will be logged using the Weights and Biases library.
+            Also, different augmentation methods will be applied (see down to the function).
+            Overall, the function is designed only for the usage with Weights and Biases library.
+
+        :param train: pd.DataFrame
+                    Pandas DataFrame with the following columns: [filename, class] or [filename, class_0, class_1, ...].
+                    Train dataset.
+        :param dev: pd.DataFrame
+                    Pandas DataFrame with the following columns: [filename, class] or [filename, class_0, class_1, ...].
+                    Development dataset
+        :param loss_func: str
+                    Type of the loss function to be applied. Either "categorical_crossentropy" or "focal_loss".
+        :return: None
+        """
     # metaparams
     metaparams = {
         "optimizer": "Adam",  # SGD, Nadam

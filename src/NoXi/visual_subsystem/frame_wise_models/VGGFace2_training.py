@@ -23,14 +23,14 @@ from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_augmentations i
     random_change_contrast_image, random_change_saturation_image, random_worse_quality_image, \
     random_convert_to_grayscale_image
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_image_VGGFace2
-from src.NoXi.visual_subsystem.frame_wise_models.utils import load_and_preprocess_data, load_NoXi_data_all_languages
+from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
 from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
 from tensorflow_utils.callbacks import get_annealing_LRreduce_callback, get_reduceLRonPlateau_callback
 from tensorflow_utils.models.CNN_models import get_modified_VGGFace2_resnet_model
 
 
 def create_VGGFace2_model(path_to_weights: str, num_classes: Optional[int] = 4) -> tf.keras.Model:
-    """Creates the VGGFace2 model and loads weights for it using proviede path.
+    """Creates the VGGFace2 model and loads weights for it using provided path.
 
     :param path_to_weights: str
             Path to the weights for VGGFace2 model.
@@ -48,7 +48,23 @@ def create_VGGFace2_model(path_to_weights: str, num_classes: Optional[int] = 4) 
     return model
 
 
-def train_model(train, dev, loss_func='categorical_crossentropy'):
+def train_model(train, dev, loss_func='categorical_crossentropy')->None:
+    """ Creates and trains on the NoXi dataset the Keras Tensorflow model.
+        Here, the model is VGGFace2.
+        During the training all metaparams will be logged using the Weights and Biases library.
+        Also, different augmentation methods will be applied (see down to the function).
+        Overall, the function is designed only for the usage with Weights and Biases library.
+
+    :param train: pd.DataFrame
+                Pandas DataFrame with the following columns: [filename, class] or [filename, class_0, class_1, ...].
+                Train dataset.
+    :param dev: pd.DataFrame
+                Pandas DataFrame with the following columns: [filename, class] or [filename, class_0, class_1, ...].
+                Development dataset
+    :param loss_func: str
+                Type of the loss function to be applied. Either "categorical_crossentropy" or "focal_loss".
+    :return: None
+    """
     # metaparams
     metaparams = {
         "optimizer": "Adam",  # SGD, Nadam

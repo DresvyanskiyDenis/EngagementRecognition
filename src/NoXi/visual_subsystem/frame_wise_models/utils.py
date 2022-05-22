@@ -15,11 +15,28 @@ from src.NoXi.preprocessing.labels_preprocessing import load_all_labels_by_paths
 def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step: int, shuffle_train:Optional[bool]=False,
                              labels_as_categories:bool=False) -> Tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
+    """ Forms the train, dev, and test DataFrames to the dataset NoXi, which will be used as a tf generators.
+        NoXi is a dataset represented by categorical engagement labels and video files.
+        If you have facial frames extracted from NoXi data, you can use this function to create the DataFrames
+        with the following columns:
+        filename, class_0, class_1, ...
+        or
+        filename, class
+        where filename is a path to the frame extracted from the corresponded video file.
 
-    :param path_to_data:
-    :param path_to_labels:
-    :return:
+    :param path_to_data: str
+                path to the data (extracted frames)
+    :param path_to_labels: str
+                path to the file with labels
+    :param frame_step: int
+                step between consequent frames (for example, each fifth frame)
+    :param shuffle_train: bool
+                shuffle the train set or not before returning
+    :param labels_as_categories: True
+                convert labels to the categories represented by one number or keep it in the one-hot encoding format
+    :return: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+                Tuple of three DataFrames (train, dev, test), with the first column equalled to paths to frames (images)
+                and labels as a last column (or columns if labels_as_categories equals True)
     """
     # generate paths to images (data)
     paths_to_images = generate_rel_paths_to_images_in_all_dirs(path_to_data, image_format="png")
@@ -84,7 +101,18 @@ def load_and_preprocess_data(path_to_data: str, path_to_labels: str, frame_step:
     # done
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
-def load_NoXi_data_all_languages(labels_as_categories:bool=False):
+def load_NoXi_data_all_languages(labels_as_categories:bool=False)->Tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """ Exploits the load_and_preprocess_data() function to form DataFrames for every language in the NoXi dataset
+        (French, German, English)
+
+
+    :param labels_as_categories: bool
+            convert labels to the categories represented by one number or keep it in the one-hot encoding format
+    :return: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+                Tuple of three DataFrames (train, dev, test), with the first column equalled to paths to frames (images)
+                and labels as a last column (or columns if labels_as_categories equals True)
+    """
     # loading data
     frame_step = 5
     path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"

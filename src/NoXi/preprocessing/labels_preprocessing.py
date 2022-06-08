@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Contains the functions for the NoXi labels preprocessing.
+
+"""
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2022"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
+
 import copy
 import glob
 import os
@@ -188,22 +201,6 @@ def combine_dataframe_of_paths_with_labels_one_video(paths:pd.DataFrame, labels:
     result[new_columns] = labels
     return result
 
-
-    '''# choose indices for labels based on the provided step of frames
-    indices_for_labels=np.arange(labels.shape[0], step=frames_step)
-    labels=labels[indices_for_labels]
-    # copy np.ndarray for consequent changing without influences on the existing np.ndarray
-    result = copy.deepcopy(paths)
-    # aligning the labels to the paths length
-    if labels.shape[0] != paths.shape[0]:
-        print("WARNING: labels shape:%i is not equal to image_paths shape:%i. Videofile:%s" % (
-        labels.shape[0], paths.shape[0], paths['rel_path'].iloc[0]))
-        required_length=min(labels.shape[0], result.shape[0])
-        labels, result= labels[:required_length], result[:required_length]
-        print("NEW SHAPES ARE: labels shape:%i, image_paths shape:%i"% (labels.shape[0], result.shape[0]))
-    # combination of chosen labels with filenames
-    result['label']=labels
-    return result'''
 
 def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFrame, labels: Dict[str, np.ndarray],
                                        sample_rate_annotations: Optional[int] = 25, frame_step:int=5) -> pd.DataFrame:

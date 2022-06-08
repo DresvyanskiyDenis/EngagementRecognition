@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-TODO: write description of module
+"""Contains the functions for the NoXi data preprocessing.
+
 """
 
 __author__ = "Denis Dresvyanskiy"
-__copyright__ = "Copyright 2021"
+__copyright__ = "Copyright 2022"
 __credits__ = ["Denis Dresvyanskiy"]
 __maintainer__ = "Denis Dresvyanskiy"
 __email__ = "denis.dresvyanskiy@uni-ulm.de"
@@ -19,49 +19,18 @@ import os
 import cv2
 from PIL import Image
 
-"""from feature_extraction.face_recognition_utils import recognize_the_most_confident_person_retinaFace, \
-    extract_face_according_bbox, load_and_prepare_detector_retinaFace
-
-
-
-def extract_faces_from_video(path_to_video:str, path_to_output:str,
-                             detector:object, every_n_frame:int=1,
-                             resize_face:Tuple[int, int]=(224,224))->None:
-    # TODO: TEST IT
-    # TODO: write description
-    # check if output directory exists
-    if not os.path.exists(path_to_output):
-        os.makedirs(path_to_output, exist_ok=True)
-    # open videofile
-    videofile = cv2.VideoCapture(path_to_video)
-    # counter for frames. It equals to -1, because we will start right from 0 (see below)
-    currentframe=-1
-    while (True):
-        # reading from frame
-        ret, frame = videofile.read()
-        currentframe += 1
-        # if currentframe is not integer divisible by every_frame, skip it
-        if not currentframe % every_n_frame == 0:
-            continue
-        if ret:
-            # convert to RGB, because opencv reads in BGR format
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            # if video is still left continue detect face and save it
-            frame=np.array(frame)
-            # recognize the face (as the most confident on frame) and get bounding box for it
-            bbox=recognize_the_most_confident_person_retinaFace(frame, detector)
-            # extract face from image according to boundeng box
-            frame=extract_face_according_bbox(frame, bbox)
-            # resize if needed
-            if resize_face and resize_face[0]!=frame.shape[0] and resize_face[1]!=frame.shape[1]:
-                frame=Image.fromarray(frame).resize(resize_face)
-            # save extracted face in png format
-            full_path_for_saving = os.path.join(path_to_output, 'frame_%i.png'%currentframe)
-            frame.save(full_path_for_saving)
-        else:
-            break"""
 
 def extract_faces_from_all_videos_by_paths(path_to_data:str,relative_paths:Tuple[str,...], output_path:str)->None:
+    """ Extracts faces from all video using provided path_to_data (path where all videos are) and relative paths to each video
+
+    :param path_to_data: str
+                General (common) path to the directory, where there are all videos
+    :param relative_paths: Tuple[str,...]
+                Tuple of relative paths, while the "starting point" is the path_to_data
+    :param output_path: str
+                Path to the output directory
+    :return: None
+    """
     # check if output directory exists
     if not os.path.exists(output_path):
         os.makedirs(output_path, exist_ok=True)
@@ -105,7 +74,6 @@ def generate_rel_paths_to_images_in_all_dirs(path: str, image_format: str = "jpg
 
 
 if __name__=='__main__':
-    # TODO: TEST IT
     path_to_data=r'D:\Noxi_extracted\NoXi\Sessions'
     # form relative paths
     relative_paths_expert=os.listdir(path_to_data)

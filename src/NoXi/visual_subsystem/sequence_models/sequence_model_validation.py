@@ -36,21 +36,21 @@ def create_sequence_model(input_shape:Tuple[int,...], neurons_on_layer:Tuple[int
 
 
 
-def validate_model_on_generator(model:tf.keras.Model, generator)->None:
+def validate_model_on_generator(model:tf.keras.Model, generator):
     """Validates provided model using generator (preferable tf.Dataset).
        Validation is done applying the following metrics: [accuracy, precision, recall, f1_score, confusion matrix]
     :param model: tf.Model
                 Tensorflow model
     :param generator: Iterator
                 Any generator that produces the output as a tuple: (features, labels)
-    :return: None
+    :return:
     """
 
     metrics = {
-        'val_accuracy': accuracy_score,
-        'val_recall': partial(recall_score, average='macro'),
-        'val_precision': partial(precision_score, average='macro'),
-        'val_f1_score:': partial(f1_score, average='macro'),
+        'accuracy': accuracy_score,
+        'recall': partial(recall_score, average='macro'),
+        'precision': partial(precision_score, average='macro'),
+        'f1_score': partial(f1_score, average='macro'),
         'confusion_matrix': confusion_matrix,
     }
     # make predictions for data from generator and save ground truth labels
@@ -76,18 +76,14 @@ def validate_model_on_generator(model:tf.keras.Model, generator)->None:
     # print confusion matrix separately one more time for better vision
     print("Confusion matrix")
     print(conf_m)
+    return results
 
 
 
 
-def validate_model(dev, test, loss_func='categorical_crossentropy'):
+def validate_model(dev, test, weights_path, window_length, num_neurons, num_layers):
     # model params
-    weights_path="/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/model_LSTN_best_val_recall.h5"
-
     num_classes=5
-    num_neurons=128
-    num_layers=3
-    window_length=80
     num_embeddings=256
     window_stride=1
     batch_size=16
@@ -95,6 +91,9 @@ def validate_model(dev, test, loss_func='categorical_crossentropy'):
     loss='categorical_crossentropy'
     optimizer='Adam'
     metrics=None
+
+
+
     # model initialization
     model = create_sequence_model(num_classes=num_classes, neurons_on_layer=tuple(num_neurons for i in range(num_layers)),
                           input_shape=(window_length, num_embeddings))
@@ -126,15 +125,38 @@ def validate_model(dev, test, loss_func='categorical_crossentropy'):
                                         cache_loaded_seq= None
                                         )
 
-    validate_model_on_generator(model, dev_data_loader)
+    print("00000000000000000000000000000000000000000000000000000000")
+    print(weights_path)
+    dev_results=validate_model_on_generator(model, dev_data_loader)
     print('--------------------test-------------------')
-    validate_model_on_generator(model, test_data_loader)
+    test_results=validate_model_on_generator(model, test_data_loader)
+    print("00000000000000000000000000000000000000000000000000000000")
+    return (dev_results, test_results)
 
 
 def main():
     train, dev, test = load_data()
-    validate_model(dev, test)
+    dir_with_models="/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/models_to_check/"
+    params_for_testing_models=pd.read_csv("/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/models_to_check/params_of_testing.csv",
+                                          delimiter=';')
+    params_for_testing_models["weights_path"]=params_for_testing_models.apply(lambda x:
+                                                                              "window_"+str(x["window_length"])+"_sweep_"+str(x["sweep_id"])+".h5",
+                                                                              axis=1)
 
+
+    results=pd.DataFrame(columns=["weights_path","val_recall", "val_precision", "val_f1_score", "val_accuracy",
+                                  "test_recall", "test_precision", "test_f1_score", "test_accuracy" ])
+    # calculate results
+    for index, row in params_for_testing_models.iterrows():
+        dev_res, test_res=validate_model(dev, test, dir_with_models+row["weights_path"], row["window_length"], row["num_neurons"], row["num_layers"])
+        results=results.append({"weights_path":row["weights_path"],
+                                "val_recall":dev_res["recall"], "val_precision":dev_res["precision"],
+                                "val_f1_score":dev_res["f1_score"], "val_accuracy":dev_res["accuracy"],
+                                "test_recall":test_res["recall"], "test_precision":test_res["precision"],
+                                "test_f1_score":test_res["f1_score"], "test_accuracy":test_res["accuracy"]},
+                                ignore_index=True)
+    # write results to the csv file
+    results.to_csv("/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/models_to_check/results_of_testing.csv")
 
 
 if __name__ == '__main__':

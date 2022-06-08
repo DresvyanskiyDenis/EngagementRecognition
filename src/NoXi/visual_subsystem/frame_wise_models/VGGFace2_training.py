@@ -1,5 +1,17 @@
-import sys
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Contains the script for training the VGGFace2 model on the NoXi dataset. The Weights and Biases library is used to
+monitor and log the information about training process.
 
+"""
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2022"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
+import sys
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 

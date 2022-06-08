@@ -1,9 +1,22 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Contains the functions for loading and preprocessing (if needed) the data from the NoXi dataset.
+
+"""
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2022"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
+
 import gc
 from typing import Tuple, Optional
-
 import pandas as pd
 import numpy as np
 import os
+
 from src.NoXi.preprocessing.data_preprocessing import generate_rel_paths_to_images_in_all_dirs
 from src.NoXi.preprocessing.labels_preprocessing import load_all_labels_by_paths, \
     combine_path_to_images_with_labels_many_videos, generate_paths_to_labels

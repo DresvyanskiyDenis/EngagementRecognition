@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Test file to check different aspects of the code in the frame_wise_models package.
+
+"""
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2022"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
+
 import sys
 
 sys.path.extend(["/work/home/dsu/datatools/"])

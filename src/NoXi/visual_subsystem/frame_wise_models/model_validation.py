@@ -1,3 +1,15 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Contains the script for model validation on the NoXi development and test sets.
+
+"""
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2022"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
 import sys
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])

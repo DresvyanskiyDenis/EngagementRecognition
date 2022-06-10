@@ -31,7 +31,8 @@ def create_sequence_model(input_shape:Tuple[int,...], neurons_on_layer:Tuple[int
                               rnn_type = 'LSTM',
                               dnn_layers=(128,),
                               need_regularization = True,
-                              dropout = True)
+                              dropout = True,
+                              output_activation='softmax')
     return sequence_model
 
 
@@ -140,7 +141,8 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         'val_f1_score:': partial(f1_score, average='macro')
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
-                                                      metric_to_monitor='val_recall')
+                                                      metric_to_monitor='val_recall',
+                                                      log_class_distribution=True)
     early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, verbose=1)
 
     # train process
@@ -216,7 +218,7 @@ def run_sweep(sweep_name:str, window_length:int):
 
 
 def main():
-    print("111")
+    print("222")
     run_sweep(sweep_name="Focal_loss_window_length_%i"%(int(sys.argv[1])), window_length=int(sys.argv[1]))
 
 

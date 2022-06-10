@@ -45,7 +45,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         "lr_scheduller": "reduceLRonPlateau",  # "reduceLRonPlateau"
         "annealing_period": 10,
         "epochs": 100,
-        "batch_size": 4,
+        "batch_size": 32,
         "architecture": "LSTM_no_attention",
         "dataset": "NoXi",
         'type_of_labels':'sequence_to_one',
@@ -137,7 +137,8 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
         'val_f1_score:': partial(f1_score, average='macro')
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
-                                                      metric_to_monitor='val_recall')
+                                                      metric_to_monitor='val_recall',
+                                                      log_class_distribution=True)
     early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, verbose=1)
 
     # train process

@@ -60,7 +60,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     }
 
     # initialization of Weights and Biases
-    wandb.init(project="NoXi_Seq_emb_training", config=metaparams)
+    wandb.init(project="NoXi_Seq_to_One", config=metaparams)
     config = wandb.config
 
     # Metaparams initialization
@@ -211,8 +211,8 @@ def run_sweep(sweep_name:str, window_length:int):
     }
 
     # focal loss
-    sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_emb_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=195, project='NoXi_Seq_emb_training')
+    sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_to_One')
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=195, project='NoXi_Seq_to_One')
     tf.keras.backend.clear_session()
     gc.collect()
 

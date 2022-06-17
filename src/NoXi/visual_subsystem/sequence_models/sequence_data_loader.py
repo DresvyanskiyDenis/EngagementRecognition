@@ -1,7 +1,18 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Contains the functions to make a tf.Dataset generator for sequence data.
+"""
+
+__author__ = "Denis Dresvyanskiy"
+__copyright__ = "Copyright 2022"
+__credits__ = ["Denis Dresvyanskiy"]
+__maintainer__ = "Denis Dresvyanskiy"
+__email__ = "denis.dresvyanskiy@uni-ulm.de"
+
+
 from typing import Dict, Optional
 
 import pandas as pd
-import numpy as np
 import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 
@@ -49,21 +60,44 @@ def create_generator_from_pd_dictionary(embeddings_dict:Dict[str, pd.DataFrame],
                                         clip_values: Optional[bool] = None,
                                         cache_loaded_seq: Optional[bool] = None
                                         )->tf.data.Dataset:
+    """Creates a tensorflow.Dataset data generator. To do so, we need to pass the embeddings_dict, which will be preprocessed.
+    The generator generates the sequences with specified window_length, window_shift, and window_stride from provided
+    embedding vectors (usually extracted from every frame of some videofiles). THis is a dicrionary type, because every
+    videofile is separated from each other to keep it consistent for windows forming.
+    The format of such dictionaries are: Dict[str, pd.DataFrame] (Dict[path_to_video_file->pd.DataFrame])
+    The DataFrame has columns: [video_filename, frame_id, embedding_0, embedding_1, ..., label_0, label_1, ...]
+
+
+    :param embeddings_dict: Dict[str, pd.DataFrame]
+                The dictionary in the format Dict[path_to_video_file->pd.DataFrame]
+                The DataFrame has columns: [video_filename, frame_id, embedding_0, embedding_1, ..., label_0, label_1, ...]
+                This is the dataset you want to convert into tensorflow generator.
+    :param num_classes: int
+            The number of classes in the classification task to make a final softmax layer with exact same
+            number of neurons
+    :param type_of_labels: str
+            The type of labels to generate for every window. Two options are possible: ["sequence_to_one", "sequence_to_sequence"]
+    :param window_length: int
+            The length of the sequences (windows). THis is to generate the sequences of fixed length (for RNN model).
+            The length should be specified in terms of frame numbers (not seconds)
+    :param window_shift: int
+            The length of window shift during data generation.
+    :param window_stride: int
+            THe stride of the window for generating data.
+    :param batch_size: int
+            The batch size for training the model.
+    :param shuffle: bool
+            Specifies, does the training data need to be shuffled before training or not.
+    :param preprocessing_function: Optional[Tensorflow_Callable]
+            Specifies, whether we need to apply preprocessing function before passing the data to the model or not.
+    :param clip_values: bool
+            Specifies, whether we need to clip the values of obtained data to [0, 1] before passing the data to model or not.
+    :param cache_loaded_seq: bool
+            Specifies, whether we need to cache the data or not. It makes the training be faster, but requires a lot of RAM.
+    :return: tf.data.Dataset
+            The sequence data generator.
     """
 
-    :param embeddings_dict:
-    :param num_classes:
-    :param type_of_labels:
-    :param window_length:
-    :param window_shift:
-    :param window_stride:
-    :param batch_size:
-    :param shuffle:
-    :param preprocessing_function:
-    :param clip_values:
-    :param cache_loaded_seq:
-    :return:
-    """
     # go through the dictionary with dataframes, take them, and create a generator from it
     dataset_list = []
     for video_filename in embeddings_dict:

@@ -167,7 +167,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     # model compilation
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
     model.summary()
-
+    print('train generator')
     # create DataLoaders (DataGenerator)
     train_data_loader = get_tensorflow_image_loader(paths_and_labels=train, batch_size=metaparams["batch_size"],
                                                  augmentation=True,
@@ -177,16 +177,18 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
                                                  cache_loaded_images=False)
 
     # transform labels in dev data to one-hot encodings
-    dev = dev.__deepcopy__()
-    dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
+    print('dev generator')
+    #dev = dev.__deepcopy__()
+    #dev = pd.concat([dev, pd.get_dummies(dev['class'], dtype="float32")], axis=1).drop(columns=['class'])
 
-    dev_data_loader = get_tensorflow_image_loader(paths_and_labels=dev, batch_size=128,
+    dev_data_loader = get_tensorflow_image_loader(paths_and_labels=dev, batch_size=100,
                                                augmentation=False,
                                                augmentation_methods=None,
                                                preprocessing_function=preprocess_data_Xception,
                                                clip_values=None,
                                                cache_loaded_images=False)
 
+    print('callbacks')
     # create Keras Callbacks for monitoring learning rate and metrics on val_set
     lr_monitor_callback = WandB_LR_log_callback()
     val_metrics = {
@@ -196,8 +198,8 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     }
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall')
-    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, verbose=1)
-
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
+    print('train')
     # train process
     print("Loss used:%s" % (loss))
     print("XCEPTION LAYERS UP TO 8 BLOCK ARE FROZEN")
@@ -219,7 +221,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
 
 
 def run_sweep(sweep_name:str, test_language:str):
-    print("Language: "+test_language+"  ONLY FOCAL LOSS")
+    print("Language: "+test_language+" ONLY FOCAL LOSS")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)

@@ -178,14 +178,11 @@ def validate_model(dev: Dict[str, pd.DataFrame], test: Dict[str, pd.DataFrame], 
 
 def main():
     train, dev, test = load_data()
-    dir_with_models = "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/models_to_check/"
+    dir_with_models = "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/softmax_activation_focal_loss/"
     params_for_testing_models = pd.read_csv(
-        "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/models_to_check/params_of_testing.csv",
-        delimiter=';')
-    params_for_testing_models["weights_path"] = params_for_testing_models.apply(lambda x:
-                                                                                "window_" + str(x[
-                                                                                                    "window_length"]) + "_sweep_" + str(
-                                                                                    x["sweep_id"]) + ".h5",
+        "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/softmax_activation_focal_loss/params_of_testing.csv",
+        delimiter=',')
+    params_for_testing_models["weights_path"] = params_for_testing_models.apply(lambda x:str(x['window_length'])+'_'+str(x["sweep_id"]) + ".h5",
                                                                                 axis=1)
 
     results = pd.DataFrame(columns=["weights_path", "val_recall", "val_precision", "val_f1_score", "val_accuracy",
@@ -202,7 +199,7 @@ def main():
                                  ignore_index=True)
     # write results to the csv file
     results.to_csv(
-        "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/models_to_check/results_of_testing.csv")
+        "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/softmax_activation_focal_loss/results_of_testing.csv")
 
 
 if __name__ == '__main__':

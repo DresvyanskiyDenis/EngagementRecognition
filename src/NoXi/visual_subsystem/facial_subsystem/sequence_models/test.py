@@ -3,19 +3,15 @@ sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
 import gc
-import numpy as np
 import pandas as pd
 import tensorflow as tf
-import wandb
 from typing import Optional, Tuple
 
 from keras.callbacks import EarlyStopping
-from wandb.integration.keras import WandbCallback
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score
-from sklearn.utils import compute_class_weight
 
-from src.NoXi.visual_subsystem.sequence_models.sequence_data_loader import create_generator_from_pd_dictionary, \
+from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import create_generator_from_pd_dictionary, \
     load_data
 from tensorflow_utils.models.sequence_to_one_models import create_simple_RNN_network
 from tensorflow_utils.Losses import categorical_focal_loss

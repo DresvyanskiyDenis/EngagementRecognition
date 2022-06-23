@@ -23,7 +23,7 @@ from typing import Optional, Tuple, Dict
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score, confusion_matrix
 
-from src.NoXi.visual_subsystem.sequence_models.sequence_data_loader import create_generator_from_pd_dictionary, \
+from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import create_generator_from_pd_dictionary, \
     load_data
 from tensorflow_utils.models.sequence_to_one_models import create_simple_RNN_network
 

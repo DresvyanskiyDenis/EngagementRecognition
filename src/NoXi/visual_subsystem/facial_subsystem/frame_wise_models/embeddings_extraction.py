@@ -18,9 +18,8 @@ sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 from functools import partial
 
 from feature_extraction.embeddings_extraction import extract_deep_embeddings_from_images_in_df
-from preprocessing.data_normalizing_utils import Xception_normalization, VGGFace2_normalization
-from src.NoXi.visual_subsystem.frame_wise_models.Xception_training import create_Xception_model
-from src.NoXi.visual_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
+from preprocessing.data_normalizing_utils import VGGFace2_normalization
+from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
 from tensorflow_utils.models.CNN_models import get_EmoVGGFace2_embeddings_extractor
 
 

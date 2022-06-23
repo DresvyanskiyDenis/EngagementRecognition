@@ -11,17 +11,16 @@ __email__ = "denis.dresvyanskiy@uni-ulm.de"
 
 import gc
 import sys
-import time
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict
 
 import pandas as pd
 import wandb
 import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 
-from src.NoXi.visual_subsystem.sequence_models.sequence_data_loader import load_embeddings_from_csv_file, \
+from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import load_embeddings_from_csv_file, \
     split_embeddings_according_to_file_path, load_data
-from src.NoXi.visual_subsystem.sequence_models.sequence_model_training import train_model
+from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_model_training import train_model
 
 
 def load_emotional_embeddings() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:

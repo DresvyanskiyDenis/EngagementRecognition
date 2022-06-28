@@ -23,9 +23,10 @@ from typing import Optional, Tuple, Dict
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score, confusion_matrix
 
-from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import create_generator_from_pd_dictionary, \
-    load_data
+
 from tensorflow_utils.models.sequence_to_one_models import create_simple_RNN_network
+from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import \
+    create_generator_from_pd_dictionary, load_data
 
 
 def create_sequence_model(input_shape: Tuple[int, ...], neurons_on_layer: Tuple[int, ...],
@@ -177,10 +178,11 @@ def validate_model(dev: Dict[str, pd.DataFrame], test: Dict[str, pd.DataFrame], 
 
 
 def main():
+    print('Start of the script...')
     train, dev, test = load_data()
-    dir_with_models = "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/softmax_activation_focal_loss/"
+    dir_with_models = "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/softmax_activation_categorical_crossentropy_loss/"
     params_for_testing_models = pd.read_csv(
-        "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/softmax_activation_focal_loss/params_of_testing.csv",
+        "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/softmax_activation_categorical_crossentropy_loss/params_of_testing.csv",
         delimiter=',')
     params_for_testing_models["weights_path"] = params_for_testing_models.apply(lambda x:str(x['window_length'])+'_'+str(x["sweep_id"]) + ".h5",
                                                                                 axis=1)
@@ -199,7 +201,7 @@ def main():
                                  ignore_index=True)
     # write results to the csv file
     results.to_csv(
-        "/work/home/dsu/weights_of_best_models/sequence_to_one_experiments/softmax_activation_focal_loss/results_of_testing.csv")
+        "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/softmax_activation_categorical_crossentropy_loss/results_of_testing.csv")
 
 
 if __name__ == '__main__':

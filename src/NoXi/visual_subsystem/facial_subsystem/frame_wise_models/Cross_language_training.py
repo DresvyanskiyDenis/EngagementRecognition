@@ -219,7 +219,7 @@ def train_model(train, dev, loss_func='categorical_crossentropy'):
     tf.keras.backend.clear_session()
 
 
-def run_sweep(sweep_name:str, test_language:str):
+def run_sweep(sweep_name:str, test_language:str, count:int):
     print("Language: "+test_language+" ONLY FOCAL LOSS")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
@@ -269,16 +269,15 @@ def run_sweep(sweep_name:str, test_language:str):
     # focal loss
     print("Focal loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=20,
+    wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=count,
                 project='VGGFace2_FtF_training')
     tf.keras.backend.clear_session()
     gc.collect()
 
 def main():
-    print('start of script...')
-    run_sweep("Xception_all_vs_english", "english")
-    run_sweep("Xception_all_vs_german", "german")
-    run_sweep("Xception_all_vs_french", "french")
+    print('112321312. start of script...')
+    run_sweep("Xception_all_vs_german", "german", count=10)
+    run_sweep("Xception_all_vs_french", "french", count=20)
 
 
 

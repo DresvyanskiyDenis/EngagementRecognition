@@ -1,17 +1,26 @@
 import glob
+from typing import Optional, Union, Tuple, List
 
 import numpy as np
-import pandas as pd
 import cv2
-import torch
-import torchvision
 import os
 
 from SimpleHigherHRNet import SimpleHigherHRNet
 
 
-def cut_frame_to_pose(extractor, frame)->np.ndarray:
+def check_bbox_length(bbox)->bool:
+    if bbox[3]-bbox[1]>800:
+        return True
+    else:
+        return False
 
+def apply_bbox_to_frame(frame, bbox)->np.ndarray:
+    return frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+
+
+def cut_frame_to_pose(extractor, frame:np.ndarray, return_bbox:bool=False)->Union[Tuple[np.ndarray, List[int]],
+                                                                                  np.ndarray,
+                                                                                  None]:
     height, width, _ = frame.shape
     prediction = extractor.predict(frame)
     if prediction is None:
@@ -35,7 +44,9 @@ def cut_frame_to_pose(extractor, frame)->np.ndarray:
         bbox[2] = width
     # cut frame
     bbox = [int(x) for x in bbox]
-    cut_frame = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+    cut_frame = apply_bbox_to_frame(frame, bbox)
+    if return_bbox:
+        return cut_frame, bbox
     return cut_frame
 
 def extract_frames_with_poses_from_one_video(path_to_videofile:str, extractor, output_path:str, every_n_frame:int=5)->None:
@@ -49,23 +60,30 @@ def extract_frames_with_poses_from_one_video(path_to_videofile:str, extractor, o
     if not os.path.exists(os.path.join(output_path, video_filename)):
         os.makedirs(os.path.join(output_path, video_filename))
 
-
-    #frames, _, _ =torchvision.io.read_video(filename=path_to_videofile)
     reader = cv2.VideoCapture(path_to_videofile)
     num_frame=0
 
-    #for num_frame, frame in enumerate(reader):
+    bbox = None
     while (reader.isOpened()):
         ret, frame = reader.read()
-        # transform to RGB format and make a tensor from it
 
         if num_frame % every_n_frame == (every_n_frame-1):
-            cut_frame = cut_frame_to_pose(extractor, frame)
+            previous_bbox = None if bbox is None else bbox
+            cut_frame, bbox = cut_frame_to_pose(extractor, frame, return_bbox=True)
+            # check if the model has found anything. THe function cut_frame_to_pose() produces None if nothing has been found.
             if cut_frame is None: continue
-            #cut_frame = torchvision.transforms.Resize(size=(256, 256))(cut_frame)
+            # check if the width of the bbox is too large (this can happen, the model sometimes produces wrong bboxes for the whole frame)
+            # if it is so, apply previous bbox (from previous frame) to the current frame
+            if check_bbox_length(bbox):
+                if previous_bbox is not None:
+                    cut_frame = apply_bbox_to_frame(frame, previous_bbox)
+                else:
+                    continue
+            # construct output filename for cut frame
             output_filename = os.path.join(output_path, video_filename, str(num_frame) + '.png')
-            #torchvision.utils.save_image(cut_frame, output_filename)
+            # save the image (frame)
             cv2.imwrite(output_filename, cut_frame)
+        # print the progress every 100 processed frames
         if num_frame % 100 == 0:
             print('Number of preprocessed frames: %i, remaining: %i' % (num_frame, reader.get(cv2.CAP_PROP_FRAME_COUNT) - num_frame))
         num_frame += 1

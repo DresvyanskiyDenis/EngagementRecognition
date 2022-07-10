@@ -1,3 +1,10 @@
+import sys
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+sys.path.extend(["/work/home/dsu/simpleHigherHRNet/"])
+
+
+from decorators.common_decorators import timer
 import glob
 from typing import Optional, Union, Tuple, List
 
@@ -23,7 +30,7 @@ def cut_frame_to_pose(extractor, frame:np.ndarray, return_bbox:bool=False)->Unio
                                                                                   None]:
     height, width, _ = frame.shape
     prediction = extractor.predict(frame)
-    if prediction is None:
+    if prediction is None or len(prediction[0]) == 0:
         return None
     bbox = prediction[0][0]
     # expand bbox so that it will cover all human with some space
@@ -49,6 +56,7 @@ def cut_frame_to_pose(extractor, frame:np.ndarray, return_bbox:bool=False)->Unio
         return cut_frame, bbox
     return cut_frame
 
+@timer
 def extract_frames_with_poses_from_one_video(path_to_videofile:str, extractor, output_path:str, every_n_frame:int=5)->None:
 
     if not os.path.exists(output_path):
@@ -66,12 +74,15 @@ def extract_frames_with_poses_from_one_video(path_to_videofile:str, extractor, o
     bbox = None
     while (reader.isOpened()):
         ret, frame = reader.read()
+        if frame is None:
+            break
 
         if num_frame % every_n_frame == (every_n_frame-1):
             previous_bbox = None if bbox is None else bbox
-            cut_frame, bbox = cut_frame_to_pose(extractor, frame, return_bbox=True)
+            result = cut_frame_to_pose(extractor, frame, return_bbox=True)
             # check if the model has found anything. THe function cut_frame_to_pose() produces None if nothing has been found.
-            if cut_frame is None: continue
+            if result is None: continue
+            else: cut_frame, bbox = result
             # check if the width of the bbox is too large (this can happen, the model sometimes produces wrong bboxes for the whole frame)
             # if it is so, apply previous bbox (from previous frame) to the current frame
             if check_bbox_length(bbox):
@@ -98,19 +109,24 @@ def extract_frames_with_poses_from_all_videos(path_to_dir:str, extractor, output
 
     all_videos_in_dir = glob.glob(os.path.join(path_to_dir, '*', '*.mp4'))
     for video_file in all_videos_in_dir:
+        print("Processing %s file..."%video_file)
         full_output_path = os.path.join(output_path,
-                                        video_file.split(os.path.sep)[-2],
-                                        os.path.basename(video_file).split(".")[0])
+                                        video_file.split(os.path.sep)[-2])
         extract_frames_with_poses_from_one_video(video_file, extractor, full_output_path, every_n_frame)
 
 
 
 
 if __name__== '__main__':
+    print("start of the main sector1...")
     model = SimpleHigherHRNet(c=32, nof_joints=17,
-                              checkpoint_path=r"C:\Users\Professional\PycharmProjects\simple-HigherHRNet-master\pose_higher_hrnet_w32_512.pth",
+                              checkpoint_path=r"/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
                               return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
                               device="cuda")
-    extract_frames_with_poses_from_one_video(r'E:\db\080_2016-05-24_Augsburg\Novice_video.mp4',
-                                             model,
-                                             r'E:\db\080_2016-05-24_Augsburg\Novice_video_poses')
+    #extract_frames_with_poses_from_one_video(r'/media/external_hdd_1/NoXi/Sessions/008_2016-03-23_Paris/Expert_video.mp4',
+    #                                         model,
+    #                                         r'/media/external_hdd_1/NoXi/tmp')
+    print("start extracting poses...")
+    extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
+                                              model,
+                                              '/media/external_hdd_1/NoXi/Pose_frames/')

@@ -112,6 +112,10 @@ def extract_frames_with_poses_from_all_videos(path_to_dir:str, extractor, output
         print("Processing %s file..."%video_file)
         full_output_path = os.path.join(output_path,
                                         video_file.split(os.path.sep)[-2])
+        # check if this video file was already preprocessed before
+        if os.path.exists(full_output_path):
+            print("Video file %s was already preprocessed, skipping..."%video_file)
+            continue
         extract_frames_with_poses_from_one_video(video_file, extractor, full_output_path, every_n_frame)
 
 
@@ -120,10 +124,10 @@ def extract_frames_with_poses_from_all_videos(path_to_dir:str, extractor, output
 if __name__== '__main__':
     print("start of the main sector1...")
     model = SimpleHigherHRNet(c=32, nof_joints=17,
-                              checkpoint_path=r"/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
+                              checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
                               return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
                               device="cuda")
-    #extract_frames_with_poses_from_one_video(r'/media/external_hdd_1/NoXi/Sessions/008_2016-03-23_Paris/Expert_video.mp4',
+    #extract_frames_with_poses_from_one_video(r'/media/external_hdd_1/NoXi/Sessions/022_2016-04-25_Paris/Expert_video.mp4',
     #                                         model,
     #                                         r'/media/external_hdd_1/NoXi/tmp')
     print("start extracting poses...")

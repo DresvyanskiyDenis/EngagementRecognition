@@ -113,7 +113,7 @@ def extract_frames_with_poses_from_all_videos(path_to_dir:str, extractor, output
         full_output_path = os.path.join(output_path,
                                         video_file.split(os.path.sep)[-2])
         # check if this video file was already preprocessed before
-        if os.path.exists(full_output_path):
+        if os.path.exists(os.path.join(full_output_path, os.path.basename(video_file).split('.')[0])):
             print("Video file %s was already preprocessed, skipping..."%video_file)
             continue
         extract_frames_with_poses_from_one_video(video_file, extractor, full_output_path, every_n_frame)

@@ -1,3 +1,8 @@
+import sys
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+sys.path.extend(["/work/home/dsu/simpleHRNet/"])
+
 from collections import Callable
 from functools import partial
 from typing import Dict, List, Optional
@@ -67,13 +72,19 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
         augmentation_functions = {}
 
     # train
-    train_generator = ImageDataLoader(labels=pd.DataFrame(train.iloc[:,1]), paths_to_images=pd.DataFrame(train.iloc[:,0]), paths_prefix=None,
+    train_generator = ImageDataLoader(labels=pd.DataFrame(train.iloc[:,1:]), paths_to_images=pd.DataFrame(train.iloc[:,0]), paths_prefix=None,
                                       preprocessing_functions=preprocessing_functions,
                                       augment=augment,
                                       augmentation_functions=augmentation_functions)
 
     train_generator = torch.utils.data.DataLoader(train_generator, batch_size=batch_size, shuffle=True,
                                               num_workers=8, pin_memory=False)
+
+    # CHECKING
+    for x, y in train_generator:
+        print(x.shape, y.shape)
+    # ---------------------------------------
+
     # dev
     dev_generator = ImageDataLoader(labels=pd.DataFrame(dev.iloc[:, 1]),
                                       paths_to_images=pd.DataFrame(dev.iloc[:, 0]), paths_prefix=None,

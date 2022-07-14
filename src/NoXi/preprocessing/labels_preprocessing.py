@@ -226,7 +226,6 @@ def combine_path_to_images_with_labels_many_videos(paths_with_images: pd.DataFra
     result_dataframe=pd.DataFrame(columns=['filename'])
     for path_to_label in labels.keys():
         labels_one_video=labels[path_to_label]
-        # TODO: CHECK IT. Check also ranking of filenames (order should be numerical, not lexical)
         # search paths to images in dataframe according to the path to the labels (for example, 031_2016-04-06_Nottingham\\expert)
         df_with_paths_one_video=paths_with_images[paths_with_images['rel_path'].str.contains(path_to_label, case=False, regex=False)]
         # combine labels with corresponding paths to images

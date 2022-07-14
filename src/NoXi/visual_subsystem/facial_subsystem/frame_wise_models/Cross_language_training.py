@@ -275,8 +275,9 @@ def run_sweep(sweep_name:str, test_language:str, count:int):
     gc.collect()
 
 def main():
-    print('112321312. start of script...')
-    run_sweep("Xception_all_vs_german", "german", count=10)
+    print('112233. start of script...')
+    run_sweep("Xception_all_vs_english", "english", count=20)
+    run_sweep("Xception_all_vs_german", "german", count=20)
     run_sweep("Xception_all_vs_french", "french", count=20)
 
 

@@ -118,6 +118,22 @@ def extract_frames_with_poses_from_all_videos(path_to_dir:str, extractor, output
             continue
         extract_frames_with_poses_from_one_video(video_file, extractor, full_output_path, every_n_frame)
 
+def rename_files_to_align_to_other_data(path_to_dir:str)->None:
+    all_files_in_dir = glob.glob(os.path.join(path_to_dir, "*.png"))
+    for file in all_files_in_dir:
+        if "frame" in file:
+            continue
+        new_filename = file.split(os.path.sep)[-1]
+        new_filename = "frame_"+new_filename
+        new_filename = os.path.join(path_to_dir, new_filename)
+        os.rename(file, new_filename)
+
+def rename_files_in_all_dirs(path_to_data:str):
+    directories = glob.glob(os.path.join(path_to_data, '*', '*'))
+    for directory in directories:
+        rename_files_to_align_to_other_data(directory)
+
+
 
 
 
@@ -130,7 +146,9 @@ if __name__== '__main__':
     #extract_frames_with_poses_from_one_video(r'/media/external_hdd_1/NoXi/Sessions/022_2016-04-25_Paris/Expert_video.mp4',
     #                                         model,
     #                                         r'/media/external_hdd_1/NoXi/tmp')
-    print("start extracting poses...")
-    extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
-                                              model,
-                                              '/media/external_hdd_1/NoXi/Pose_frames/')
+    #print("start extracting poses...")
+    #extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
+    #                                          model,
+    #                                          '/media/external_hdd_1/NoXi/Pose_frames/')
+    print("start renaming files....")
+    rename_files_in_all_dirs('/media/external_hdd_1/NoXi/Pose_frames/')

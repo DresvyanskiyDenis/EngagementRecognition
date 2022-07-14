@@ -119,7 +119,7 @@ def load_NoXi_data_all_languages(labels_as_categories:bool=False)->Tuple[
     """
     # loading data
     frame_step = 5
-    path_to_data = "/Noxi_extracted/NoXi/extracted_faces/"
+    path_to_data = "/media/external_hdd_1/NoXi/Pose_frames/"
     path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
     path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
     path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
@@ -145,5 +145,8 @@ def load_NoXi_data_all_languages(labels_as_categories:bool=False)->Tuple[
     return (train, dev, test)
 
 if __name__ == "__main__":
-    # TODO: check it
+    print("1")
     train, dev, test = load_NoXi_data_all_languages()
+    print(train.shape)
+    print(dev.shape)
+    print(test.shape)

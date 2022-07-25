@@ -77,7 +77,7 @@ def extract_frames_with_poses_from_one_video(path_to_videofile:str, extractor, o
         if frame is None:
             break
 
-        if num_frame % every_n_frame == (every_n_frame-1):
+        if num_frame % every_n_frame == 0:
             previous_bbox = None if bbox is None else bbox
             result = cut_frame_to_pose(extractor, frame, return_bbox=True)
             # check if the model has found anything. THe function cut_frame_to_pose() produces None if nothing has been found.
@@ -138,7 +138,7 @@ def rename_files_in_all_dirs(path_to_data:str):
 
 
 if __name__== '__main__':
-    print("start of the main sector1...")
+    print("start of the main sector...")
     model = SimpleHigherHRNet(c=32, nof_joints=17,
                               checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
                               return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
@@ -147,8 +147,8 @@ if __name__== '__main__':
     #                                         model,
     #                                         r'/media/external_hdd_1/NoXi/tmp')
     #print("start extracting poses...")
-    #extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
-    #                                          model,
-    #                                          '/media/external_hdd_1/NoXi/Pose_frames/')
+    extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
+                                              model,
+                                              '/media/external_hdd_1/NoXi/Pose_frames/')
     print("start renaming files....")
     rename_files_in_all_dirs('/media/external_hdd_1/NoXi/Pose_frames/')

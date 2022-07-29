@@ -121,7 +121,7 @@ def extract_frames_with_poses_from_all_videos(path_to_dir:str, extractor, output
 def rename_files_to_align_to_other_data(path_to_dir:str)->None:
     all_files_in_dir = glob.glob(os.path.join(path_to_dir, "*.png"))
     for file in all_files_in_dir:
-        if "frame" in file:
+        if "frame_" in file:
             continue
         new_filename = file.split(os.path.sep)[-1]
         new_filename = "frame_"+new_filename
@@ -147,8 +147,8 @@ if __name__== '__main__':
     #                                         model,
     #                                         r'/media/external_hdd_1/NoXi/tmp')
     #print("start extracting poses...")
-    extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
-                                              model,
-                                              '/media/external_hdd_1/NoXi/Pose_frames/')
+    #extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
+    #                                          model,
+    #                                          '/media/external_hdd_1/NoXi/Pose_frames/')
     print("start renaming files....")
     rename_files_in_all_dirs('/media/external_hdd_1/NoXi/Pose_frames/')

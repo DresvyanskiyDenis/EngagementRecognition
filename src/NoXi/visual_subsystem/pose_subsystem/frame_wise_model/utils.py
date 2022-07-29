@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import os
 
+import torch
+
 from src.NoXi.preprocessing.labels_preprocessing import generate_paths_to_labels, load_all_labels_by_paths, \
     combine_path_to_images_with_labels_many_videos
 
@@ -143,6 +145,12 @@ def load_NoXi_data_all_languages(train_labels_as_categories:bool=False)->Tuple[
     gc.collect()
 
     return (train, dev, test)
+
+def convert_image_to_float_and_scale(image:torch.Tensor)->torch.Tensor:
+    image = image.float() / 255.
+    return image
+
+
 
 if __name__ == "__main__":
     print("1")

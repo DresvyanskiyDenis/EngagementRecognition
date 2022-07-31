@@ -4,6 +4,10 @@ sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 sys.path.extend(["/work/home/dsu/simpleHigherHRNet/"])
 
 
+import PIL
+
+
+from SimpleHigherHRNet import SimpleHigherHRNet
 from decorators.common_decorators import timer
 import glob
 from typing import Optional, Union, Tuple, List
@@ -12,7 +16,6 @@ import numpy as np
 import cv2
 import os
 
-from SimpleHigherHRNet import SimpleHigherHRNet
 
 
 def check_bbox_length(bbox)->bool:
@@ -133,22 +136,53 @@ def rename_files_in_all_dirs(path_to_data:str):
     for directory in directories:
         rename_files_to_align_to_other_data(directory)
 
+def load_resize_and_save_image(path_to_image:str, output_path:str, new_size:Tuple[int, int]=(256,256))->None:
+    image = PIL.Image.open(path_to_image)
+    image = image.resize(new_size, PIL.Image.ANTIALIAS)
+    image.save(output_path)
+
+@timer
+def load_resize_and_save_images_in_directory(path_to_dir:str, output_path:str, new_size:Tuple[int, int]=(256,256))->None:
+    if not os.path.exists(output_path):
+        os.makedirs(output_path, exist_ok=True)
+    all_files_in_dir = glob.glob(os.path.join(path_to_dir, "*.png"))
+    for filename in all_files_in_dir:
+        output_filename = os.path.join(output_path, os.path.basename(filename))
+        load_resize_and_save_image(filename, output_filename, new_size)
+
+
+def load_resize_and_save_images_in_all_dirs(path_to_data:str, output_dir:str, new_size:Tuple[int, int]=(256,256))->None:
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    directories = glob.glob(os.path.join(path_to_data, '*', "*"))
+    for num, directory in enumerate(directories):
+        print("Processing %i/%i directory... name:%s"%(num+1, len(directories), directory))
+        output_path = os.path.join(output_dir, *directory.split(os.path.sep)[-2:])
+        if not os.path.exists(output_path):
+            os.makedirs(output_path, exist_ok=True)
+        load_resize_and_save_images_in_directory(directory, output_path, new_size)
+
 
 
 
 
 if __name__== '__main__':
-    print("start of the main sector...")
-    model = SimpleHigherHRNet(c=32, nof_joints=17,
-                              checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
-                              return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
-                              device="cuda")
-    #extract_frames_with_poses_from_one_video(r'/media/external_hdd_1/NoXi/Sessions/022_2016-04-25_Paris/Expert_video.mp4',
+    print("start of the main sector111...")
+    #model = SimpleHigherHRNet(c=32, nof_joints=17,
+    #                          checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
+    #                          return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
+    #                          device="cuda")
+    print("done...")
+    #extract_frames_with_poses_from_one_video(r'/media/external_hdd_1/NoXi/Sessions/013_2016-03-30_Paris/Novice_video.mp4',
     #                                         model,
-    #                                         r'/media/external_hdd_1/NoXi/tmp')
+    #                                         r'/media/external_hdd_1/NoXi/Pose_frames/013_2016-03-30_Paris/Novice_video/')
     #print("start extracting poses...")
     #extract_frames_with_poses_from_all_videos('/media/external_hdd_1/NoXi/Sessions/',
     #                                          model,
     #                                          '/media/external_hdd_1/NoXi/Pose_frames/')
-    print("start renaming files....")
-    rename_files_in_all_dirs('/media/external_hdd_1/NoXi/Pose_frames/')
+    #print("start renaming files....")
+    #rename_files_in_all_dirs('/media/external_hdd_1/NoXi/Pose_frames/')
+    print("start loading and resizing images....")
+    load_resize_and_save_images_in_all_dirs(path_to_data='/media/external_hdd_1/NoXi/Pose_frames/',
+                                            output_dir='/media/external_hdd_1/Pose_frames_256/',
+                                            new_size=(256,256))

@@ -23,13 +23,15 @@ from pytorch_utils.generators.pytorch_augmentations import pad_image_random_fact
     random_horizontal_flip_image, random_vertical_flip_image
 from pytorch_utils.losses import FocalLoss
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.HRNet import load_HRNet_model, modified_HRNet
-from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import load_NoXi_data_all_languages
+from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import load_NoXi_data_all_languages, \
+    convert_image_to_float_and_scale
 
 
 def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoader,
                optimizer:torch.optim.Optimizer, criterion:torch.nn.Module,
                device:torch.device, print_step:int=100):
 
+    running_loss=0.0
     for i, data in enumerate(train_generator):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
@@ -47,7 +49,7 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
 
         # print statistics
         running_loss += loss.item()
-        if i % print_step == (print_step-1):  # print every 10 mini-batches
+        if i % print_step == (print_step-1):  # print every 100 mini-batches
             print("Mini-batch: %i, loss: %.10f" % (i, running_loss / print_step))
             running_loss = 0.0
 
@@ -78,12 +80,7 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
                                       augmentation_functions=augmentation_functions)
 
     train_generator = torch.utils.data.DataLoader(train_generator, batch_size=batch_size, shuffle=True,
-                                              num_workers=8, pin_memory=False)
-
-    # CHECKING
-    for x, y in train_generator:
-        print(x.shape, y.shape)
-    # ---------------------------------------
+                                              num_workers=16, pin_memory=False)
 
     # dev
     dev_generator = ImageDataLoader(labels=pd.DataFrame(dev.iloc[:, 1]),
@@ -93,7 +90,7 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
                                       augmentation_functions=None)
 
     dev_generator = torch.utils.data.DataLoader(dev_generator, batch_size=batch_size, shuffle=False,
-                                                  num_workers=8, pin_memory=False)
+                                                  num_workers=16, pin_memory=False)
     # test
     test_generator = ImageDataLoader(labels=pd.DataFrame(test.iloc[:, 1]),
                                     paths_to_images=pd.DataFrame(test.iloc[:, 0]), paths_prefix=None,
@@ -107,13 +104,13 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
     return train_generator, dev_generator, test_generator
 
 def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
-    # TODO: check the script
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     HRNet = load_HRNet_model(device="cuda" if torch.cuda.is_available() else "cpu",
                              path_to_weights = "/work/home/dsu/simpleHRNet/pose_hrnet_w32_256x192.pth")
-    model = modified_HRNet(HRNet, num_classes=4)
+    model = modified_HRNet(HRNet, num_classes=5)
     model.to(device)
+    summary(model, input_size=(32, 3, 256, 256))
     # Select optimizer
     lr = 0.001
     optimizers = {'Adam': torch.optim.Adam,
@@ -123,6 +120,8 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
 
     optimizer = optimizers['Adam'](model.parameters(), lr=lr)
     # select loss function
+    class_weights = torch.from_numpy(class_weights)
+    class_weights = class_weights.to(device)
     criterions = {'Cross_entropy': torch.nn.CrossEntropyLoss(weight=class_weights),
                    'Focal_loss': FocalLoss(alpha=class_weights, gamma=2)}
     criterion = criterions['Cross_entropy']
@@ -151,7 +150,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
     for epoch in range(epochs):
         # train model one epoch
         train_step(model=model, train_generator=train, optimizer=optimizer, criterion=criterion,
-                   device=device, print_step = 100)
+                   device=device, print_step = 10)
         # evaluate model on dev set
         with torch.no_grad():
             dev_results = metric_evaluator()
@@ -165,7 +164,6 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
 
 def main():
     # load data
-    # TODO: check it
     BATCH_SIZE = 64
     train, dev, test = load_NoXi_data_all_languages()
     # compute class weights
@@ -175,8 +173,10 @@ def main():
 
     train_gen, dev_gen, test_gen = get_data_loaders_from_data(train, dev, test, augment=True, augment_prob=0.05, batch_size=BATCH_SIZE,
                                                               preprocessing_functions=[T.Resize(size=(256,256)),
-                                                                                       T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]) # From HRNet
-    train_model(train_gen, dev_gen, test_gen, class_weights=class_weights)
+                                                                                       convert_image_to_float_and_scale,
+                                                                                       T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                                                                                       ]) # From HRNet
+    train_model(train_gen, dev_gen, test_gen, epochs=100, class_weights=class_weights)
 
 
 if __name__ == "__main__":

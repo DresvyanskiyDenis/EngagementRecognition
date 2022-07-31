@@ -32,7 +32,7 @@ class modified_HRNet(torch.nn.Module):
         self.additional_layers = torch.nn.Sequential(
             OrderedDict([
                 # block 1
-                ("conv1_new", torch.nn.Conv2d(32, 128, kernel_size=(3, 3), stride=(1, 1), padding="same")),
+                ("conv1_new", torch.nn.Conv2d(17, 128, kernel_size=(3, 3), stride=(1, 1), padding="same")),
                 ("BatchNormalization1_new", torch.nn.BatchNorm2d(128)),
                 ("relu1_new", torch.nn.ReLU()),
                 ("maxpool1_new", torch.nn.MaxPool2d(kernel_size=2, stride=2)),  # 64x64

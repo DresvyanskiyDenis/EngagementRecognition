@@ -121,7 +121,7 @@ def load_NoXi_data_all_languages(train_labels_as_categories:bool=False)->Tuple[
     """
     # loading data
     frame_step = 5
-    path_to_data = "/media/external_hdd_1/NoXi/Pose_frames/"
+    path_to_data = "/Pose_frames_256/"
     path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
     path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
     path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"

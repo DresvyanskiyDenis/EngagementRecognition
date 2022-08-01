@@ -18,6 +18,7 @@ from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
 from torchinfo import summary
 
+from decorators.common_decorators import timer
 from pytorch_utils.callbacks import TorchEarlyStopping, TorchMetricEvaluator
 from pytorch_utils.generators.ImageDataGenerator import ImageDataLoader
 from pytorch_utils.generators.pytorch_augmentations import pad_image_random_factor, grayscale_image, \
@@ -29,7 +30,7 @@ from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.HRNet import load
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import load_NoXi_data_all_languages, \
     convert_image_to_float_and_scale
 
-
+@timer
 def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoader,
                optimizer:torch.optim.Optimizer, criterion:torch.nn.Module,
                device:torch.device, print_step:int=100):

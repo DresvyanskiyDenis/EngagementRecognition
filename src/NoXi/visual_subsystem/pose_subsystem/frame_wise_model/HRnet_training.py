@@ -134,7 +134,8 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=6, eta_min=min_lr),
         'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 10),
     }
-    lr_scheduller = lr_schedullers['Cyclic']
+    lr_scheduller_type = 'ReduceLRonPlateau'
+    lr_scheduller = lr_schedullers[lr_scheduller_type]
     # callbacks
     val_metrics = {
         'val_recall': partial(recall_score, average='macro'),
@@ -164,7 +165,11 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
             # check early stopping
             early_stopping_result = early_stopping_callback(dev_results['val_recall'], model)
         # update lr
-        lr_scheduller.step()
+        if lr_scheduller_type == 'Cyclic':
+            lr_scheduller.step()
+        elif lr_scheduller_type == 'ReduceLRonPlateau':
+            lr_scheduller.step(dev_results['loss'])
+
         if early_stopping_result:
             break
 

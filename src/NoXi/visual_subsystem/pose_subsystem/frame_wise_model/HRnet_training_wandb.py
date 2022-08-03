@@ -146,7 +146,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
 
     optimizer = optimizers[config.optimizer](model.parameters(), lr=config.learning_rate_max)
     # select loss function
-    class_weights = torch.from_numpy(class_weights)
+    class_weights = torch.from_numpy(class_weights).float()
     class_weights = class_weights.to(device)
     criterions = {'Crossentropy': torch.nn.CrossEntropyLoss(weight=class_weights),
                    'Focal_loss': FocalLoss(alpha=class_weights, gamma=2)}
@@ -171,8 +171,9 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
                  model=model,
                  metrics=val_metrics,
                  device=device,
-                 need_argmax=False,
-                 need_softmax=True)
+                 need_argmax=True,
+                 need_softmax=True,
+                 loss_func=criterion)
 
     # go through epochs
     for epoch in range(epochs):
@@ -188,15 +189,17 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
             for metric_name, metric_value in dev_results.items():
                 print("%s: %.4f" % (metric_name, metric_value))
             # check early stopping
-            early_stopping_callback(dev_results['val_recall:'], model)
+            early_stopping_result = early_stopping_callback(dev_results['val_recall'], model)
         # log everything using wandb
         wandb.log({'epoch': epoch}, commit=False)
         wandb.log({'learning_rate':optimizer.param_groups[0]["lr"]}, commit=False)
         wandb.log(dev_results, commit=False)
         wandb.log({'train_loss': loss})
         # update lr
-        lr_scheduller.step()
-
+        lr_scheduller.step(dev_results['loss'])
+        # break the training loop if the model is not improving for a while
+        if early_stopping_result:
+            break
     # clear RAM
     gc.collect()
     torch.cuda.empty_cache()
@@ -224,7 +227,7 @@ def main():
                 'min': 0.000001
             },
             'lr_scheduller': {
-                'values': ['Cyclic', 'reduceLRonPlateau']
+                'values': ['Cyclic', 'ReduceLRonPlateau']
             },
             'augmentation_rate': {
                 'values': [0.1, 0.2, 0.3]

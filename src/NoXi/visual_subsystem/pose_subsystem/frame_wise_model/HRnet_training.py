@@ -43,6 +43,9 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
 
         # forward + backward + optimize
         outputs = model(inputs)
+        #print(outputs.shape)
+        #print(labels.shape)
+        #print("------------")
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -120,7 +123,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
 
     optimizer = optimizers['Adam'](model.parameters(), lr=lr)
     # select loss function
-    class_weights = torch.from_numpy(class_weights)
+    class_weights = torch.from_numpy(class_weights).float()
     class_weights = class_weights.to(device)
     criterions = {'Cross_entropy': torch.nn.CrossEntropyLoss(weight=class_weights),
                    'Focal_loss': FocalLoss(alpha=class_weights, gamma=2)}
@@ -138,13 +141,14 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
         'val_precision': partial(precision_score, average='macro'),
         'val_f1_score:': partial(f1_score, average='macro')
     }
-    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10, save_path = "best_model/")
+    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10, save_path = "")
     metric_evaluator = TorchMetricEvaluator(generator = dev,
                  model=model,
                  metrics=val_metrics,
                  device=device,
-                 need_argmax=False,
-                 need_softmax=True)
+                 need_argmax=True,
+                 need_softmax=True,
+                 loss_func=torch.nn.CrossEntropyLoss(weight=class_weights))
 
     # go through epochs
     for epoch in range(epochs):
@@ -158,14 +162,17 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
             for metric_name, metric_value in dev_results.items():
                 print("%s: %.4f" % (metric_name, metric_value))
             # check early stopping
-            early_stopping_callback(dev_results['val_recall:'], model)
+            early_stopping_result = early_stopping_callback(dev_results['val_recall'], model)
         # update lr
         lr_scheduller.step()
+        if early_stopping_result:
+            break
 
 def main():
     # load data
     BATCH_SIZE = 64
     train, dev, test = load_NoXi_data_all_languages()
+    train = train.iloc[:1000,:]
     # compute class weights
     class_weights = compute_class_weight(class_weight='balanced',
                                          classes=np.unique(np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True)),

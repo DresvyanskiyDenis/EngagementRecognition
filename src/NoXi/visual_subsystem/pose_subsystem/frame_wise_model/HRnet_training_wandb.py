@@ -196,7 +196,10 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
         wandb.log(dev_results, commit=False)
         wandb.log({'train_loss': loss})
         # update lr
-        lr_scheduller.step(dev_results['loss'])
+        if config.lr_scheduller == "ReduceLRonPlateau":
+            lr_scheduller.step(dev_results['loss'])
+        elif config.lr_scheduller == "Cyclic":
+            lr_scheduller.step()
         # break the training loop if the model is not improving for a while
         if early_stopping_result:
             break
@@ -205,6 +208,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     torch.cuda.empty_cache()
 
 def main():
+    print("start!12")
     sweep_config = {
         'name': "HRNet_f2f_categorical_crossentropy",
         'method': 'random',
@@ -255,7 +259,8 @@ def main():
 
     print("Wandb with categorical loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
-    wandb.agent(sweep_id, function=lambda: train_model(train_gen, dev_gen, test_gen, epochs=100, class_weights=class_weights),
+    wandb.agent(sweep_id, function=lambda: train_model(train_gen, dev_gen, test_gen, epochs=100,
+                loss_function="Crossentropy", class_weights=class_weights),
                 count=20,
                 project='VGGFace2_FtF_training')
     gc.collect()

@@ -165,7 +165,8 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
         'val_f1_score:': partial(f1_score, average='macro')
     }
     early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10,
-                                                 save_path = wandb.run.dir)
+                                                 save_path = wandb.run.dir,
+                                                 mode = "max")
 
     metric_evaluator = TorchMetricEvaluator(generator = dev,
                  model=model,
@@ -208,7 +209,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     torch.cuda.empty_cache()
 
 def main():
-    print("start!12")
+    print("Start112...")
     sweep_config = {
         'name': "HRNet_f2f_categorical_crossentropy",
         'method': 'random',

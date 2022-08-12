@@ -196,7 +196,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
             # check if we have new best recall result on the validation set
             if dev_results['val_recall'] > best_val_recall:
                 best_val_recall = dev_results['val_recall']
-                wandb.config.update({'best_val_recall' : best_val_recall})
+                wandb.config.update({'best_val_recall' : best_val_recall}, allow_val_change=True)
         # log everything using wandb
         wandb.log({'epoch': epoch}, commit=False)
         wandb.log({'learning_rate':optimizer.param_groups[0]["lr"]}, commit=False)

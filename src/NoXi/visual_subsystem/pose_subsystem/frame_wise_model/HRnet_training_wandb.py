@@ -164,6 +164,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
         'val_precision': partial(precision_score, average='macro'),
         'val_f1_score:': partial(f1_score, average='macro')
     }
+    best_val_recall = 0
     early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10,
                                                  save_path = wandb.run.dir,
                                                  mode = "max")
@@ -191,6 +192,10 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
                 print("%s: %.4f" % (metric_name, metric_value))
             # check early stopping
             early_stopping_result = early_stopping_callback(dev_results['val_recall'], model)
+            # check if we have new best recall result on the validation set
+            if dev_results['val_recall'] > best_val_recall:
+                best_val_recall = dev_results['val_recall']
+                wandb.config.update({'best_val_recall' : best_val_recall})
         # log everything using wandb
         wandb.log({'epoch': epoch}, commit=False)
         wandb.log({'learning_rate':optimizer.param_groups[0]["lr"]}, commit=False)

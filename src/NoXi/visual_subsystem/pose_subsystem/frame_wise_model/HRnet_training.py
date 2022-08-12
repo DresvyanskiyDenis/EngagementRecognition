@@ -21,7 +21,7 @@ from pytorch_utils.generators.pytorch_augmentations import pad_image_random_fact
     collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
     random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
     random_horizontal_flip_image, random_vertical_flip_image
-from pytorch_utils.losses import FocalLoss
+from pytorch_utils.losses import FocalLoss, SoftFocalLoss
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.HRNet import load_HRNet_model, modified_HRNet
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import load_NoXi_data_all_languages, \
     convert_image_to_float_and_scale
@@ -86,7 +86,7 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
                                               num_workers=16, pin_memory=False)
 
     # dev
-    dev_generator = ImageDataLoader(labels=pd.DataFrame(dev.iloc[:, 1]),
+    dev_generator = ImageDataLoader(labels=pd.DataFrame(dev.iloc[:, 1:]),
                                       paths_to_images=pd.DataFrame(dev.iloc[:, 0]), paths_prefix=None,
                                       preprocessing_functions=preprocessing_functions,
                                       augment=False,
@@ -95,7 +95,7 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
     dev_generator = torch.utils.data.DataLoader(dev_generator, batch_size=batch_size, shuffle=False,
                                                   num_workers=16, pin_memory=False)
     # test
-    test_generator = ImageDataLoader(labels=pd.DataFrame(test.iloc[:, 1]),
+    test_generator = ImageDataLoader(labels=pd.DataFrame(test.iloc[:, 1:]),
                                     paths_to_images=pd.DataFrame(test.iloc[:, 0]), paths_prefix=None,
                                     preprocessing_functions=preprocessing_functions,
                                     augment=False,
@@ -126,8 +126,8 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
     class_weights = torch.from_numpy(class_weights).float()
     class_weights = class_weights.to(device)
     criterions = {'Cross_entropy': torch.nn.CrossEntropyLoss(weight=class_weights),
-                   'Focal_loss': FocalLoss(alpha=class_weights, gamma=2)}
-    criterion = criterions['Cross_entropy']
+                   'Focal_loss': SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)}
+    criterion = criterions['Focal_loss']
     # Select lr scheduller
     min_lr=0.00001
     lr_schedullers = {
@@ -149,7 +149,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
                  device=device,
                  need_argmax=True,
                  need_softmax=True,
-                 loss_func=torch.nn.CrossEntropyLoss(weight=class_weights))
+                 loss_func=criterion)
 
     # go through epochs
     for epoch in range(epochs):
@@ -174,9 +174,13 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
             break
 
 def main():
+    print('Loading data.....')
     # load data
     BATCH_SIZE = 64
-    train, dev, test = load_NoXi_data_all_languages()
+    train, dev, test = load_NoXi_data_all_languages(train_labels_as_categories=False,
+                                                    dev_labels_as_categories=False,
+                                                    test_labels_as_categories=False)
+    print(dev.shape)
     train = train.iloc[:1000,:]
     # compute class weights
     class_weights = compute_class_weight(class_weight='balanced',

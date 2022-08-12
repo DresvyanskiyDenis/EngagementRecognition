@@ -91,7 +91,7 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
                                               num_workers=16, pin_memory=False)
 
     # dev
-    dev_generator = ImageDataLoader(labels=pd.DataFrame(dev.iloc[:, 1]),
+    dev_generator = ImageDataLoader(labels=pd.DataFrame(dev.iloc[:, 1:]),
                                       paths_to_images=pd.DataFrame(dev.iloc[:, 0]), paths_prefix=None,
                                       preprocessing_functions=preprocessing_functions,
                                       augment=False,
@@ -100,7 +100,7 @@ def get_data_loaders_from_data(train, dev, test, augment:bool, augment_prob:floa
     dev_generator = torch.utils.data.DataLoader(dev_generator, batch_size=batch_size, shuffle=False,
                                                   num_workers=16, pin_memory=False)
     # test
-    test_generator = ImageDataLoader(labels=pd.DataFrame(test.iloc[:, 1]),
+    test_generator = ImageDataLoader(labels=pd.DataFrame(test.iloc[:, 1:]),
                                     paths_to_images=pd.DataFrame(test.iloc[:, 0]), paths_prefix=None,
                                     preprocessing_functions=preprocessing_functions,
                                     augment=False,
@@ -185,6 +185,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
         loss = loss/config.batch_size
 
         # evaluate model on dev set
+        print('model evaluation...')
         with torch.no_grad():
             dev_results = metric_evaluator()
             print("Epoch: %i, dev results:"% epoch)
@@ -214,7 +215,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     torch.cuda.empty_cache()
 
 def main():
-    print("Start...")
+    print("Start111...")
     sweep_config = {
         'name': "HRNet_f2f_Focal_loss",
         'method': 'random',
@@ -248,7 +249,9 @@ def main():
 
 
     # load data
-    train, dev, test = load_NoXi_data_all_languages()
+    train, dev, test = load_NoXi_data_all_languages(train_labels_as_categories=False,
+                                                    dev_labels_as_categories=False,
+                                                    test_labels_as_categories=False)
     # compute class weights
     class_weights = compute_class_weight(class_weight='balanced',
                                          classes=np.unique(np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True)),

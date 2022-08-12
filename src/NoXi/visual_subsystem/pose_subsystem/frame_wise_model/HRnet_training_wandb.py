@@ -25,7 +25,7 @@ from pytorch_utils.generators.pytorch_augmentations import pad_image_random_fact
     collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
     random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
     random_horizontal_flip_image, random_vertical_flip_image
-from pytorch_utils.losses import FocalLoss
+from pytorch_utils.losses import FocalLoss, SoftFocalLoss
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.HRNet import load_HRNet_model, modified_HRNet
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import load_NoXi_data_all_languages, \
     convert_image_to_float_and_scale
@@ -149,7 +149,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     class_weights = torch.from_numpy(class_weights).float()
     class_weights = class_weights.to(device)
     criterions = {'Crossentropy': torch.nn.CrossEntropyLoss(weight=class_weights),
-                   'Focal_loss': FocalLoss(alpha=class_weights, gamma=2)}
+                   'Focal_loss': SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)}
     criterion = criterions[loss_function]
     wandb.config.update({'loss': criterion})
     # Select lr scheduller
@@ -214,9 +214,9 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     torch.cuda.empty_cache()
 
 def main():
-    print("Start112...")
+    print("Start...")
     sweep_config = {
-        'name': "HRNet_f2f_categorical_crossentropy",
+        'name': "HRNet_f2f_Focal_loss",
         'method': 'random',
         'metric': {
             'name': 'val_loss',
@@ -263,10 +263,10 @@ def main():
                                                                                            std=[0.229, 0.224, 0.225])
                                                                                        ])  # From HRNet
 
-    print("Wandb with categorical loss")
+    print("Wandb with Focal_loss")
     sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
     wandb.agent(sweep_id, function=lambda: train_model(train_gen, dev_gen, test_gen, epochs=100,
-                loss_function="Crossentropy", class_weights=class_weights),
+                loss_function="Focal_loss", class_weights=class_weights),
                 count=20,
                 project='VGGFace2_FtF_training')
     gc.collect()

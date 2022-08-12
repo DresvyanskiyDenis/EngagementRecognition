@@ -42,7 +42,7 @@ def generate_rel_paths_to_images_in_all_dirs(path: str, image_format: str = "jpg
 
 
 def load_data_one_language(path_to_data: str, path_to_labels: str, frame_step: int, shuffle_train:Optional[bool]=False,
-                             train_labels_as_categories:bool=False):
+                             train_labels_as_categories:bool=False, dev_labels_as_categories:bool=False, test_labels_as_categories:bool=False):
     # generate paths to images (data)
     paths_to_images = generate_rel_paths_to_images_in_all_dirs(path_to_data, image_format="png")
     # generate paths to train/dev/test labels
@@ -89,13 +89,15 @@ def load_data_one_language(path_to_data: str, path_to_labels: str, frame_step: i
         train_image_paths_and_labels = train_image_paths_and_labels.iloc[:, :1]
         train_image_paths_and_labels['class'] = train_labels
 
-    dev_labels = np.argmax(dev_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
-    dev_image_paths_and_labels = dev_image_paths_and_labels.iloc[:, :1]
-    dev_image_paths_and_labels['class'] = dev_labels
+    if dev_labels_as_categories:
+        dev_labels = np.argmax(dev_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
+        dev_image_paths_and_labels = dev_image_paths_and_labels.iloc[:, :1]
+        dev_image_paths_and_labels['class'] = dev_labels
 
-    test_labels = np.argmax(test_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
-    test_image_paths_and_labels = test_image_paths_and_labels.iloc[:, :1]
-    test_image_paths_and_labels['class'] = test_labels
+    if test_labels_as_categories:
+        test_labels = np.argmax(test_image_paths_and_labels.iloc[:, 1:].values, axis=1, keepdims=True)
+        test_image_paths_and_labels = test_image_paths_and_labels.iloc[:, :1]
+        test_image_paths_and_labels['class'] = test_labels
     # create abs path for all paths instead of relative (needed for generator)
     train_image_paths_and_labels['filename'] = train_image_paths_and_labels['filename'].apply(
         lambda x: os.path.join(path_to_data, x))
@@ -107,7 +109,8 @@ def load_data_one_language(path_to_data: str, path_to_labels: str, frame_step: i
     return (train_image_paths_and_labels, dev_image_paths_and_labels, test_image_paths_and_labels)
 
 
-def load_NoXi_data_all_languages(train_labels_as_categories:bool=False)->Tuple[
+def load_NoXi_data_all_languages(train_labels_as_categories:bool=False, dev_labels_as_categories:bool=False,
+                                 test_labels_as_categories:bool=False)->Tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """ Exploits the load_and_preprocess_data() function to form DataFrames for every language in the NoXi dataset
         (French, German, English)
@@ -127,13 +130,19 @@ def load_NoXi_data_all_languages(train_labels_as_categories:bool=False)->Tuple[
     path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
     # load french data
     train_french, dev_french, test_french = load_data_one_language(path_to_data, path_to_labels_french, frame_step,
-                                                                     train_labels_as_categories=train_labels_as_categories)
+                                                                   train_labels_as_categories=train_labels_as_categories,
+                                                                   dev_labels_as_categories=dev_labels_as_categories,
+                                                                   test_labels_as_categories=test_labels_as_categories)
     # load english data
     train_german, dev_german, test_german = load_data_one_language(path_to_data, path_to_labels_german, frame_step,
-                                                                     train_labels_as_categories=train_labels_as_categories)
+                                                                   train_labels_as_categories=train_labels_as_categories,
+                                                                   dev_labels_as_categories=dev_labels_as_categories,
+                                                                   test_labels_as_categories=test_labels_as_categories)
     # load german data
     train_english, dev_english, test_english = load_data_one_language(path_to_data, path_to_labels_english, frame_step,
-                                                                     train_labels_as_categories=train_labels_as_categories)
+                                                                   train_labels_as_categories=train_labels_as_categories,
+                                                                   dev_labels_as_categories=dev_labels_as_categories,
+                                                                   test_labels_as_categories=test_labels_as_categories)
     # concatenate all data
     train = pd.concat([train_french, train_german, train_english], axis=0)
     dev = pd.concat([dev_french, dev_german, dev_english], axis=0)
@@ -153,8 +162,10 @@ def convert_image_to_float_and_scale(image:torch.Tensor)->torch.Tensor:
 
 
 if __name__ == "__main__":
-    print("1")
-    train, dev, test = load_NoXi_data_all_languages(train_labels_as_categories=False)
+    print("Loading data...")
+    train, dev, test = load_NoXi_data_all_languages(train_labels_as_categories=False,
+                                                    dev_labels_as_categories=False,
+                                                    test_labels_as_categories=False)
     print(train.shape)
     print(dev.shape)
     print(test.shape)

@@ -162,7 +162,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     val_metrics = {
         'val_recall': partial(recall_score, average='macro'),
         'val_precision': partial(precision_score, average='macro'),
-        'val_f1_score:': partial(f1_score, average='macro')
+        'val_f1_score': partial(f1_score, average='macro')
     }
     best_val_recall = 0
     early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10,

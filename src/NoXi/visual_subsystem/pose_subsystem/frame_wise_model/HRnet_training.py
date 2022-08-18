@@ -134,7 +134,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=6, eta_min=min_lr),
         'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 10),
     }
-    lr_scheduller_type = 'ReduceLRonPlateau'
+    lr_scheduller_type = 'Cyclic'
     lr_scheduller = lr_schedullers[lr_scheduller_type]
     # callbacks
     val_metrics = {
@@ -142,20 +142,21 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
         'val_precision': partial(precision_score, average='macro'),
         'val_f1_score:': partial(f1_score, average='macro')
     }
-    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10, save_path = "")
+    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 5, save_path = "model/")
     metric_evaluator = TorchMetricEvaluator(generator = dev,
                  model=model,
                  metrics=val_metrics,
                  device=device,
-                 need_argmax=True,
-                 need_softmax=True,
+                 output_argmax=True,
+                 output_softmax=True,
+                 labels_argmax=True,
                  loss_func=criterion)
 
     # go through epochs
     for epoch in range(epochs):
         # train model one epoch
         train_step(model=model, train_generator=train, optimizer=optimizer, criterion=criterion,
-                   device=device, print_step = 10)
+                   device=device, print_step = 100)
         # evaluate model on dev set
         with torch.no_grad():
             dev_results = metric_evaluator()
@@ -181,7 +182,7 @@ def main():
                                                     dev_labels_as_categories=False,
                                                     test_labels_as_categories=False)
     print(dev.shape)
-    train = train.iloc[:1000,:]
+    train = train.iloc[:100000,:]
     # compute class weights
     class_weights = compute_class_weight(class_weight='balanced',
                                          classes=np.unique(np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True)),
@@ -192,7 +193,7 @@ def main():
                                                                                        convert_image_to_float_and_scale,
                                                                                        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                                                                                        ]) # From HRNet
-    train_model(train_gen, dev_gen, test_gen, epochs=100, class_weights=class_weights)
+    train_model(train_gen, dev_gen, test_gen, epochs=10, class_weights=class_weights)
 
 
 if __name__ == "__main__":

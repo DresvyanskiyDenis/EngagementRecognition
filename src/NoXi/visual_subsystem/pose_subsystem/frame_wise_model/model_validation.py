@@ -33,8 +33,9 @@ def _validate_model_on_dataset(dataset:torch.utils.data.DataLoader, model:torch.
                  model=model,
                  metrics=val_metrics,
                  device=device,
-                 need_argmax=True,
-                 need_softmax=True,
+                 output_argmax=True,
+                 output_softmax=True,
+                 labels_argmax=True,
                  loss_func=None)
 
     # evaluate the model
@@ -48,7 +49,7 @@ def main():
     # params
     BATCH_SIZE = 64
     NUM_CLASSES = 5
-    path_to_dir_with_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/"
+    path_to_dir_with_weights = "/work/home/dsu/engagement_recognition_project_server/src/NoXi/visual_subsystem/pose_subsystem/frame_wise_model/model/"
     paths_to_weights= glob.glob(os.path.join(path_to_dir_with_weights, "*.pt"))
     # specify device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -65,14 +66,17 @@ def main():
                                                                                            std=[0.229, 0.224, 0.225])
                                                                                        ])  # From HRNet
 
+
+
     for path_to_weights in paths_to_weights:
         # create model and load its weights
         HRNet = load_HRNet_model(device="cuda" if torch.cuda.is_available() else "cpu",
                                  path_to_weights="/work/home/dsu/simpleHRNet/pose_hrnet_w32_256x192.pth")
         model = modified_HRNet(HRNet, num_classes=NUM_CLASSES)
         model.load_state_dict(torch.load(path_to_weights))
-        model.to(device)
         model.eval()
+        model.to(device)
+
         # calculate metrics
         val_metrics = _validate_model_on_dataset(dataset=dev_gen, model=model, device=device)
         test_metrics = _validate_model_on_dataset(dataset=test_gen, model=model, device=device)

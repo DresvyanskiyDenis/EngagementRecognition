@@ -142,7 +142,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None):
         'val_precision': partial(precision_score, average='macro'),
         'val_f1_score:': partial(f1_score, average='macro')
     }
-    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 5, save_path = "model/")
+    early_stopping_callback = TorchEarlyStopping(mode="max", verbose= True, patience = 5, save_path = "model/")
     metric_evaluator = TorchMetricEvaluator(generator = dev,
                  model=model,
                  metrics=val_metrics,
@@ -182,7 +182,7 @@ def main():
                                                     dev_labels_as_categories=False,
                                                     test_labels_as_categories=False)
     print(dev.shape)
-    train = train.iloc[:100000,:]
+    train = train.iloc[:10000,:]
     # compute class weights
     class_weights = compute_class_weight(class_weight='balanced',
                                          classes=np.unique(np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True)),

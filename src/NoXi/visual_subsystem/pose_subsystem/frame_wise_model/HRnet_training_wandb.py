@@ -121,8 +121,8 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
         "annealing_period": 6,
         "epochs": 30,
         "batch_size": 64,
-        "augmentation_rate": 0.1,  # 0.2, 0.3
-        "architecture": "Xception_256_Dense",
+        "augmentation_rate": 0.05,
+        "architecture": "HRNet_modified_additional_convs",
         "dataset": "NoXi",
         "num_classes": 5
     }
@@ -155,7 +155,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     # Select lr scheduller
     lr_schedullers = {
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period, eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 10),
+        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 8),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks
@@ -165,7 +165,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
         'val_f1_score': partial(f1_score, average='macro')
     }
     best_val_recall = 0
-    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 10,
+    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 15,
                                                  save_path = wandb.run.dir,
                                                  mode = "max")
 
@@ -173,10 +173,17 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
                  model=model,
                  metrics=val_metrics,
                  device=device,
-                 need_argmax=True,
-                 need_softmax=True,
+                 output_argmax=True,
+                 output_softmax=True,
+                 labels_argmax=True,
                  loss_func=criterion)
-
+    # print information about run
+    print('Metaparams: optimizer: %s, learning_rate:%f, lr_scheduller: %s, annealing_period: %d, epochs: %d, '
+          'batch_size: %d, augmentation_rate: %f, architecture: %s, '
+          'dataset: %s, num_classes: %d' % (config.optimizer, config.learning_rate_max, config.lr_scheduller,
+                                            config.annealing_period, config.epochs, config.batch_size,
+                                            config.augmentation_rate, config.architecture, config.dataset,
+                                            config.num_classes))
     # go through epochs
     for epoch in range(epochs):
         # train model one epoch
@@ -215,7 +222,7 @@ def train_model(train, dev, test, epochs:int, class_weights:Optional=None, loss_
     torch.cuda.empty_cache()
 
 def main():
-    print("Start111...")
+    print("Start...")
     sweep_config = {
         'name': "HRNet_f2f_Focal_loss",
         'method': 'random',
@@ -240,12 +247,12 @@ def main():
             'lr_scheduller': {
                 'values': ['Cyclic', 'ReduceLRonPlateau']
             },
-            'augmentation_rate': {
-                'values': [0.1, 0.2, 0.3]
+            'augmentation_rate':{
+                'values': [0.05]
             }
         }
     }
-    BATCH_SIZE=64
+    BATCH_SIZE=128
 
 
     # load data
@@ -257,7 +264,7 @@ def main():
                                          classes=np.unique(np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True)),
                                          y=np.argmax(train.iloc[:, 1:].values, axis=1, keepdims=True).flatten())
 
-    train_gen, dev_gen, test_gen = get_data_loaders_from_data(train, dev, test, augment=True, augment_prob=0.05,
+    train_gen, dev_gen, test_gen = get_data_loaders_from_data(train, dev, test, augment=True, augment_prob=sweep_config['parameters']['augmentation_rate']['values'][0],
                                                               batch_size=BATCH_SIZE,
                                                               preprocessing_functions=[T.Resize(size=(256, 256)),
                                                                                        convert_image_to_float_and_scale,

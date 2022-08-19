@@ -49,7 +49,7 @@ def main():
     # params
     BATCH_SIZE = 64
     NUM_CLASSES = 5
-    path_to_dir_with_weights = "/work/home/dsu/engagement_recognition_project_server/src/NoXi/visual_subsystem/pose_subsystem/frame_wise_model/model/"
+    path_to_dir_with_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/"
     paths_to_weights= glob.glob(os.path.join(path_to_dir_with_weights, "*.pt"))
     # specify device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -74,7 +74,6 @@ def main():
                                  path_to_weights="/work/home/dsu/simpleHRNet/pose_hrnet_w32_256x192.pth")
         model = modified_HRNet(HRNet, num_classes=NUM_CLASSES)
         model.load_state_dict(torch.load(path_to_weights))
-        model.eval()
         model.to(device)
 
         # calculate metrics

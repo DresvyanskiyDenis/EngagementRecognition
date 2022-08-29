@@ -20,14 +20,15 @@ import numpy as np
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, accuracy_score
 
-from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages
+from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages, \
+    load_NoXi_data_cross_corpus
 from tensorflow_utils.tensorflow_datagenerators.ImageDataLoader_tf2 import get_tensorflow_image_loader
 from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing import preprocess_data_Xception
-from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.Xception_training import create_Xception_model
+from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.Cross_language_training import create_Xception_model
 
 
 
-def validate_model(model:tf.Model, generator)->None:
+def validate_model(model:tf.keras.Model, generator)->None:
     """Validates provided model using generator (preferable tf.Dataset).
        Validation is done applying the following metrics: [accuracy, precision, recall, f1_score, confusion matrix]
     :param model: tf.Model
@@ -71,12 +72,12 @@ def validate_model(model:tf.Model, generator)->None:
 
 
 def main():
-    print("131231")
+    print("Start....9 English")
     # params
-    train, dev, test = load_NoXi_data_all_languages(labels_as_categories=False)
-    path_to_model_weights="/work/home/dsu/weights_of_best_models/ID_11_2.h5"
+    train, dev, test = load_NoXi_data_cross_corpus(test_corpus='english')
+    path_to_model_weights="/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Facial_model/Cross_language/English_9.h5"
     preprocess_function = preprocess_data_Xception
-    batch_size = 128
+    batch_size = 32
     model_creation_function = create_Xception_model
     gc.collect()
 

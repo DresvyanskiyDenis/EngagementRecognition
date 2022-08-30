@@ -4,6 +4,7 @@ from typing import List, Tuple, Callable
 
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+sys.path.extend(["/work/home/dsu/simpleHRNet/"])
 
 import torch
 import numpy as np

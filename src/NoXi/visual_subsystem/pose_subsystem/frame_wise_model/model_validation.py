@@ -46,10 +46,11 @@ def _validate_model_on_dataset(dataset:torch.utils.data.DataLoader, model:torch.
 
 
 def main():
+    print("Start...")
     # params
     BATCH_SIZE = 64
     NUM_CLASSES = 5
-    path_to_dir_with_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/"
+    path_to_dir_with_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/All_languages/"
     paths_to_weights= glob.glob(os.path.join(path_to_dir_with_weights, "*.pt"))
     # specify device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

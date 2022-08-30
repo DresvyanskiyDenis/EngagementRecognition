@@ -104,8 +104,7 @@ def main():
     # params
     BATCH_SIZE = 64
     NUM_CLASSES = 5
-    path_to_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/All_languages/focal_1_1.pt"
-    path_to_data = "/Pose_frames_256/"
+    path_to_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/All_languages/crossentropy_6_2.pt"
     output_path = "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/"
     preprocessing_functions = [T.Resize(size=(256, 256)),convert_image_to_float_and_scale,T.Normalize(
                                                                                            mean=[0.485, 0.456, 0.406],

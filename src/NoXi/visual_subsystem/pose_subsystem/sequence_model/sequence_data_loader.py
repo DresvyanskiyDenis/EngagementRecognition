@@ -3,12 +3,16 @@ from typing import Callable, List, Dict, Union
 import pandas as pd
 import numpy as np
 import sklearn.preprocessing as preprocessing
+import torch
 from sklearn.decomposition import PCA
 from torch.utils.data import Dataset
+import scipy
+from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import load_NoXi_data_all_languages
 
-class ImageDataLoader(Dataset):
+
+class SequenceDataLoader(Dataset):
     def __init__(self, dataframe:pd.DataFrame, window_length:int, window_shift:int, labels_included:bool = False,
-                 scaler:Union[str, object, None] = None):
+                 scaler:Union[str, object, None] = None, sequence_to_one:bool=True):
         """
 
         :param dataframe: pd.DataFrame
@@ -29,6 +33,7 @@ class ImageDataLoader(Dataset):
         self.labels_included = labels_included
         self.window_length = window_length
         self.window_shift = window_shift
+        self.sequence_to_one = sequence_to_one
         # define which scaler will be used
         if scaler is not None:
             if isinstance(scaler, str):
@@ -39,33 +44,39 @@ class ImageDataLoader(Dataset):
             else:
                 self.scaler = scaler
                 self._fit_scaler = True
+        # indentify start of the labels in columns. We need -1, since first columns will be deleted later
+        self.labels_start_idx = list(self.dataframe.columns).index("label_0") - 1
+        # apply scaler to the dataframe
+        self.dataframe.iloc[:,1:self.labels_start_idx] = self._scaling(self.dataframe.iloc[:,1:self.labels_start_idx])
 
         # split the dataframe according to the file path
         self.split_embeddings = self._split_df_according_to_file_path(self.dataframe)
         # cut every file on provided windows and concatenate them in overall big dataframe
         self.windows = self._cut_every_file_on_windows(self.split_embeddings, self.window_length, self.window_shift)
-        # indentify start of the labels in columns
-        self.labels_start_idx = list(self.windows.columns).index("label_0")
-        # apply scaler to the dataframe
-        self.windows = self._scaling(self.windows)
+        # delete two first columns, since they are useless (filename and frame_id)
+        self.windows = self.windows[:,:,2:]
+        self.windows = self.windows.astype(np.float32)
 
     def __len__(self):
-        return sum(value.shape[0] for value in self.split_embeddings.values())
+        return self.windows.shape[0]
 
 
     def __getitem__(self, idx):
-        data = self.windows.iloc[idx,:self.labels_start_idx]
-        labels = self.windows.iloc[idx,self.labels_start_idx:]
+        data = self.windows[idx][:,:self.labels_start_idx]
+        labels = self.windows[idx][:,self.labels_start_idx:]
+        if self.sequence_to_one:
+            normalization_sum = np.sum(labels)
+            labels = np.sum(labels, axis=0)/normalization_sum
         return data, labels
 
     def _scaling(self, df):
         # apply scaling function to the dataframe
         if self.scaler is not None:
             # if scaler was not provided, but chosen, we need to fit (train) it first
-            if self._fit_scaler:
-                self.scaler = self.scaler.fit(df.iloc[:,:self.labels_start_idx])
+            if not self._fit_scaler:
+                self.scaler = self.scaler.fit(df.iloc[:])
             # apply scaler to the dataframe
-            df.iloc[:,:self.labels_start_idx] = self.scaler.transform(df.iloc[:,:self.labels_start_idx])
+            df.iloc[:] = self.scaler.transform(df.iloc[:])
 
         return df
 
@@ -93,13 +104,15 @@ class ImageDataLoader(Dataset):
         return split_embeddings
 
     def _cut_every_file_on_windows(self, files:Dict[str, pd.DataFrame], window_length:int, window_shift:int)->pd.DataFrame:
-        result_df = pd.DataFrame(columns = files.columns[2:]) # drop first two columns: video_filename and frame_id
+        all_windows =[]
         for filename, values in files.items():
             windows = self.__cut_df_on_windows(values, window_length, window_shift)
+            windows = [window[np.newaxis,...] for window in windows]
             windows = np.concatenate(windows, axis=0)
-            windows = pd.DataFrame(windows, columns = result_df.columns)
-            result_df = pd.concat([result_df, windows], axis=0, ignore_index=True)
-        return result_df
+            all_windows.append(windows)
+        # concatenate all_windows into one array
+        all_windows = np.concatenate(all_windows, axis=0)
+        return all_windows
 
 
     def __cut_df_on_windows(self, df, window_length, window_shift):
@@ -115,8 +128,22 @@ class ImageDataLoader(Dataset):
             end_idx += window_shift
             if end_idx > df.shape[0]:
                 end_idx = df.shape[0]
-                start_idx = end_idx - window_shift
+                start_idx = end_idx - window_length
                 chunk = df.iloc[start_idx:end_idx].values
                 windows.append(chunk)
                 break
         return windows
+
+
+if __name__=="__main__":
+    # load data
+    train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv")
+
+    data_loader = SequenceDataLoader(dataframe=train, window_length=40, window_shift=10, labels_included=True,
+                 scaler="standard")
+
+    train_generator = torch.utils.data.DataLoader(data_loader, batch_size=128, shuffle=True,
+                                                  num_workers=16, pin_memory=False)
+
+    for i, (data, labels) in enumerate(train_generator):
+        print(i, data.shape, labels.shape)

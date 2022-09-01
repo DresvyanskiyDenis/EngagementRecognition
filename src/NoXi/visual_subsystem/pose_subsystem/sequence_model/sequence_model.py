@@ -37,19 +37,24 @@ class Seq2One_model(torch.nn.Module):
         self.LSTM_layers = torch.nn.ModuleList()
             # first layer
         self.LSTM_layers.append(torch.nn.LSTM(input_size=input_shape, hidden_size=self.LSTM_neurons[0], batch_first=True))
+        if self.dropout is not None and len(self.LSTM_neurons) > 1:
+            self.LSTM_layers.append(torch.nn.Dropout(self.dropout))
             # other layers
         for i in range(1,len(self.LSTM_neurons)):
             self.LSTM_layers.append(torch.nn.LSTM(input_size=self.LSTM_neurons[i-1], hidden_size=self.LSTM_neurons[i], batch_first=True))
+            if self.dropout is not None: self.LSTM_layers.append(torch.nn.Dropout(self.dropout))
 
         # Dense layers
         self.dense_layers = torch.nn.ModuleList()
             # first layer
         self.dense_layers.append(torch.nn.Linear(self.LSTM_neurons[-1], self.dense_neurons[0]))
+        if self.dense_dropout is not None: self.dense_layers.append(torch.nn.Dropout(self.dense_dropout))
         if self.activation_functions_mapping[self.dense_neurons_activation_functions[0]] is not None:
             self.dense_layers.append(self.activation_functions_mapping[self.dense_neurons_activation_functions[0]]())
             # other dense layers
         for i in range(1,len(self.dense_neurons)):
             self.dense_layers.append(torch.nn.Linear(self.dense_neurons[i-1], self.dense_neurons[i]))
+            if self.dropout is not None: self.dense_layers.append(torch.nn.Dropout(self.dense_dropout))
             if self.activation_functions_mapping[self.dense_neurons_activation_functions[i]] is not None:
                 self.dense_layers.append(self.activation_functions_mapping[self.dense_neurons_activation_functions[i]]())
 
@@ -62,7 +67,8 @@ class Seq2One_model(torch.nn.Module):
 
     def forward(self, x):
         for layer in self.LSTM_layers:
-            x, _ = layer(x)
+            if isinstance(layer, torch.nn.Dropout): x = layer(x)
+            else: x, _ = layer(x)
         # take the last state of the LSTM
         x = x[:,-1,:]
         # flatten the tensor
@@ -89,7 +95,7 @@ def initialize_weights(model):
 if __name__ == '__main__':
     model = Seq2One_model(input_shape=(32, 40, 256), LSTM_neurons=(512, 256, 128), dense_neurons=(256, 128, 64),
                           dense_neurons_activation_functions=('relu', 'relu', 'relu'), output_layer_neurons=5,
-                          output_activation_function='linear')
+                          output_activation_function='linear', dropout=0.3, dense_dropout=0.3)
     model.apply(initialize_weights)
     print(model)
     summary(model, input_size=(32, 40, 256))

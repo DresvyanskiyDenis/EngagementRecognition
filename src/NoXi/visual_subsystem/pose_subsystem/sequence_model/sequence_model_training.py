@@ -55,20 +55,6 @@ def train_step(model: torch.nn.Module, train_generator: torch.utils.data.DataLoa
     return total_loss / counter
 
 
-def get_data_loaders_from_data(train, dev, test, batch_size: int = 32):
-    # train
-    train_generator = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True,
-                                                  num_workers=16, pin_memory=False)
-    # dev
-    dev_generator = torch.utils.data.DataLoader(dev, batch_size=batch_size, shuffle=False,
-                                                num_workers=16, pin_memory=False)
-    # test
-    test_generator = torch.utils.data.DataLoader(test, batch_size=batch_size, shuffle=False,
-                                                 num_workers=8, pin_memory=False)
-
-    return train_generator, dev_generator, test_generator
-
-
 def train_model(train, dev, test, epochs: int,  input_shape:Tuple[int,...], class_weights: Optional = None, loss_function: str = "Crossentropy"):
     # metaparams
     metaparams = {
@@ -188,7 +174,7 @@ def train_model(train, dev, test, epochs: int,  input_shape:Tuple[int,...], clas
 
 
 def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_loss"):
-    print("Start...")
+    print("Start.....")
     # parameters
     BATCH_SIZE = 128
     num_classes=5
@@ -232,7 +218,6 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
     # load data
     train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
     dev = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_dev.csv")
-    test = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_test.csv")
 
     # compute class weights
     class_weights = compute_class_weight(class_weight='balanced',
@@ -246,12 +231,17 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
     dev = SequenceDataLoader(dataframe=dev, window_length=window_length, window_shift=window_shift,
                                labels_included=True, scaler=scaler)
 
+
     # create generators for torch
     train_generator = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=True,
                                                   num_workers=16, pin_memory=False)
     dev_generator = torch.utils.data.DataLoader(dev, batch_size=BATCH_SIZE, num_workers=16, pin_memory=False)
 
-
+    # clear RAM
+    train.clear_RAM()
+    dev.clear_RAM()
+    del train, dev
+    gc.collect()
 
     print("Wandb with Focal_loss, window_length: %i, window_shift: %i" % (window_length, window_shift))
     sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_to_One')
@@ -260,6 +250,7 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
                                                        input_shape=(BATCH_SIZE, window_length, num_embeddings)),
                 count=195,
                 project="NoXi_Seq_to_One")
+    del train_generator, dev_generator
     gc.collect()
 
 

@@ -60,6 +60,11 @@ class SequenceDataLoader(Dataset):
     def __len__(self):
         return self.windows.shape[0]
 
+    def clear_RAM(self):
+        del self.dataframe
+        del self.split_embeddings
+        self.dataframe = None
+        self.split_embeddings = None
 
     def __getitem__(self, idx):
         data = self.windows[idx][:,:self.labels_start_idx]

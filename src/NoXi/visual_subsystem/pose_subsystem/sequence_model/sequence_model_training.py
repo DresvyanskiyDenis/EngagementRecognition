@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import wandb
 import torch
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
 from torchinfo import summary
@@ -207,7 +209,7 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
                 'values': [1, 2, 3]
             },
             'num_neurons': {
-                'values': [64, 128, 256, 512]
+                'values': [512, 256, 128, 64]
             },
             'window_length': {
                 'values': [window_length]
@@ -243,7 +245,7 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
     del train, dev
     gc.collect()
 
-    print("Wandb with Focal_loss, window_length: %i, window_shift: %i" % (window_length, window_shift))
+    print("Wandb with Crossentropy, window_length: %i, window_shift: %i" % (window_length, window_shift))
     sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_to_One')
     wandb.agent(sweep_id, function=lambda: train_model(train_generator, dev_generator, None, epochs=100,
                                                        loss_function=loss, class_weights=class_weights,
@@ -255,19 +257,11 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
 
 
 if __name__ == "__main__":
-    run(80, 40, "Seq2One_LSTM_PyTorch_window_80_focal_loss", "Focal_loss")
-    run(70, 35, "Seq2One_LSTM_PyTorch_window_70_focal_loss", "Focal_loss")
-    run(60, 30, "Seq2One_LSTM_PyTorch_window_60_focal_loss", "Focal_loss")
-    run(50, 25, "Seq2One_LSTM_PyTorch_window_50_focal_loss", "Focal_loss")
-    run(40, 20, "Seq2One_LSTM_PyTorch_window_40_focal_loss", "Focal_loss")
-    run(30, 15, "Seq2One_LSTM_PyTorch_window_30_focal_loss", "Focal_loss")
-    run(20, 10, "Seq2One_LSTM_PyTorch_window_20_focal_loss", "Focal_loss")
-
-    run(80, 40, "Seq2One_LSTM_PyTorch_window_80_crossentropy", "Crossentropy")
-    run(70, 35, "Seq2One_LSTM_PyTorch_window_70_crossentropy", "Crossentropy")
-    run(60, 30, "Seq2One_LSTM_PyTorch_window_60_crossentropy", "Crossentropy")
-    run(50, 25, "Seq2One_LSTM_PyTorch_window_50_crossentropy", "Crossentropy")
-    run(40, 20, "Seq2One_LSTM_PyTorch_window_40_crossentropy", "Crossentropy")
-    run(30, 15, "Seq2One_LSTM_PyTorch_window_30_crossentropy", "Crossentropy")
-    run(20, 10, "Seq2One_LSTM_PyTorch_window_20_crossentropy", "Crossentropy")
+    print("Hello, my dear friend!!!! Another loss.")
+    window_size = int(sys.argv[1])
+    window_step = int(window_size / 2)
+    sweep_name = str(sys.argv[2])
+    loss = "Crossentropy"
+    print("start....params:window_size: %i, window_step: %i, sweep_name: %s" % (window_size, window_step, sweep_name))
+    run(window_size, window_step, sweep_name, loss=loss)
 

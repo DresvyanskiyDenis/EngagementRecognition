@@ -13,8 +13,6 @@ __email__ = "denis.dresvyanskiy@uni-ulm.de"
 
 import sys
 
-from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.utils import load_NoXi_data_cross_corpus
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -30,8 +28,8 @@ from wandb.integration.keras import WandbCallback
 from functools import partial
 from sklearn.metrics import recall_score, precision_score, f1_score
 
-from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import create_generator_from_pd_dictionary, \
-    load_data
+from src.NoXi.visual_subsystem.facial_subsystem.sequence_models.sequence_data_loader import \
+    create_generator_from_pd_dictionary, load_data_cross_corpus
 from tensorflow_utils.models.sequence_to_one_models import create_simple_RNN_network
 from tensorflow_utils.Losses import categorical_focal_loss
 from tensorflow_utils.wandb_callbacks import WandB_LR_log_callback, WandB_val_metrics_callback
@@ -89,12 +87,12 @@ def train_model(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
         "lr_scheduller": "reduceLRonPlateau",  # "reduceLRonPlateau"
         "annealing_period": 10,
         "epochs": 100,
-        "batch_size": 128,
+        "batch_size": 256,
         "architecture": "LSTM_no_attention",
         "dataset": "NoXi",
         'type_of_labels': 'sequence_to_one',
         "num_classes": 5,
-        'num_embeddings': 256,
+        'num_embeddings': 128,
         'num_layers': 3,
         'num_neurons': 256,
         'window_length': 40,
@@ -107,7 +105,7 @@ def train_model(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
     config = wandb.config
 
     # Metaparams initialization
-    metrics = ['accuracy', tf.keras.metrics.Recall()]
+    metrics = ['accuracy']
     if config.lr_scheduller == 'Cyclic':
         lr_scheduller = get_annealing_LRreduce_callback(highest_lr=config.learning_rate_max,
                                                         lowest_lr=config.learning_rate_min,
@@ -143,7 +141,8 @@ def train_model(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
         train_class_weights = None
     else:
         raise AttributeError(
-            'Passed name of loss function is not acceptable. Possible variants are categorical_crossentropy or focal_loss.')
+            'Passed name of loss function is not acceptable. Possible variants are categorical_crossentropy or '
+            'focal_loss.')
     wandb.config.update({'loss': loss})
     # model initialization
     model = create_sequence_model(num_classes=config.num_classes,
@@ -191,8 +190,8 @@ def train_model(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
     val_metrics_callback = WandB_val_metrics_callback(dev_data_loader, val_metrics,
                                                       metric_to_monitor='val_recall',
                                                       log_class_distribution=True)
-    # TODO: test whether it works
-    early_stopping_callback = EarlyStopping(monitor='val_recall', patience=20, verbose=1, mode='max')
+
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=35, verbose=1, mode='max')
 
     # train process
     print("Loss used:%s" % (loss))
@@ -214,7 +213,7 @@ def train_model(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
     tf.keras.backend.clear_session()
 
 
-def run_sweep(sweep_name: str, window_length: int, test_language:str) -> None:
+def run_sweep(sweep_name: str, window_length: int, test_language: str) -> None:
     """Runs the sweep (for hyperparameter search) using the Weights and Biases lib.
 
     :param sweep_name: str
@@ -224,12 +223,12 @@ def run_sweep(sweep_name: str, window_length: int, test_language:str) -> None:
 
     :return: None
     """
-    print("START OF SCRIPT...")
+    print("START OF SCRIPT...1")
     # gpus = tf.config.experimental.list_physical_devices('GPU')
     # for gpu in gpus:
     #    tf.config.experimental.set_memory_growth(gpu, True)
     # load the data and labels
-    train, dev, test = load_NoXi_data_cross_corpus(test_corpus=test_language)
+    train, dev, test = load_data_cross_corpus(test_corpus=test_language)
     gc.collect()
 
     sweep_config = {
@@ -272,28 +271,28 @@ def run_sweep(sweep_name: str, window_length: int, test_language:str) -> None:
     sweep_id = wandb.sweep(sweep_config, project='NoXi_Seq_to_One')
     wandb.agent(sweep_id, function=lambda: train_model(train, dev, 'focal_loss'), count=195,
                 project='NoXi_Seq_to_One')
+    # clear RAM
+    del train, dev, test
     tf.keras.backend.clear_session()
     gc.collect()
 
 
 def main():
-    # TODO: test it
     # english
-    run_sweep("cross_corpus_focal_loss_window_length_80_english", 80,'english')
+    run_sweep("cross_corpus_focal_loss_window_length_80_english", 80, 'english')
     run_sweep("cross_corpus_focal_loss_window_length_60_english", 60, 'english')
     run_sweep("cross_corpus_focal_loss_window_length_40_english", 40, 'english')
     run_sweep("cross_corpus_focal_loss_window_length_20_english", 20, 'english')
     # french
-    run_sweep("cross_corpus_focal_loss_window_length_80_french", 80,'french')
+    run_sweep("cross_corpus_focal_loss_window_length_80_french", 80, 'french')
     run_sweep("cross_corpus_focal_loss_window_length_60_french", 60, 'french')
     run_sweep("cross_corpus_focal_loss_window_length_40_french", 40, 'french')
     run_sweep("cross_corpus_focal_loss_window_length_20_french", 20, 'french')
     # german
-    run_sweep("cross_corpus_focal_loss_window_length_80_german", 80,'german')
+    run_sweep("cross_corpus_focal_loss_window_length_80_german", 80, 'german')
     run_sweep("cross_corpus_focal_loss_window_length_60_german", 60, 'german')
     run_sweep("cross_corpus_focal_loss_window_length_40_german", 40, 'german')
     run_sweep("cross_corpus_focal_loss_window_length_20_german", 20, 'german')
-
 
 
 if __name__ == '__main__':

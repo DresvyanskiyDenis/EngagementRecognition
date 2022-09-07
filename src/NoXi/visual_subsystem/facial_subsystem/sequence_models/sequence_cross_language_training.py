@@ -87,12 +87,12 @@ def train_model(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
         "lr_scheduller": "reduceLRonPlateau",  # "reduceLRonPlateau"
         "annealing_period": 10,
         "epochs": 100,
-        "batch_size": 256,
+        "batch_size": 128,
         "architecture": "LSTM_no_attention",
         "dataset": "NoXi",
         'type_of_labels': 'sequence_to_one',
         "num_classes": 5,
-        'num_embeddings': 128,
+        'num_embeddings': 256,
         'num_layers': 3,
         'num_neurons': 256,
         'window_length': 40,
@@ -223,7 +223,7 @@ def run_sweep(sweep_name: str, window_length: int, test_language: str) -> None:
 
     :return: None
     """
-    print("START OF SCRIPT...1")
+    print("START OF SCRIPT...")
     # gpus = tf.config.experimental.list_physical_devices('GPU')
     # for gpu in gpus:
     #    tf.config.experimental.set_memory_growth(gpu, True)

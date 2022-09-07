@@ -142,7 +142,61 @@ def load_data():
 
     return train_embeddings_split, dev_embeddings_split, test_embeddings_split
 
+def load_data_cross_corpus(test_corpus:str):
+    if not test_corpus in ('english', 'german', 'french'):
+        raise ValueError('The test corpus should be one of the following: english, german, french')
+    print('Start loading data...')
+    # paths to the data
+    path_to_train_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/train_embeddings.csv"
+    path_to_dev_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/dev_embeddings.csv"
+    path_to_test_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/test_embeddings.csv"
+
+    path_to_train_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/train_embeddings.csv"
+    path_to_dev_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/dev_embeddings.csv"
+    path_to_test_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/test_embeddings.csv"
+
+    path_to_train_embeddings_german= "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/train_embeddings.csv"
+    path_to_dev_embeddings_german = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/dev_embeddings.csv"
+    path_to_test_embeddings_german = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/test_embeddings.csv"
+
+    # load all embeddings in dictionary
+    english_embeddings = {'train': pd.read_csv(path_to_train_embeddings_english),
+                          'dev': pd.read_csv(path_to_dev_embeddings_english),
+                          'test': pd.read_csv(path_to_test_embeddings_english)}
+
+    french_embeddings = {'train': pd.read_csv(path_to_train_embeddings_french),
+                         'dev': pd.read_csv(path_to_dev_embeddings_french),
+                         'test': pd.read_csv(path_to_test_embeddings_french)}
+    german_embeddings = {'train': pd.read_csv(path_to_train_embeddings_german),
+                         'dev': pd.read_csv(path_to_dev_embeddings_german),
+                         'test': pd.read_csv(path_to_test_embeddings_german)}
+    # concatenate embeddings and divide on train, dev, and test parts
+    embeddings = {'english': english_embeddings, 'french': french_embeddings, 'german': german_embeddings}
+    # test part
+    test_part = embeddings.pop(test_corpus)
+    test_part = pd.concat([value for key,value in test_part.items()], axis=0, ignore_index=True)
+    # train part
+    train_part = [item.pop('train') for item in list(embeddings.values())] + [item.pop('test') for item in list(embeddings.values())]
+    train_part = pd.concat(train_part, axis=0, ignore_index=True)
+    # dev part
+    dev_part = [item.pop('dev') for item in list(embeddings.values())]
+    dev_part = pd.concat(dev_part, axis=0, ignore_index=True)
+    # apply normalization
+    scaler = StandardScaler()
+    scaler = scaler.fit(train_part.iloc[:, 1:-5])
+    train_part.iloc[:, 1:-5] = scaler.transform(train_part.iloc[:, 1:-5])
+    dev_part.iloc[:, 1:-5] = scaler.transform(dev_part.iloc[:, 1:-5])
+    test_part.iloc[:, 1:-5] = scaler.transform(test_part.iloc[:, 1:-5])
+
+    # split embeddings
+    train_part = split_embeddings_according_to_file_path(train_part)
+    dev_part = split_embeddings_according_to_file_path(dev_part)
+    test_part = split_embeddings_according_to_file_path(test_part)
+
+    # done
+    return train_part, dev_part, test_part
+
 
 if __name__ == '__main__':
-    train, dev, test = load_data()
+    train, dev, test = load_data_cross_corpus('english')
     print(train)

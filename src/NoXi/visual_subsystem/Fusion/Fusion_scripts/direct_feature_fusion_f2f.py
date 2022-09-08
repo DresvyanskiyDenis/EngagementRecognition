@@ -222,7 +222,7 @@ def main():
                 'values': [1, 2, 3, 4]
             },
             'activation_function': {
-                'values': ['ReLU', 'sigmoid', 'tanh', 'elu']
+                'values': ['relu', 'sigmoid', 'tanh', 'elu']
             }
         }
     }

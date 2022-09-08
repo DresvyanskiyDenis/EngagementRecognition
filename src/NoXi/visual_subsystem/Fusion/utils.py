@@ -106,6 +106,9 @@ class FusionDataLoader(Dataset):
     def __len__(self):
         return self.embeddings.shape[0]
 
+    def get_data_width(self):
+        return self.embeddings.shape[1]
+
 
     def __getitem__(self, idx):
         data = self.embeddings[idx]

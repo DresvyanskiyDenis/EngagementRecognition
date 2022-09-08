@@ -3,11 +3,6 @@ import sys
 
 import wandb
 
-from pytorch_utils.callbacks import TorchEarlyStopping, TorchMetricEvaluator
-from pytorch_utils.losses import SoftFocalLoss
-from pytorch_utils.models.Dense_models import DenseModel
-from src.NoXi.visual_subsystem.Fusion.utils import cut_filenames_to_original_names, FusionDataLoader
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 sys.path.extend(["/work/home/dsu/simpleHRNet/"])
@@ -24,6 +19,11 @@ from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
 from torchinfo import summary
 
+from pytorch_utils.callbacks import TorchEarlyStopping, TorchMetricEvaluator
+from pytorch_utils.losses import SoftFocalLoss
+from pytorch_utils.models.Dense_models import DenseModel
+from src.NoXi.visual_subsystem.Fusion.utils import cut_filenames_to_original_names, FusionDataLoader
+
 def create_model(input_shape:int, num_layers:int, num_neurons:int, activation_function:str, num_classes:int = 5):
     activation_functions = {'relu', 'sigmoid', 'tanh', 'elu'}
     if activation_function not in activation_functions:
@@ -34,7 +34,7 @@ def create_model(input_shape:int, num_layers:int, num_neurons:int, activation_fu
 
     model = DenseModel(input_shape= input_shape,
                        dense_neurons=tuple(num_neurons for _ in range(num_layers)),
-                       activations=activation_function,
+                       activations=tuple(activation_function for _ in range(num_layers)),
                        dropout = 0.3,
                        output_neurons = num_classes,
                        activation_function_for_output='softmax')
@@ -84,7 +84,7 @@ def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_functi
         "architecture": "Dense_network",
         "dataset": "NoXi",
         "num_classes": 5,
-        "num_embeddings": train.get_data_width(),
+        "num_embeddings": 256,
         "num_layers": 3, # 1,2,3,4
         "num_neurons": 128, # 64, 128, 256, 512
         "activation_function": "relu", # relu, sigmoid, tanh, elu
@@ -237,7 +237,7 @@ def main():
 
 
     # compute class weights
-    train_data = np.concatenate([y for x,y in train_generator], axis=0)
+    train_data = np.concatenate([y[np.newaxis,...] for x,y in train_generator], axis=0)
     class_weights = compute_class_weight(class_weight='balanced',
                                          classes=np.unique(np.argmax(train_data, axis=1, keepdims=True)),
                                          y=np.argmax(train_data, axis=1, keepdims=True).flatten())

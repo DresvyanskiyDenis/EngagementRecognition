@@ -1,7 +1,7 @@
 import gc
+import os
 import sys
-
-import wandb
+os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
@@ -10,6 +10,7 @@ sys.path.extend(["/work/home/dsu/simpleHRNet/"])
 from collections import Callable
 from functools import partial
 from typing import Dict, List, Optional, Tuple
+import wandb
 
 import numpy as np
 import pandas as pd
@@ -48,7 +49,9 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
                optimizer:torch.optim.Optimizer, criterion:torch.nn.Module,
                device:torch.device, print_step:int=100):
 
-    running_loss=0.0
+    running_loss = 0.0
+    total_loss = 0.0
+    counter = 0.0
     for i, data in enumerate(train_generator):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
@@ -66,9 +69,12 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
 
         # print statistics
         running_loss += loss.item()
-        if i % print_step == (print_step-1):  # print every 100 mini-batches
+        total_loss += loss.item()
+        counter += 1.
+        if i % print_step == (print_step - 1):  # print every 100 mini-batches
             print("Mini-batch: %i, loss: %.10f" % (i, running_loss / print_step))
             running_loss = 0.0
+    return total_loss / counter
 
 
 def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_function:str="Crossentropy"):
@@ -84,7 +90,7 @@ def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_functi
         "architecture": "Dense_network",
         "dataset": "NoXi",
         "num_classes": 5,
-        "num_embeddings": 256,
+        "num_embeddings": 100,
         "num_layers": 3, # 1,2,3,4
         "num_neurons": 128, # 64, 128, 256, 512
         "activation_function": "relu", # relu, sigmoid, tanh, elu
@@ -95,11 +101,11 @@ def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_functi
 
 
     # create model
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     model = create_model(input_shape=config.num_embeddings, num_layers=config.num_layers, num_neurons=config.num_neurons,
                          activation_function=config.activation_function, num_classes= config.num_classes)
     model.to(device)
-    summary(model, input_size=(config.batch_size, 3, 256, 256))
+    summary(model, input_size=(config['batch_size'], 100))
     # Select optimizer
     optimizers = {'Adam': torch.optim.Adam,
                   'SGD': torch.optim.SGD,
@@ -252,11 +258,11 @@ def main():
 
 
     print("Wandb with Focal_loss")
-    sweep_id = wandb.sweep(sweep_config, project='VGGFace2_FtF_training')
+    sweep_id = wandb.sweep(sweep_config, project='Engagement_recognition_fusion')
     wandb.agent(sweep_id, function=lambda: train_model(train_generator_pytorch, dev_generator_pytorch, epochs=100,
                 loss_function="Focal_loss", class_weights=class_weights),
                 count=300,
-                project='VGGFace2_FtF_training')
+                project='Engagement_recognition_fusion')
     gc.collect()
 
 

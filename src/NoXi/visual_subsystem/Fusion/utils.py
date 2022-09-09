@@ -30,6 +30,8 @@ class FusionDataLoader(Dataset):
                     if PCA_components is None: raise ValueError("PCA_components must be provided.")
                     self.PCA_components = PCA_components
                     self.scaler = PCA(n_components = PCA_components)
+            else:
+                self.scaler = self.scaling
 
         # split labels from embeddings
         if self.labels_included:

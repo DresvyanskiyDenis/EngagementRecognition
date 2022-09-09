@@ -1,7 +1,8 @@
 import os
 from functools import reduce
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
@@ -119,6 +120,37 @@ class FusionDataLoader(Dataset):
             return data, labels
         else:
             return data
+
+class Nflow_FusionDataLoader(Dataset):
+
+    def __init__(self, fusion_data_loaders:Tuple[FusionDataLoader,...]):
+        self.fusion_data_loaders = fusion_data_loaders
+        self.num_fusion_data_loaders = len(fusion_data_loaders)
+        self.data_width = sum([loader.get_data_width() for loader in self.fusion_data_loaders])
+        self.labels_included = self.fusion_data_loaders[0].labels_included
+
+    def __len__(self):
+        return self.fusion_data_loaders[0].__len__()
+
+    def __getitem__(self, idx):
+        data_all_loaders = []
+        for loader in self.fusion_data_loaders:
+            if self.labels_included:
+                data, labels = loader[idx]
+            else:
+                data = loader[idx]
+            data_all_loaders.append(data[np.newaxis,...])
+
+        # concatenate data from all loaders
+        data_all_loaders = np.concatenate(data_all_loaders, axis=0)
+        # return data and labels (if needed)
+        if self.labels_included:
+            return data_all_loaders, labels # here we return labels from the last loader, but it doesn't matter - they are the same
+        else:
+            return data_all_loaders
+
+
+
 
 
 def cut_filenames_to_original_names(df:pd.DataFrame):

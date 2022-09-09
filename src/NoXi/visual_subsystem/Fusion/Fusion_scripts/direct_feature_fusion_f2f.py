@@ -77,7 +77,8 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
     return total_loss / counter
 
 
-def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_function:str="Crossentropy"):
+def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoader,
+                epochs:int, class_weights:Optional=None, loss_function:str="Crossentropy"):
     # metaparams
     metaparams = {
         "optimizer": "Adam",  # SGD, RMSprop, AdamW
@@ -90,22 +91,23 @@ def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_functi
         "architecture": "Dense_network",
         "dataset": "NoXi",
         "num_classes": 5,
-        "num_embeddings": 100,
+        "num_embeddings": iter(train).next()[0].shape[1],
         "num_layers": 3, # 1,2,3,4
         "num_neurons": 128, # 64, 128, 256, 512
         "activation_function": "relu", # relu, sigmoid, tanh, elu
     }
+
     # initialization of Weights and Biases
+
     wandb.init(project="Engagement_recognition_fusion", config=metaparams)
     config = wandb.config
-
 
     # create model
     device = torch.device("cpu")
     model = create_model(input_shape=config.num_embeddings, num_layers=config.num_layers, num_neurons=config.num_neurons,
                          activation_function=config.activation_function, num_classes= config.num_classes)
     model.to(device)
-    summary(model, input_size=(config['batch_size'], 100))
+    summary(model, input_size=(config['batch_size'], config.num_embeddings))
     # Select optimizer
     optimizers = {'Adam': torch.optim.Adam,
                   'SGD': torch.optim.SGD,
@@ -189,10 +191,10 @@ def train_model(train, dev, epochs:int, class_weights:Optional=None, loss_functi
     gc.collect()
     torch.cuda.empty_cache()
 
-def main():
-    print("New start...")
+def run(scaler):
+    print("New start...!!!")
     sweep_config = {
-        'name': "Direct_fusion_f2f_PCA_focal_loss",
+        'name': "Direct_fusion_f2f_%sScaler_focal_loss"%scaler,
         'method': 'random',
         'metric': {
             'name': 'val_loss',
@@ -237,9 +239,13 @@ def main():
     dev_1, dev_2 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(dev_2)
 
 
+    if scaler == "PCA":
+        PCA_components = 100
+    else:
+        PCA_components = None
     # create generators
-    train_generator = FusionDataLoader([train_1, train_2], scaling="PCA", PCA_components=100, labels_included=True)
-    dev_generator = FusionDataLoader([dev_1, dev_2], scaling="PCA", PCA_components=100, labels_included=True)
+    train_generator = FusionDataLoader([train_1, train_2], scaling=scaler, PCA_components=PCA_components, labels_included=True)
+    dev_generator = FusionDataLoader([dev_1, dev_2], scaling=train_generator.scaler, PCA_components=PCA_components, labels_included=True)
 
 
     # compute class weights
@@ -267,4 +273,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run("standard")
+    run("PCA")

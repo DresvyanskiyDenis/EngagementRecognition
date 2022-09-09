@@ -38,7 +38,7 @@ def create_model(input_shape:int, num_layers:int, num_neurons:int, activation_fu
                        activations=tuple(activation_function for _ in range(num_layers)),
                        dropout = 0.3,
                        output_neurons = num_classes,
-                       activation_function_for_output='softmax')
+                       activation_function_for_output='linear')
 
     model.train()
     return model
@@ -192,7 +192,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     torch.cuda.empty_cache()
 
 def run(scaler):
-    print("New start...!!!")
+    print("New start...!!!1241414124124124124")
     sweep_config = {
         'name': "Direct_fusion_f2f_%sScaler_focal_loss"%scaler,
         'method': 'random',

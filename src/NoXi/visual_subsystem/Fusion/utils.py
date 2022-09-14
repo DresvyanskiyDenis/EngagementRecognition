@@ -154,7 +154,7 @@ class Nflow_FusionDataLoader(Dataset):
 
 
 def cut_filenames_to_original_names(df:pd.DataFrame):
-    df['filename'] = df['filename'].apply(lambda x: os.path.join(*x.split(os.path.sep)[-3:]))
+    df['filename'] = df['filename'].apply(lambda x: os.path.join(*x.split('/')[-3:]))
     return df
 
 

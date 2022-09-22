@@ -1,7 +1,7 @@
 import gc
 import os
 import sys
-os.environ["CUDA_VISIBLE_DEVICES"]=""
+#os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
@@ -103,7 +103,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     config = wandb.config
 
     # create model
-    device = torch.device("cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = create_model(input_shape=config.num_embeddings, num_layers=config.num_layers, num_neurons=config.num_neurons,
                          activation_function=config.activation_function, num_classes= config.num_classes)
     model.to(device)
@@ -125,7 +125,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     # Select lr scheduller
     lr_schedullers = {
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period, eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 8),
+        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 15),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks
@@ -135,7 +135,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
         'val_f1_score': partial(f1_score, average='macro')
     }
     best_val_recall = 0
-    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 15,
+    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 30,
                                                  save_path = wandb.run.dir,
                                                  mode = "max")
 

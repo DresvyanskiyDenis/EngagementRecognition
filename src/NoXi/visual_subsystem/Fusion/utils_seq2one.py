@@ -17,7 +17,7 @@ class Nflow_FusionSequenceDataLoader(Dataset):
     }
 
     def __init__(self, embeddings:List[pd.DataFrame], window_length:int, window_shift:int,
-                 scalers:Union[Tuple[str,...], Tuple[object,...]]=None, labels_included:bool=False,
+                 scalers:Union[List[str], List[object]]=None, labels_included:bool=False,
                  PCA_components:Optional[int]=None, sequence_to_one:bool=False):
         self.embeddings = embeddings
         self.window_length = window_length
@@ -37,7 +37,7 @@ class Nflow_FusionSequenceDataLoader(Dataset):
                         else: new_scalers.append(self.possible_scalers[scaler]())
                     else:
                         raise ValueError("Scaler %s is not supported!"%scaler)
-                self.scalers = tuple(new_scalers)
+                self.scalers = list(new_scalers)
 
         # split labels from embeddings
         if self.labels_included:
@@ -49,7 +49,13 @@ class Nflow_FusionSequenceDataLoader(Dataset):
         if self.scalers is not None:
             for i in range(len(embeddings)):
                 # 1: because the first column if the filenames
-                self.embeddings[i][:,1:], self.scalers[i] = self._scaling(self.embeddings[i][:,1:], self.scalers[i], fit=self._is_scaler_fit)
+                # save the first column, since it is the filename
+                filenames = self.embeddings[i].iloc[:, 0]
+                # scale the data
+                scaled_data, scaler = self._scaling(self.embeddings[i].iloc[:,1:], self.scalers[i], fit=self._is_scaler_fit)
+                # concatenate with filenames column
+                self.embeddings[i] = pd.concat([filenames, pd.DataFrame(scaled_data)], axis=1)
+                self.scalers[i] = scaler
 
         # check congruity between embeddings
         self._check_embeddings_congruity()
@@ -75,13 +81,12 @@ class Nflow_FusionSequenceDataLoader(Dataset):
 
     def __splitting_labels_from_embeddings(self, df_with_emb_and_lbs):
         labels = []
-        for df in df_with_emb_and_lbs:
-            # take all labels columns + filename (for further merging)
-            labels_columns = ["filename"]+[col for col in df.columns if "label" in col]
-            labels.append(df[labels_columns])
-            # delete labels columns from the dataframe
-            labels_columns = [col for col in df.columns if "label" in col]
-            df.drop(columns=labels_columns, inplace=True)
+        # take all labels columns + filename (for further merging)
+        labels_columns = ["filename"]+[col for col in df_with_emb_and_lbs.columns if "label" in col]
+        labels.append(df_with_emb_and_lbs[labels_columns])
+        # delete labels columns from the dataframe
+        labels_columns = [col for col in df_with_emb_and_lbs.columns if "label" in col]
+        df_with_emb_and_lbs.drop(columns=labels_columns, inplace=True)
         # merge labels into one dataframe and delete those, who incogurent
         # fuse embeddings into one dataframe based on their filenames
         labels = [df.set_index("filename") for df in labels]

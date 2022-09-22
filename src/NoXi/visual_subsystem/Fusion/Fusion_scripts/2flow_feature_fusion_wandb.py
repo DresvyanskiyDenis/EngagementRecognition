@@ -1,4 +1,12 @@
+import sys
 import gc
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]=""
+
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+sys.path.extend(["/work/home/dsu/simpleHRNet/"])
+
 from functools import partial
 from typing import Tuple, Union, Optional, List
 
@@ -130,24 +138,24 @@ def preprocess_and_align_data(df1, df2):
 
 def load_data(scaler:str):
     # load train data
-    train_1 = pd.read_csv("C:\\Users\\Professional\\Desktop\\Pose_model\\embeddings_train.csv")
+    train_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
     train_2 = pd.read_csv(
-        "C:\\Users\\Professional\\Desktop\\Xception_model\\train_extracted_deep_embeddings.csv")
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv")
     train_1, train_2 = cut_filenames_to_original_names(train_1), cut_filenames_to_original_names(train_2)
     # change the filenames to the same format for all dataframes
-    train_1['filename'] = train_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
-    train_2['filename'] = train_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
+    #train_1['filename'] = train_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
+    #train_2['filename'] = train_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
     # preprocess and align dataframes. Check the congruity as well
     train_1, train_2 = preprocess_and_align_data(train_1, train_2)
 
     # load validation data
-    dev_1 = pd.read_csv("C:\\Users\\Professional\\Desktop\\Pose_model\\embeddings_dev.csv")
+    dev_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_dev.csv")
     dev_2 = pd.read_csv(
-        "C:\\Users\\Professional\\Desktop\\Xception_model\\dev_extracted_deep_embeddings.csv")
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/dev_extracted_deep_embeddings.csv")
     dev_1, dev_2 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(dev_2)
     # change the filenames to the same format for all dataframes
-    dev_1['filename'] = dev_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
-    dev_2['filename'] = dev_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
+    #dev_1['filename'] = dev_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
+    #dev_2['filename'] = dev_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
     # preprocess and align dataframes. Check the congruity as well
     dev_1, dev_2 = preprocess_and_align_data(dev_1, dev_2)
 
@@ -250,7 +258,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     # Select lr scheduller
     lr_schedullers = {
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period, eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 8),
+        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 15),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks

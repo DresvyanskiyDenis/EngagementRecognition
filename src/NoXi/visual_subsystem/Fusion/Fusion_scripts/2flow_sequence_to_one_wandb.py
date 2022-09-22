@@ -121,18 +121,18 @@ class n_flow_Seq2One_model(torch.nn.Module):
 
 def load_data(window_length:int, window_shift:int, scaler:str='PCA'):
     # load train data
-    train_1 = pd.read_csv("C:\\Users\\Professional\\Desktop\\Pose_model\\embeddings_train.csv")
+    train_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
     train_2 = pd.read_csv(
-        "C:\\Users\\Professional\\Desktop\\Xception_model\\train_extracted_deep_embeddings.csv")
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv")
     train_1, train_2 = cut_filenames_to_original_names(train_1), cut_filenames_to_original_names(train_2)
     # change the filenames to the same format for all dataframes
     train_1['filename'] = train_1['filename'].apply(lambda x: os.path.join(*x.split("/")[-3:]))
     train_2['filename'] = train_2['filename'].apply(lambda x: os.path.join(*x.split("/")[-3:]))
 
     # load validation data
-    dev_1 = pd.read_csv("C:\\Users\\Professional\\Desktop\\Pose_model\\embeddings_dev.csv")
+    dev_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_dev.csv")
     dev_2 = pd.read_csv(
-        "C:\\Users\\Professional\\Desktop\\Xception_model\\dev_extracted_deep_embeddings.csv")
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/dev_extracted_deep_embeddings.csv")
     dev_1, dev_2 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(dev_2)
     # change the filenames to the same format for all dataframes
     dev_1['filename'] = dev_1['filename'].apply(lambda x: os.path.join(*x.split("/")[-3:]))
@@ -146,12 +146,12 @@ def load_data(window_length:int, window_shift:int, scaler:str='PCA'):
     # create generators
     train_generator = Nflow_FusionSequenceDataLoader(embeddings=[train_1, train_2], window_length=window_length,
                                                      window_shift=window_shift,
-                                                     scalers=('PCA', 'PCA'), labels_included=True, PCA_components=PCA_components,
+                                                     scalers=['PCA', 'PCA'], labels_included=True, PCA_components=PCA_components,
                                                      sequence_to_one=True)
-
+    scalers = train_generator.scalers
     dev_generator = Nflow_FusionSequenceDataLoader(embeddings=[dev_1, dev_2], window_length=window_length,
                                                    window_shift=window_shift,
-                                                   scalers=('PCA', 'PCA'), labels_included=True, PCA_components=PCA_components,
+                                                   scalers=[scalers[0], scalers[1]], labels_included=True, PCA_components=PCA_components,
                                                    sequence_to_one=True)
     return train_generator, dev_generator
 
@@ -303,7 +303,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
 def run(window_length:int):
     print("New start...!!!")
     sweep_config = {
-        'name': "2Flow_fusion_Seq2One_PCA_window_&i" % window_length,
+        'name': "2Flow_fusion_Seq2One_PCA_window_%i" % window_length,
         'method': 'random',
         'metric': {
             'name': 'val_loss',

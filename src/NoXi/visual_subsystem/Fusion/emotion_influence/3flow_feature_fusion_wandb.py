@@ -13,7 +13,6 @@ from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
 
 from pytorch_utils.callbacks import TorchEarlyStopping, TorchMetricEvaluator
-from pytorch_utils.general_functions import train_step
 from pytorch_utils.losses import SoftFocalLoss
 from src.NoXi.visual_subsystem.Fusion.utils import cut_filenames_to_original_names, FusionDataLoader, \
     Nflow_FusionDataLoader
@@ -92,18 +91,25 @@ class n_flow_model(torch.nn.Module):
             self.output_layer.append(self.activation_functions_mapping[self.output_activation_function]())
 
 
-    def forward(self, x):
-        # !important!
-        # x will have the shape (batch_size, n_flows, num_features) due to the way the data is loaded (in generator)
-        # flow layers
+    def forward(self, flow_0, flow_1, flow_2):
+
         flow_outputs = []
-        for i in range(self.n_flows):
-            # take the i-th flow data and squeeze it to (batch_size, num_features)
-            flow_output = x[:,i]
-            flow_output = torch.squeeze(flow_output)
-            for layer in self.flow_layers[i]:
-                flow_output = layer(flow_output)
-            flow_outputs.append(flow_output)
+        # flow 0
+        flow_0 = flow_0.squeeze()
+        for layer in self.flow_layers[0]:
+            flow_0 = layer(flow_0)
+        flow_outputs.append(flow_0)
+        # flow 1
+        flow_1 = flow_1.squeeze()
+        for layer in self.flow_layers[1]:
+            flow_1 = layer(flow_1)
+        flow_outputs.append(flow_1)
+        # flow 2
+        flow_2 = flow_2.squeeze()
+        for layer in self.flow_layers[2]:
+            flow_2 = layer(flow_2)
+        flow_outputs.append(flow_2)
+
         # fusion layers
         fusion_output = torch.cat(flow_outputs, dim=-1)
         for layer in self.fusion_layers:
@@ -197,6 +203,38 @@ def create_model(input_shapes:Tuple[int,...], n_flows:int, n_flow_layers:int, n_
     return model
 
 
+def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoader,
+               optimizer:torch.optim.Optimizer, criterion:torch.nn.Module,
+               device:torch.device, print_step:int=100):
+
+    running_loss = 0.0
+    total_loss = 0.0
+    counter = 0.0
+    for i, data in enumerate(train_generator):
+        # get the inputs; data is a list of [inputs, labels]
+        inputs, labels = data
+        flow_0, flow_1, flow_2 = inputs
+        flow_0, flow_1, flow_2 = flow_0.float(), flow_1.float(), flow_2.float()
+        flow_0, flow_1, flow_2, labels = flow_0.to(device), flow_1.to(device), flow_2.to(device), labels.to(device)
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        # forward + backward + optimize
+        outputs = model(flow_0, flow_1, flow_2)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        # print statistics
+        running_loss += loss.item()
+        total_loss += loss.item()
+        counter += 1.
+        if i % print_step == (print_step - 1):  # print every print_step mini-batches
+            print("Mini-batch: %i, loss: %.10f" % (i, running_loss / print_step))
+            running_loss = 0.0
+    return total_loss / counter
+
 
 def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoader,
                 epochs:int, class_weights:Optional=None, loss_function:str="Crossentropy"):
@@ -261,7 +299,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     # Select lr scheduller
     lr_schedullers = {
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period, eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 8),
+        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 15),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks

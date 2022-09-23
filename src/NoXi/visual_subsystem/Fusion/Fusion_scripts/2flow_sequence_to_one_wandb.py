@@ -1,3 +1,9 @@
+import sys
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+sys.path.extend(["/work/home/dsu/simpleHRNet/"])
+
+
 import gc
 from functools import partial
 from typing import Tuple, Union, Optional, List
@@ -6,7 +12,6 @@ import pandas as pd
 import numpy as np
 import torch
 import os
-import sys
 
 import wandb
 from sklearn.metrics import recall_score, precision_score, f1_score

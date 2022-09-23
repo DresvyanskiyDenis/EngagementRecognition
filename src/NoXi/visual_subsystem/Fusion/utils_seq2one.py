@@ -190,12 +190,15 @@ class Nflow_FusionSequenceDataLoader(Dataset):
     def __getitem__(self, idx):
         data_flows = []
         for i in range(len(self.windows)):
-            data = self.windows[i][idx].values
+            data = self.windows[i][idx]
             data = data[np.newaxis,...]
             data_flows.append(data)
         data_flows = np.concatenate(data_flows, axis=0)
         if self.labels_included:
-            labels = self.labels.iloc[idx].values
+            labels = self.labels[idx]
+            if self.sequence_to_one:
+                normalization_sum = np.sum(labels)
+                labels = np.sum(labels, axis=0) / normalization_sum
             return data_flows, labels
         else:
             return data_flows

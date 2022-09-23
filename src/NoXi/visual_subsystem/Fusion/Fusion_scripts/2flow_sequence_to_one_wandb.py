@@ -233,7 +233,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     # Select lr scheduller
     lr_schedullers = {
         'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period, eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 8),
+        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 15),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks

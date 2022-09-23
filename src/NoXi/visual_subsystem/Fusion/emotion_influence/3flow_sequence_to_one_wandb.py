@@ -92,7 +92,6 @@ class n_flow_Seq2One_model(torch.nn.Module):
 
 
     def forward(self, x):
-        # TODO: TEST IT
         # !important!
         # x will have the shape (batch_size, n_flows, sequence_length, num_features) due to the way the data is loaded (in generator)
         # flow layers

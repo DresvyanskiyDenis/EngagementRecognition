@@ -123,33 +123,52 @@ class FusionDataLoader(Dataset):
 
 class Nflow_FusionDataLoader(Dataset):
 
-    def __init__(self, fusion_data_loaders:Tuple[FusionDataLoader,...]):
+    def __init__(self, fusion_data_loaders:Tuple[FusionDataLoader,...], output_as_list:bool=False):
         self.fusion_data_loaders = fusion_data_loaders
         self.num_fusion_data_loaders = len(fusion_data_loaders)
         self.data_width = sum([loader.get_data_width() for loader in self.fusion_data_loaders])
         self.labels_included = self.fusion_data_loaders[0].labels_included
+        self.output_as_list = output_as_list
 
     def __len__(self):
         return self.fusion_data_loaders[0].__len__()
 
     def __getitem__(self, idx):
+        if not self.output_as_list:
+            return self._getitem_integrated(idx)
+        else:
+            return self._getitem_separated(idx)
+
+
+    def _getitem_integrated(self, idx):
         data_all_loaders = []
         for loader in self.fusion_data_loaders:
             if self.labels_included:
                 data, labels = loader[idx]
             else:
                 data = loader[idx]
-            data_all_loaders.append(data[np.newaxis,...])
+            data_all_loaders.append(data[np.newaxis, ...])
 
         # concatenate data from all loaders
         data_all_loaders = np.concatenate(data_all_loaders, axis=0)
         # return data and labels (if needed)
         if self.labels_included:
-            return data_all_loaders, labels # here we return labels from the last loader, but it doesn't matter - they are the same
+            return data_all_loaders, labels  # here we return labels from the last loader, but it doesn't matter - they are the same
         else:
             return data_all_loaders
 
-
+    def _getitem_separated(self, idx):
+        data_all_loaders = []
+        for loader in self.fusion_data_loaders:
+            if self.labels_included:
+                data, labels = loader[idx]
+            else:
+                data = loader[idx]
+            data_all_loaders.append(data)
+        if self.labels_included:
+            return data_all_loaders, labels  # here we return labels from the last loader, but it doesn't matter - they are the same
+        else:
+            return data_all_loaders
 
 
 

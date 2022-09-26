@@ -47,7 +47,12 @@ class SequenceDataLoader(Dataset):
         # indentify start of the labels in columns. We need -1, since first columns will be deleted later
         self.labels_start_idx = list(self.dataframe.columns).index("label_0") - 1
         # apply scaler to the dataframe
-        self.dataframe.iloc[:,1:self.labels_start_idx] = self._scaling(self.dataframe.iloc[:,1:self.labels_start_idx])
+        if scaler is not None:
+            filename = self.dataframe[:,0]
+            labels = self.dataframe.iloc[:, self.labels_start_idx:]
+            scaled_dataframe = self._scaling(self.dataframe.iloc[:,1:self.labels_start_idx])
+            final_df = pd.concat([filename, scaled_dataframe, labels], axis=1)
+            self.dataframe = final_df
 
         # split the dataframe according to the file path
         self.split_embeddings = self._split_df_according_to_file_path(self.dataframe)
@@ -142,7 +147,7 @@ class SequenceDataLoader(Dataset):
 
 if __name__=="__main__":
     # load data
-    train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv")
+    train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
 
     data_loader = SequenceDataLoader(dataframe=train, window_length=40, window_shift=10, labels_included=True,
                  scaler="standard")

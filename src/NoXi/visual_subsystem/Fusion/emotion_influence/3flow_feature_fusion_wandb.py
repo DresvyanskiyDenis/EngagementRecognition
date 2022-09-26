@@ -11,6 +11,7 @@ import sys
 import wandb
 from sklearn.metrics import recall_score, precision_score, f1_score
 from sklearn.utils import compute_class_weight
+from torch.autograd import Variable
 
 from pytorch_utils.callbacks import TorchEarlyStopping, TorchMetricEvaluator
 from pytorch_utils.losses import SoftFocalLoss
@@ -29,10 +30,10 @@ class n_flow_model(torch.nn.Module):
                                     'linear': None
                                     }
 
-    def __init__(self, input_shapes:Tuple[int,...], n_flows:int, n_flow_layers:int, n_flow_neurons:int,
-                 activation_function:str, n_fusion_layers:int, n_fusion_neurons:Tuple[int,...],
-                 fusion_activation_function:str, dropout:Optional[float]=None,
-                 output_neurons:Union[Tuple[int],int]=7, output_activation_function:str='softmax'):
+    def __init__(self, input_shapes: Tuple[int, ...], n_flows: int, n_flow_layers: int, n_flow_neurons: int,
+                 activation_function: str, n_fusion_layers: int, n_fusion_neurons: Tuple[int, ...],
+                 fusion_activation_function: str, dropout: Optional[float] = None,
+                 output_neurons: Union[Tuple[int], int] = 7, output_activation_function: str = 'softmax'):
         super(n_flow_model, self).__init__()
         self.input_shapes = input_shapes
         self.n_flows = n_flows
@@ -48,9 +49,8 @@ class n_flow_model(torch.nn.Module):
         # build the model
         self._build_model()
 
-
-    def _build_flow(self, input_shape:int, n_flow_layers:int, n_flow_neurons:int,
-                 activation_function:str, dropout:Optional[float]=None):
+    def _build_flow(self, input_shape: int, n_flow_layers: int, n_flow_neurons: int,
+                    activation_function: str, dropout: Optional[float] = None):
         # create one "flow" (branch) of the model
         flow = torch.nn.ModuleList()
         # input layer
@@ -75,10 +75,10 @@ class n_flow_model(torch.nn.Module):
                                                      self.dropout))
         # create fusion layers and fuse (concatenate first) all outputs of flow layers
         self.fusion_layers = torch.nn.ModuleList()
-        self.fusion_layers.append(torch.nn.Linear(self.n_flows*self.n_flow_neurons, self.n_fusion_neurons[0]))
+        self.fusion_layers.append(torch.nn.Linear(self.n_flows * self.n_flow_neurons, self.n_fusion_neurons[0]))
         self.fusion_layers.append(self.activation_functions_mapping[self.fusion_activation_function]())
         for i in range(1, self.n_fusion_layers):
-            self.fusion_layers.append(torch.nn.Linear(self.n_fusion_neurons[i-1], self.n_fusion_neurons[i]))
+            self.fusion_layers.append(torch.nn.Linear(self.n_fusion_neurons[i - 1], self.n_fusion_neurons[i]))
             self.fusion_layers.append(self.activation_functions_mapping[self.fusion_activation_function]())
         # create output layer
         self.output_layer = torch.nn.ModuleList()
@@ -89,7 +89,6 @@ class n_flow_model(torch.nn.Module):
             pass
         else:
             self.output_layer.append(self.activation_functions_mapping[self.output_activation_function]())
-
 
     def forward(self, flow_0, flow_1, flow_2):
 
@@ -119,6 +118,7 @@ class n_flow_model(torch.nn.Module):
             fusion_output = layer(fusion_output)
         return fusion_output
 
+
 def preprocess_and_align_data(df1, df2, df3):
     # take only frames that are in both dataframes
     df1 = df1[df1.set_index(['filename']).index.isin(df2.set_index(['filename']).index)]
@@ -140,26 +140,33 @@ def preprocess_and_align_data(df1, df2, df3):
     df3.reset_index(inplace=True)
     return df1, df2, df3
 
-def load_data(scaler:str):
+
+def load_data(scaler: str):
     # load train data
     train_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
-    train_2 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv")
-    train_3 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/EmoVGGFace2/train_extracted_deep_embeddings.csv")
-    train_1, train_2, train_3 = cut_filenames_to_original_names(train_1), cut_filenames_to_original_names(train_2), cut_filenames_to_original_names(train_3)
+    train_2 = pd.read_csv(
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/train_extracted_deep_embeddings.csv")
+    train_3 = pd.read_csv(
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/EmoVGGFace2/train_extracted_deep_embeddings.csv")
+    train_1, train_2, train_3 = cut_filenames_to_original_names(train_1), cut_filenames_to_original_names(
+        train_2), cut_filenames_to_original_names(train_3)
     # change the filenames to the same format for all dataframes
-    #train_1['filename'] = train_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
-    #train_2['filename'] = train_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
+    # train_1['filename'] = train_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
+    # train_2['filename'] = train_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
     # preprocess and align dataframes. Check the congruity as well
     train_1, train_2, train_3 = preprocess_and_align_data(train_1, train_2, train_3)
 
     # load validation data
     dev_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_dev.csv")
-    dev_2 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/dev_extracted_deep_embeddings.csv")
-    dev_3 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/EmoVGGFace2/dev_extracted_deep_embeddings.csv")
-    dev_1, dev_2, dev_3 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(dev_2), cut_filenames_to_original_names(dev_3)
+    dev_2 = pd.read_csv(
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Xception_model/dev_extracted_deep_embeddings.csv")
+    dev_3 = pd.read_csv(
+        "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/EmoVGGFace2/dev_extracted_deep_embeddings.csv")
+    dev_1, dev_2, dev_3 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(
+        dev_2), cut_filenames_to_original_names(dev_3)
     # change the filenames to the same format for all dataframes
-    #dev_1['filename'] = dev_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
-    #dev_2['filename'] = dev_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
+    # dev_1['filename'] = dev_1['filename'].apply(lambda x: os.path.join(*x.split("/")[2:]))
+    # dev_2['filename'] = dev_2['filename'].apply(lambda x: os.path.join(*x.split("/")[4:]))
     # preprocess and align dataframes. Check the congruity as well
     dev_1, dev_2, dev_3 = preprocess_and_align_data(dev_1, dev_2, dev_3)
 
@@ -170,12 +177,13 @@ def load_data(scaler:str):
         PCA_components = None
     # create generators
     train_generator_flow_1 = FusionDataLoader([train_1], scaling=scaler, PCA_components=PCA_components,
-                                       labels_included=True)
+                                              labels_included=True)
     train_generator_flow_2 = FusionDataLoader([train_2], scaling=scaler, PCA_components=PCA_components,
-                                       labels_included=True)
+                                              labels_included=True)
     train_generator_flow_3 = FusionDataLoader([train_3], scaling=scaler, PCA_components=PCA_components,
-                                        labels_included=True)
-    dev_generator_flow_1 = FusionDataLoader([dev_1], scaling=train_generator_flow_1.scaler, PCA_components=PCA_components,
+                                              labels_included=True)
+    dev_generator_flow_1 = FusionDataLoader([dev_1], scaling=train_generator_flow_1.scaler,
+                                            PCA_components=PCA_components,
                                             labels_included=True)
     dev_generator_flow_2 = FusionDataLoader([dev_2], scaling=train_generator_flow_2.scaler,
                                             PCA_components=PCA_components,
@@ -185,28 +193,27 @@ def load_data(scaler:str):
                                             labels_included=True)
 
     # create train and dev generators, which will concatenate outputs from generators made above
-    train_generator = Nflow_FusionDataLoader((train_generator_flow_1, train_generator_flow_2, train_generator_flow_3))
-    dev_generator = Nflow_FusionDataLoader((dev_generator_flow_1, dev_generator_flow_2, dev_generator_flow_3))
+    train_generator = Nflow_FusionDataLoader((train_generator_flow_1, train_generator_flow_2, train_generator_flow_3), output_as_list=True)
+    dev_generator = Nflow_FusionDataLoader((dev_generator_flow_1, dev_generator_flow_2, dev_generator_flow_3), output_as_list=True)
 
     return train_generator, dev_generator
 
-def create_model(input_shapes:Tuple[int,...], n_flows:int, n_flow_layers:int, n_flow_neurons:int,
-                 activation_function:str, n_fusion_layers:int, n_fusion_neurons:Tuple[int,...],
-                 fusion_activation_function:str, dropout:Optional[float]=None,
-                 output_neurons:Union[Tuple[int],int]=7, output_activation_function:str='linear'):
 
+def create_model(input_shapes: Tuple[int, ...], n_flows: int, n_flow_layers: int, n_flow_neurons: int,
+                 activation_function: str, n_fusion_layers: int, n_fusion_neurons: Tuple[int, ...],
+                 fusion_activation_function: str, dropout: Optional[float] = None,
+                 output_neurons: Union[Tuple[int], int] = 7, output_activation_function: str = 'linear'):
     model = n_flow_model(input_shapes, n_flows, n_flow_layers, n_flow_neurons,
-                              activation_function, n_fusion_layers, n_fusion_neurons,
-                              fusion_activation_function, dropout, output_neurons,
-                              output_activation_function)
+                         activation_function, n_fusion_layers, n_fusion_neurons,
+                         fusion_activation_function, dropout, output_neurons,
+                         output_activation_function)
     model.train()
     return model
 
 
-def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoader,
-               optimizer:torch.optim.Optimizer, criterion:torch.nn.Module,
-               device:torch.device, print_step:int=100):
-
+def train_step(model: torch.nn.Module, train_generator: torch.utils.data.DataLoader,
+               optimizer: torch.optim.Optimizer, criterion: torch.nn.Module,
+               device: torch.device, print_step: int = 100):
     running_loss = 0.0
     total_loss = 0.0
     counter = 0.0
@@ -214,7 +221,7 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
         flow_0, flow_1, flow_2 = inputs
-        flow_0, flow_1, flow_2 = flow_0.float(), flow_1.float(), flow_2.float()
+        flow_0, flow_1, flow_2 = Variable(flow_0.float()), Variable(flow_1.float()), Variable(flow_2.float())
         flow_0, flow_1, flow_2, labels = flow_0.to(device), flow_1.to(device), flow_2.to(device), labels.to(device)
 
         # zero the parameter gradients
@@ -236,10 +243,10 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
     return total_loss / counter
 
 
-def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoader,
-                epochs:int, class_weights:Optional=None, loss_function:str="Crossentropy"):
+def train_model(train: torch.utils.data.DataLoader, dev: torch.utils.data.DataLoader,
+                epochs: int, class_weights: Optional = None, loss_function: str = "Crossentropy"):
     # metaparams
-    data_shape = np.array(iter(train).next()[0].shape)
+    data_shape = np.array([x.shape for x in iter(train).next()[0]])
     metaparams = {
         "optimizer": "Adam",  # SGD, RMSprop, AdamW
         "learning_rate_max": 0.001,  # up to 0.0001
@@ -251,14 +258,14 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
         "architecture": "3Flow_fusion_network",
         "dataset": "NoXi",
         "num_classes": 5,
-        "input_shapes": [data_shape[-1], data_shape[-1], data_shape[-1]],
-        "n_flows": data_shape[1],
-        "n_flow_layers": 2, # 1,2,3
-        "n_flow_neurons": 128, # 64, 128, 256
-        "activation_function": "relu", # relu, elu, tanh, sigmoid
-        "n_fusion_layers": 2, #  1,2,3
-        "n_fusion_neurons": 128, # 32, 64, 128
-        "fusion_activation_function": "relu", # relu, elu, tanh, sigmoid
+        "input_shapes": [data_shape[0,-1], data_shape[1,-1], data_shape[2,-1]],
+        "n_flows": data_shape.shape[0],
+        "n_flow_layers": 2,  # 1,2,3
+        "n_flow_neurons": 128,  # 64, 128, 256
+        "activation_function": "relu",  # relu, elu, tanh, sigmoid
+        "n_fusion_layers": 2,  # 1,2,3
+        "n_fusion_neurons": 128,  # 32, 64, 128
+        "fusion_activation_function": "relu",  # relu, elu, tanh, sigmoid
     }
 
     # initialization of Weights and Biases
@@ -271,15 +278,17 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     model = create_model(input_shapes=config.input_shapes, n_flows=config.n_flows, n_flow_layers=config.n_flow_layers,
                          n_flow_neurons=config.n_flow_neurons, activation_function=config.activation_function,
                          n_fusion_layers=config.n_fusion_layers,
-                         n_fusion_neurons=tuple(int(config.n_fusion_neurons/i) for i in range(1, config.n_fusion_layers+1)),
+                         n_fusion_neurons=tuple(
+                             int(config.n_fusion_neurons / i) for i in range(1, config.n_fusion_layers + 1)),
                          fusion_activation_function=config.fusion_activation_function,
                          dropout=0.3, output_neurons=config.num_classes,
                          output_activation_function='linear')
     model.to(device)
     # check the model graph
-    input = [torch.rand(1, metaparams['n_flows'], data_shape[-1]), torch.rand(1, metaparams['n_flows'], data_shape[-1])]
-    input = torch.cat(input, dim=0)
-    input = input.to(device)
+    input = [torch.rand(1, metaparams['n_flows'], data_shape[0,-1]), torch.rand(1, metaparams['n_flows'], data_shape[1,-1]),
+             torch.rand(1, metaparams['n_flows'], data_shape[2,-1])]
+    input = [Variable(x.float()) for x in input]
+    input = [x.to(device) for x in input]
     summary(model, input_data=input)
 
     # Select optimizer
@@ -293,13 +302,14 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     class_weights = torch.from_numpy(class_weights).float()
     class_weights = class_weights.to(device)
     criterions = {'Crossentropy': torch.nn.CrossEntropyLoss(weight=class_weights),
-                   'Focal_loss': SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)}
+                  'Focal_loss': SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)}
     criterion = criterions[loss_function]
     wandb.config.update({'loss': criterion})
     # Select lr scheduller
     lr_schedullers = {
-        'Cyclic':torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period, eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau':torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', patience = 15),
+        'Cyclic': torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period,
+                                                             eta_min=config.learning_rate_min),
+        'ReduceLRonPlateau': torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=15),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks
@@ -309,18 +319,19 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
         'val_f1_score': partial(f1_score, average='macro')
     }
     best_val_recall = 0
-    early_stopping_callback = TorchEarlyStopping(verbose= True, patience = 30,
-                                                 save_path = wandb.run.dir,
-                                                 mode = "max")
+    early_stopping_callback = TorchEarlyStopping(verbose=True, patience=30,
+                                                 save_path=wandb.run.dir,
+                                                 mode="max")
 
-    metric_evaluator = TorchMetricEvaluator(generator = dev,
-                 model=model,
-                 metrics=val_metrics,
-                 device=device,
-                 output_argmax=True,
-                 output_softmax=True,
-                 labels_argmax=True,
-                 loss_func=criterion)
+    metric_evaluator = TorchMetricEvaluator(generator=dev,
+                                            model=model,
+                                            metrics=val_metrics,
+                                            device=device,
+                                            output_argmax=True,
+                                            output_softmax=True,
+                                            labels_argmax=True,
+                                            loss_func=criterion,
+                                            separate_inputs=True)
     # print information about run
     print('Metaparams: optimizer: %s, learning_rate:%f, lr_scheduller: %s, annealing_period: %d, epochs: %d, '
           'batch_size: %d, architecture: %s, '
@@ -332,14 +343,14 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     for epoch in range(epochs):
         # train model one epoch
         loss = train_step(model=model, train_generator=train, optimizer=optimizer, criterion=criterion,
-                   device=device, print_step = 100)
-        loss = loss/config.batch_size
+                          device=device, print_step=100)
+        loss = loss / config.batch_size
 
         # evaluate model on dev set
         print('model evaluation...')
         with torch.no_grad():
             dev_results = metric_evaluator()
-            print("Epoch: %i, dev results:"% epoch)
+            print("Epoch: %i, dev results:" % epoch)
             for metric_name, metric_value in dev_results.items():
                 print("%s: %.4f" % (metric_name, metric_value))
             # check early stopping
@@ -347,10 +358,10 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
             # check if we have new best recall result on the validation set
             if dev_results['val_recall'] > best_val_recall:
                 best_val_recall = dev_results['val_recall']
-                wandb.config.update({'best_val_recall' : best_val_recall}, allow_val_change=True)
+                wandb.config.update({'best_val_recall': best_val_recall}, allow_val_change=True)
         # log everything using wandb
         wandb.log({'epoch': epoch}, commit=False)
-        wandb.log({'learning_rate':optimizer.param_groups[0]["lr"]}, commit=False)
+        wandb.log({'learning_rate': optimizer.param_groups[0]["lr"]}, commit=False)
         wandb.log(dev_results, commit=False)
         wandb.log({'train_loss': loss})
         # update lr
@@ -366,7 +377,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     torch.cuda.empty_cache()
 
 
-def run(scaler:str):
+def run(scaler: str):
     print("New start...!With Emotions...")
     sweep_config = {
         'name': "3Flow_fusion_f2f_%sScaler_focal_loss(facial, pose, emotional)" % scaler,
@@ -437,8 +448,6 @@ def run(scaler:str):
                 project='Engagement_recognition_fusion')
     gc.collect()
     torch.cuda.empty_cache()
-
-
 
 
 if __name__ == '__main__':

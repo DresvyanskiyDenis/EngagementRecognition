@@ -205,10 +205,10 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
             'lr_scheduller': {
                 'values': ['Cyclic', 'ReduceLRonPlateau']
             },
-            'num_layers': {
+            'num_lstm_layers': {
                 'values': [1, 2, 3]
             },
-            'num_neurons': {
+            'num_lstm_neurons': {
                 'values': [512, 256, 128, 64]
             },
             'window_length': {
@@ -257,11 +257,23 @@ def run(window_length:int, window_shift:int, sweep_name:str, loss:str = "Focal_l
 
 
 if __name__ == "__main__":
-    print("Hello, my dear friend!!!! Another loss.")
-    window_size = int(sys.argv[1])
-    window_step = int(window_size / 2)
-    sweep_name = str(sys.argv[2])
+    print("Hello, my dear friend!!!! Crossentropy loss.")
     loss = "Crossentropy"
-    print("start....params:window_size: %i, window_step: %i, sweep_name: %s" % (window_size, window_step, sweep_name))
-    run(window_size, window_step, sweep_name, loss=loss)
+    run(window_length=80, window_shift=40, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_80_40', loss=loss)
+    run(window_length=70, window_shift=35, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_70_35', loss=loss)
+    run(window_length=60, window_shift=30, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_60_30', loss=loss)
+    run(window_length=50, window_shift=25, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_50_25', loss=loss)
+    run(window_length=40, window_shift=20, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_40_20', loss=loss)
+    run(window_length=30, window_shift=15, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_30_15', loss=loss)
+    run(window_length=20, window_shift=10, sweep_name='PyTorch_Seq2One_All_languages_Crossentropy_20_10', loss=loss)
+
+    print("Hello, my dear friend!!!! Focal loss.")
+    loss = "Focal_loss"
+    run(window_length=80, window_shift=40, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_80_40', loss=loss)
+    run(window_length=70, window_shift=35, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_70_35', loss=loss)
+    run(window_length=60, window_shift=30, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_60_30', loss=loss)
+    run(window_length=50, window_shift=25, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_50_25', loss=loss)
+    run(window_length=40, window_shift=20, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_40_20', loss=loss)
+    run(window_length=30, window_shift=15, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_30_15', loss=loss)
+    run(window_length=20, window_shift=10, sweep_name='PyTorch_Seq2One_All_languages_Focal_loss_20_10', loss=loss)
 

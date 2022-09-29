@@ -45,10 +45,10 @@ class SequenceDataLoader(Dataset):
                 self.scaler = scaler
                 self._fit_scaler = True
         # indentify start of the labels in columns. We need -1, since first columns will be deleted later
-        self.labels_start_idx = list(self.dataframe.columns).index("label_0") - 1
+        self.labels_start_idx = list(self.dataframe.columns).index("label_0")
         # apply scaler to the dataframe
         if scaler is not None:
-            filename = self.dataframe[:,0]
+            filename = self.dataframe.iloc[:,0]
             labels = self.dataframe.iloc[:, self.labels_start_idx:]
             scaled_dataframe = self._scaling(self.dataframe.iloc[:,1:self.labels_start_idx])
             final_df = pd.concat([filename, scaled_dataframe, labels], axis=1)
@@ -61,6 +61,8 @@ class SequenceDataLoader(Dataset):
         # delete two first columns, since they are useless (filename and frame_id)
         self.windows = self.windows[:,:,2:]
         self.windows = self.windows.astype(np.float32)
+        self.labels_start_idx -= 1 # since we deleted two columns, we need to update the index of the labels
+        # one columns was added so far, and then two was deleted. That is why we need to subtract 1 from the index part
 
     def __len__(self):
         return self.windows.shape[0]

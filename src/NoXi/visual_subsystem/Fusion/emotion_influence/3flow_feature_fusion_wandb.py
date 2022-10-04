@@ -1,3 +1,10 @@
+import sys
+
+sys.path.extend(["/work/home/dsu/datatools/"])
+sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
+sys.path.extend(["/work/home/dsu/simpleHRNet/"])
+
+
 import gc
 from functools import partial
 from typing import Tuple, Union, Optional, List

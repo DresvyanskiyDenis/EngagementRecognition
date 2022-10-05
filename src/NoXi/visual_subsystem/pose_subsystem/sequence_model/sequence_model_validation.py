@@ -34,7 +34,7 @@ def validate_model(model, data_loader, device):
     metric_results = metric_evaluator()
     for metric_name, metric_value in metric_results.items():
         print(f'{metric_name}: {metric_value}')
-    s = 'metrics:' + str(metric_results['recall'])+','+str(metric_results['precision'])+','+str(metric_results['f1_score'])+','+str(metric_results['accuracy'])
+    s = str(metric_results['recall'])+','+str(metric_results['precision'])+','+str(metric_results['f1_score'])+','+str(metric_results['accuracy'])
     print(s)
     model.train()
     return s
@@ -44,8 +44,8 @@ def main():
     # params
     BATCH_SIZE = 64
     test_params = pd.read_csv("/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/All_languages/Pose_model_all_languages/Pose_models_focal_loss/testing_params.csv")
-    test_params = test_params.iloc[:36]
-    path_to_all_weights = "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/All_languages/Pose_model_all_languages/Pose_models_focal_loss"
+    test_params = test_params.iloc[42:]
+    path_to_all_weights = "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/All_languages/Pose_model_all_languages/Pose_models_crossentropy/"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # load data
     train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
@@ -53,7 +53,8 @@ def main():
     test = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_test.csv")
 
 
-    result_s = ''
+    val_s = ''
+    test_s = ''
     for index, row in test_params.iterrows():
         print('--------------------------------------------------------------------------------------')
         window_length = int(row['window_length'])
@@ -84,14 +85,17 @@ def main():
 
         # validate model
         print('----------Development dataset----------')
-        s = validate_model(model, dev_gen, device)
-        result_s += s+ '\n'
+        s_val = validate_model(model, dev_gen, device)
+        val_s += s_val+ '\n'
         print('----------Test dataset----------')
-        s = validate_model(model, test_gen, device)
-        result_s += s + '\n'
+        s_test = validate_model(model, test_gen, device)
+        test_s += s_test + '\n'
 
     print('FINAL')
-    print(result_s)
+    print('dev')
+    print(val_s)
+    print('--------------test')
+    print(test_s)
 
 
 if __name__ == '__main__':

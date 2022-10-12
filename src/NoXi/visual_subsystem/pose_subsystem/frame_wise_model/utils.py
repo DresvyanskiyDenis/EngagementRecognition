@@ -155,6 +155,58 @@ def load_NoXi_data_all_languages(train_labels_as_categories:bool=False, dev_labe
 
     return (train, dev, test)
 
+def load_NoXi_data_cross_corpus(test_corpus:str, train_labels_as_categories:bool=False, dev_labels_as_categories:bool=False,
+                                 test_labels_as_categories:bool=False)->Tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    # loading data
+    frame_step = 5
+    path_to_data = "/Pose_frames_256/"
+    path_to_labels_french = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/French"
+    path_to_labels_german = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/German"
+    path_to_labels_english = "/media/external_hdd_1/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/English"
+    # load french data
+    train_french, dev_french, test_french = load_data_one_language(path_to_data, path_to_labels_french, frame_step,
+                                                                   train_labels_as_categories=train_labels_as_categories,
+                                                                   dev_labels_as_categories=dev_labels_as_categories,
+                                                                   test_labels_as_categories=test_labels_as_categories)
+    # load english data
+    train_german, dev_german, test_german = load_data_one_language(path_to_data, path_to_labels_german, frame_step,
+                                                                   train_labels_as_categories=train_labels_as_categories,
+                                                                   dev_labels_as_categories=dev_labels_as_categories,
+                                                                   test_labels_as_categories=test_labels_as_categories)
+    # load german data
+    train_english, dev_english, test_english = load_data_one_language(path_to_data, path_to_labels_english, frame_step,
+                                                                      train_labels_as_categories=train_labels_as_categories,
+                                                                      dev_labels_as_categories=dev_labels_as_categories,
+                                                                      test_labels_as_categories=test_labels_as_categories)
+
+
+    french = {'train': train_french, 'dev': dev_french, 'test': test_french}
+    german = {'train': train_german, 'dev': dev_german, 'test': test_german}
+    english = {'train': train_english, 'dev': dev_english, 'test': test_english}
+    all_languages = {'french': french, 'german': german, 'english': english}
+
+    # pick the language for test (leave-one-out procedure)
+    test = all_languages.pop(test_corpus)
+    test = pd.concat(list(test.values()), axis=0)
+    # take as a dev set - developments sets of other corpora
+    dev = [item.pop('dev') for item in all_languages.values()]
+    dev = pd.concat(list(dev), axis=0)
+    # take everything else as a training set
+    train = [language['train'] for language in all_languages.values()] + [language['test'] for language in
+                                                                      all_languages.values()]
+    train = pd.concat(train, axis=0)
+    # clear RAM
+    del train_english, train_french, train_german
+    del dev_english, dev_french, dev_german
+    del test_english, test_german, test_french
+    gc.collect()
+
+    return train, dev, test
+
+
+
+
 def convert_image_to_float_and_scale(image:torch.Tensor)->torch.Tensor:
     image = image.float() / 255.
     return image
@@ -163,7 +215,7 @@ def convert_image_to_float_and_scale(image:torch.Tensor)->torch.Tensor:
 
 if __name__ == "__main__":
     print("Loading data...")
-    train, dev, test = load_NoXi_data_all_languages(train_labels_as_categories=False,
+    train, dev, test = load_NoXi_data_cross_corpus(test_corpus='english', train_labels_as_categories=False,
                                                     dev_labels_as_categories=False,
                                                     test_labels_as_categories=False)
     print(train.shape)

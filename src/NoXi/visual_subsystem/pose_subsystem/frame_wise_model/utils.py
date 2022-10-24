@@ -22,7 +22,7 @@ def generate_rel_paths_to_images_in_all_dirs(path: str, image_format: str = "jpg
             relative paths to images (including filename)
     """
     # define pattern for search (in every dir and subdir the image with specified format)
-    pattern = path + "/**/**/*." + image_format
+    pattern = path + "**/**/*." + image_format
     # searching via this pattern
     abs_paths = glob.glob(pattern)
     # find a relative path to it

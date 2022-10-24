@@ -17,7 +17,7 @@ from torchinfo import summary
 
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.HRNet import load_HRNet_model, modified_HRNet
 from src.NoXi.visual_subsystem.pose_subsystem.frame_wise_model.utils import convert_image_to_float_and_scale, \
-    load_NoXi_data_all_languages
+    load_NoXi_data_all_languages, load_NoXi_data_cross_corpus
 
 
 def load_and_preprocess_batch_images(paths: List[str], preprocess_functions: Tuple[Callable]) -> torch.Tensor:
@@ -64,7 +64,7 @@ def extract_embeddings_from_df_with_paths(df: pd.DataFrame, extractor: torch.nn.
     # create dataframe for saving features
     extracted_deep_embeddings = pd.DataFrame(columns=columns)
     # save the "template" csv file to append to it in future
-    extracted_deep_embeddings.to_csv(os.path.join(output_path, 'extracted_deep_embeddings.csv'), index=False)
+    extracted_deep_embeddings.to_csv(os.path.join(output_path, output_filename), index=False)
     # load batch_size images and then predict them
     with torch.no_grad():
         for extraction_idx, filename_idx in enumerate(range(0, df.shape[0], batch_size)):
@@ -100,11 +100,14 @@ def extract_embeddings_from_df_with_paths(df: pd.DataFrame, extractor: torch.nn.
 
 
 def main():
+    language = "english"
+    model_name = "%s_6.pt" % language
     # params
     BATCH_SIZE = 64
     NUM_CLASSES = 5
-    path_to_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/Pose_model/All_languages/crossentropy_6_2.pt"
-    output_path = "/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/"
+    path_to_weights = "/work/home/dsu/Model_weights/weights_of_best_models/frame_to_frame_experiments/" \
+                      "Pose_model/Cross_corpus/%s/%s"%(language.capitalize(), model_name)
+    output_path = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/pose_model/"%(language.capitalize())
     preprocessing_functions = [T.Resize(size=(256, 256)), convert_image_to_float_and_scale, T.Normalize(
         mean=[0.485, 0.456, 0.406],
         std=[0.229, 0.224, 0.225]
@@ -120,9 +123,8 @@ def main():
     # turn the extractor to the inference mode
     extractor.eval()
     # load data
-    train, dev, test = load_NoXi_data_all_languages(train_labels_as_categories=False,
-                                                    dev_labels_as_categories=False,
-                                                    test_labels_as_categories=False)
+    train, dev, test = load_NoXi_data_cross_corpus(test_corpus=language, train_labels_as_categories=False,
+                                                    dev_labels_as_categories=False,test_labels_as_categories=False)
     # extract embeddings from train set
     extract_embeddings_from_df_with_paths(df=train, extractor=extractor, device=device, output_path=output_path,
                                           output_filename="embeddings_train.csv",
@@ -143,4 +145,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print("Cross corpus embeddings extraction...")
     main()

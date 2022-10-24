@@ -29,17 +29,17 @@ def load_cross_corpus_data(test_corpus:str):
         raise ValueError('The test corpus should be one of the following: english, german, french')
     print('Start loading data...Cross corpus.')
     # paths to the data
-    path_to_train_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/pose_model/train_embeddings.csv"
-    path_to_dev_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/pose_model/dev_embeddings.csv"
-    path_to_test_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/pose_model/test_embeddings.csv"
+    path_to_train_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/pose_model/embeddings_train.csv"
+    path_to_dev_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/pose_model/embeddings_dev.csv"
+    path_to_test_embeddings_english = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/English/pose_model/embeddings_test.csv"
 
-    path_to_train_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/pose_model/train_embeddings.csv"
-    path_to_dev_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/pose_model/dev_embeddings.csv"
-    path_to_test_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/pose_model/test_embeddings.csv"
+    path_to_train_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/pose_model/embeddings_train.csv"
+    path_to_dev_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/pose_model/embeddings_dev.csv"
+    path_to_test_embeddings_french = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/French/pose_model/embeddings_test.csv"
 
-    path_to_train_embeddings_german= "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/pose_model/train_embeddings.csv"
-    path_to_dev_embeddings_german = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/pose_model/dev_embeddings.csv"
-    path_to_test_embeddings_german = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/pose_model/test_embeddings.csv"
+    path_to_train_embeddings_german= "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/pose_model/embeddings_train.csv"
+    path_to_dev_embeddings_german = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/pose_model/embeddings_dev.csv"
+    path_to_test_embeddings_german = "/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/German/pose_model/embeddings_test.csv"
 
     # load all embeddings in dictionary
     english_embeddings = {'train': pd.read_csv(path_to_train_embeddings_english),
@@ -152,7 +152,7 @@ def train_model(train, dev, test, epochs: int,  input_shape:Tuple[int,...], clas
     lr_schedullers = {
         'Cyclic': torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.annealing_period,
                                                              eta_min=config.learning_rate_min),
-        'ReduceLRonPlateau': torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=8),
+        'ReduceLRonPlateau': torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=10),
     }
     lr_scheduller = lr_schedullers[config.lr_scheduller]
     # callbacks
@@ -162,7 +162,7 @@ def train_model(train, dev, test, epochs: int,  input_shape:Tuple[int,...], clas
         'val_f1_score': partial(f1_score, average='macro')
     }
     best_val_recall = 0
-    early_stopping_callback = TorchEarlyStopping(verbose=True, patience=20,
+    early_stopping_callback = TorchEarlyStopping(verbose=True, patience=25,
                                                  save_path=wandb.run.dir,
                                                  mode="max")
 

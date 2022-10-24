@@ -279,7 +279,7 @@ def run_sweep(sweep_name: str, window_length: int, test_language: str) -> None:
 
 def main():
     # english
-    run_sweep("cross_corpus_focal_loss_window_length_80_english", 80, 'english')
+    #run_sweep("cross_corpus_focal_loss_window_length_80_english", 80, 'english')
     run_sweep("cross_corpus_focal_loss_window_length_60_english", 60, 'english')
     run_sweep("cross_corpus_focal_loss_window_length_40_english", 40, 'english')
     run_sweep("cross_corpus_focal_loss_window_length_20_english", 20, 'english')

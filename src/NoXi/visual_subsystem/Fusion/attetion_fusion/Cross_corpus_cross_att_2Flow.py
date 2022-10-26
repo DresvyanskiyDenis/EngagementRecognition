@@ -261,10 +261,10 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     torch.cuda.empty_cache()
 
 
-def run(window_length:int):
+def run(window_length:int, language:str):
     print("New start...!!!")
     sweep_config = {
-        'name': "Cross_corpus_cross_attention_2Flow_window_%i" % window_length,
+        'name': "cross_attention_2Flow_all_vs_%s_window_%i" % (language, window_length),
         'method': 'random',
         'metric': {
             'name': 'val_loss',
@@ -294,7 +294,7 @@ def run(window_length:int):
     }
     BATCH_SIZE = 128
     # load data
-    train_generator, dev_generator = load_data(window_length, window_shift=window_length//2)
+    train_generator, dev_generator = load_data(language=language, window_length=window_length, window_shift=window_length//2)
 
     # compute class weights
     train_data = np.concatenate([y[np.newaxis, ...] for x, y in train_generator], axis=0)
@@ -321,7 +321,19 @@ def run(window_length:int):
 
 
 if __name__ == '__main__':
-    run(window_length=80)
-    run(window_length=60)
-    run(window_length=40)
-    run(window_length=20)
+    run(window_length=80, language='english')
+    run(window_length=60, language='english')
+    run(window_length=40, language='english')
+    run(window_length=20, language='english')
+
+    run(window_length=80, language='german')
+    run(window_length=60, language='german')
+    run(window_length=40, language='german')
+    run(window_length=20, language='german')
+
+
+    run(window_length=80, language='french')
+    run(window_length=60, language='french')
+    run(window_length=40, language='french')
+    run(window_length=20, language='french')
+

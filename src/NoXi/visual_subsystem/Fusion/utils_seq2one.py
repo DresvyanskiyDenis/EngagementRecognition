@@ -18,13 +18,15 @@ class Nflow_FusionSequenceDataLoader(Dataset):
 
     def __init__(self, embeddings:List[pd.DataFrame], window_length:int, window_shift:int,
                  scalers:Union[List[str], List[object]]=None, labels_included:bool=False,
-                 PCA_components:Optional[int]=None, sequence_to_one:bool=False):
+                 PCA_components:Optional[int]=None, sequence_to_one:bool=False,
+                 data_as_list:Optional[bool]=False):
         self.embeddings = embeddings
         self.window_length = window_length
         self.window_shift = window_shift
         self.labels_included = labels_included
         self.scalers = scalers
         self.sequence_to_one = sequence_to_one
+        self.data_as_list = data_as_list
 
         # check if the scalers are provided, and create ones, if the type of the scalers are provided (it is needed to fit it later)
         if self.scalers is not None:
@@ -189,11 +191,17 @@ class Nflow_FusionSequenceDataLoader(Dataset):
 
     def __getitem__(self, idx):
         data_flows = []
+        # extract the data (windows) from all dataflows
         for i in range(len(self.windows)):
             data = self.windows[i][idx]
-            data = data[np.newaxis,...]
+            # add newaxis if the data should be presented as np.array
+            if not self.data_as_list:
+                data = data[np.newaxis,...]
             data_flows.append(data)
-        data_flows = np.concatenate(data_flows, axis=0)
+        # concatenate the data from all dataflows across the "flow" axis, if needed
+        if not self.data_as_list:
+            data_flows = np.concatenate(data_flows, axis=0)
+
         if self.labels_included:
             labels = self.labels[idx]
             if self.sequence_to_one:

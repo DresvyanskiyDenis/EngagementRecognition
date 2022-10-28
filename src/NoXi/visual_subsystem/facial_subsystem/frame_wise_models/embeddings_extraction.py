@@ -19,7 +19,7 @@ sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 from functools import partial
 import tensorflow as tf
 
-from feature_extraction.embeddings_extraction import extract_deep_embeddings_from_images_in_df
+from feature_extraction.embeddings_extraction_tf import extract_deep_embeddings_from_images_in_df_tf
 from preprocessing.data_normalizing_utils import VGGFace2_normalization
 from src.NoXi.visual_subsystem.facial_subsystem.frame_wise_models.utils import load_NoXi_data_all_languages, \
     load_NoXi_data_cross_corpus
@@ -33,10 +33,11 @@ from tensorflow_utils.tensorflow_datagenerators.tensorflow_image_preprocessing i
 def extract_embeddings(language:str, model_weights:str):
     print("Start... embeddings extraction....!")
     # parameters for embeddings extraction
-    output_dir="/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/"+language.capitalize()
-    model_weights_path=model_weights
-    #model_creation_function=partial(get_EmoVGGFace2_embeddings_extractor, path_to_weights="/work/home/dsu/VGG_model_weights/EmoVGGFace2/weights_0_66_37_affectnet_cat.h5")
-    model_creation_function = create_Xception_model
+    output_dir="/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/"+language.capitalize()+"/EmoVGGFace2/"
+    #model_weights_path=model_weights
+    model_creation_function=partial(get_EmoVGGFace2_embeddings_extractor,
+                                    path_to_weights="/work/home/dsu/Model_weights/VGG_model_weights/EmoVGGFace2/weights_0_66_37_affectnet_cat.h5")
+    #model_creation_function = create_Xception_model
 
     # load the data and labels. The data is a dataframes with the filename (full path) as a first column - that is
     # what we need
@@ -44,26 +45,26 @@ def extract_embeddings(language:str, model_weights:str):
 
     # create the model and load its weights
     model=model_creation_function()
-    model.load_weights(model_weights_path)
+    #model.load_weights(model_weights_path)
     # cut off the last layer of the model
-    model=tf.keras.Model(inputs=model.inputs, outputs=model.layers[-2].output)
+    #model=tf.keras.Model(inputs=model.inputs, outputs=model.layers[-2].output)
     model.compile(optimizer="Adam", loss="categorical_crossentropy")
     model.summary()
     # extract the embeddings
-    extract_deep_embeddings_from_images_in_df(paths_to_images=train, extractor=model, output_dir=output_dir,
+    extract_deep_embeddings_from_images_in_df_tf(paths_to_images=train, extractor=model, output_dir=output_dir,
                                               output_filename = "train_embeddings.csv",
                                               batch_size = 128,
-                                              preprocessing_functions= (preprocess_data_Xception,), include_labels=True)
+                                              preprocessing_functions= (VGGFace2_normalization,), include_labels=True)
 
-    extract_deep_embeddings_from_images_in_df(paths_to_images=dev, extractor=model, output_dir=output_dir,
+    extract_deep_embeddings_from_images_in_df_tf(paths_to_images=dev, extractor=model, output_dir=output_dir,
                                               output_filename="dev_embeddings.csv",
                                               batch_size=128,
-                                              preprocessing_functions=(preprocess_data_Xception,), include_labels=True)
+                                              preprocessing_functions=(VGGFace2_normalization,), include_labels=True)
 
-    extract_deep_embeddings_from_images_in_df(paths_to_images=test, extractor=model, output_dir=output_dir,
+    extract_deep_embeddings_from_images_in_df_tf(paths_to_images=test, extractor=model, output_dir=output_dir,
                                               output_filename="test_embeddings.csv",
                                               batch_size=128,
-                                              preprocessing_functions=(preprocess_data_Xception,), include_labels=True)
+                                              preprocessing_functions=(VGGFace2_normalization,), include_labels=True)
     # should be done
 
 

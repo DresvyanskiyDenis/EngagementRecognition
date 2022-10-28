@@ -1,7 +1,5 @@
 import sys
 
-from pytorch_utils.layers.attention_layers import MultiHeadAttention
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 sys.path.extend(["/work/home/dsu/simpleHRNet/"])
@@ -28,6 +26,8 @@ from src.NoXi.visual_subsystem.Fusion.utils import cut_filenames_to_original_nam
 from torchinfo import summary
 
 from src.NoXi.visual_subsystem.Fusion.utils_seq2one import Nflow_FusionSequenceDataLoader
+
+from pytorch_utils.layers.attention_layers import MultiHeadAttention
 
 
 class TwoFlowCrossAttentionModel(torch.nn.Module):
@@ -325,7 +325,7 @@ def run(window_length:int, language:str):
     sweep_id = wandb.sweep(sweep_config, project='Engagement_recognition_fusion')
     wandb.agent(sweep_id, function=lambda: train_model(train_generator, dev_generator, epochs=100,
                                                        loss_function="Focal_loss", class_weights=class_weights),
-                count=50,
+                count=100,
                 project='Engagement_recognition_fusion')
     gc.collect()
     torch.cuda.empty_cache()

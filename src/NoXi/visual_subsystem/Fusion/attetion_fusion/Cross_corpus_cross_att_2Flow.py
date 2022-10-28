@@ -45,6 +45,7 @@ class TwoFlowCrossAttentionModel(torch.nn.Module):
         super(TwoFlowCrossAttentionModel, self).__init__()
         # instance of the input shape is (n_flows, sequence_length, num_features)
         self.input_shapes = input_shapes
+        self.sequence_length = input_shapes[0][1]
         self.num_flows = len(input_shapes)
         self.gru_neurons = gru_neurons
         self.num_heads = num_heads
@@ -52,7 +53,6 @@ class TwoFlowCrossAttentionModel(torch.nn.Module):
         self.output_neurons = output_neurons
 
         self._build_model()
-
 
     def _build_model(self):
         # create GRU layers
@@ -62,17 +62,23 @@ class TwoFlowCrossAttentionModel(torch.nn.Module):
                                  num_layers=1, batch_first=True)
             self.gru_layers.append(layer)
         # create cross-attention layers
-        self.cross_attention_pose = MultiHeadAttention(input_dim=self.gru_neurons, # num of hidden neurons from the GRU layer
+        self.cross_attention_pose = MultiHeadAttention(input_dim=self.gru_neurons,
+                                                       # num of hidden neurons from the GRU layer
                                                        num_heads=self.num_heads, dropout=self.dropout)
-        self.cross_attention_facial = MultiHeadAttention(input_dim=self.gru_neurons, # num of hidden neurons from the GRU layer
-                                                        num_heads=self.num_heads, dropout=self.dropout)
+        self.cross_attention_facial = MultiHeadAttention(input_dim=self.gru_neurons,
+                                                         # num of hidden neurons from the GRU layer
+                                                         num_heads=self.num_heads, dropout=self.dropout)
         # create self.attention layer after concat
-        self.self_attention_layer = MultiHeadAttention(input_dim=self.gru_neurons*2, # here we have *2, since the features after
+        self.self_attention_layer = MultiHeadAttention(input_dim=self.gru_neurons * 2,
+                                                       # here we have *2, since the features after
                                                        # concatenation (after 2 cross-attention layers) will be doubled
-                                                         num_heads=self.num_heads*2, dropout=self.dropout)
-        # create output layer
-        self.output_layer = torch.nn.Linear(in_features=self.gru_neurons*2, out_features=self.output_neurons)
+                                                       num_heads=self.num_heads * 2, dropout=self.dropout)
+        # create averaging 2D 1x1 Conv
+        self.averaging_conv = torch.nn.Conv1d(in_channels=self.gru_neurons * 2, out_channels=1,
+                                              kernel_size=1, stride=1, padding="same")
 
+        # create output layer
+        self.output_layer = torch.nn.Linear(in_features=self.sequence_length, out_features=self.output_neurons)
 
     def forward(self, x):
         # x has the shape (batch_size, n_flows, sequence_length, num_features)
@@ -80,7 +86,7 @@ class TwoFlowCrossAttentionModel(torch.nn.Module):
         # go through the GRU layers
         gru_outputs = []
         for i in range(self.num_flows):
-            gru_output, hidden_state = self.gru_layers[i](x[:,i])
+            gru_output, hidden_state = self.gru_layers[i](x[:, i])
             gru_outputs.append(gru_output)
         # take data from gru outputs
         pose_flow = gru_outputs[0]
@@ -94,9 +100,16 @@ class TwoFlowCrossAttentionModel(torch.nn.Module):
         # concatenate the outputs from the cross-attention layers
         concat_output = torch.cat([pose_cross_attention_output, facial_cross_attention_output], dim=-1)
         # go through the self-attention layer
-        self_attention_output = self.self_attention_layer(queries=concat_output, keys=concat_output, values=concat_output)
+        self_attention_output = self.self_attention_layer(queries=concat_output, keys=concat_output,
+                                                          values=concat_output)
+        # average the output from the self-attention layer for every timestep using Conv2D
+        self_attention_output = self_attention_output.permute(0, 2, 1)
+        averaged_output = self.averaging_conv(self_attention_output)
+        # flatten the output
+        averaged_output = averaged_output.squeeze(dim=1)
+        #averaged_output = averaged_output.view(averaged_output.shape[0], -1)
         # go through the output layer
-        output = self.output_layer(self_attention_output)
+        output = self.output_layer(averaged_output)
 
         # output shape is (batch_size, output_neurons)
         return output
@@ -107,7 +120,7 @@ def load_data(language:str, window_length:int, window_shift:int):
     train_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
                           "pose_model/embeddings_train.csv"%language.capitalize())
     train_2 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
-                          "facial_model/embeddings_train.csv"%language.capitalize())
+                          "facial_model/train_embeddings.csv"%language.capitalize())
     train_1, train_2 = cut_filenames_to_original_names(train_1), cut_filenames_to_original_names(train_2)
     # change the filenames to the same format for all dataframes
     train_1['filename'] = train_1['filename'].apply(lambda x: os.path.join(*x.split(os.path.sep)[-3:]))
@@ -117,7 +130,7 @@ def load_data(language:str, window_length:int, window_shift:int):
     dev_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
                           "pose_model/embeddings_dev.csv"%language.capitalize())
     dev_2 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
-                          "facial_model/embeddings_dev.csv"%language.capitalize())
+                          "facial_model/dev_embeddings.csv"%language.capitalize())
     dev_1, dev_2 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(dev_2)
     # change the filenames to the same format for all dataframes
     dev_1['filename'] = dev_1['filename'].apply(lambda x: os.path.join(*x.split(os.path.sep)[-3:]))

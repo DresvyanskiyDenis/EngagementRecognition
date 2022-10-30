@@ -9,6 +9,8 @@ import pandas as pd
 
 from src.NoXi.visual_subsystem.pose_subsystem.sequence_model.sequence_data_loader import SequenceDataLoader
 from src.NoXi.visual_subsystem.pose_subsystem.sequence_model.sequence_model import Seq2One_model
+from src.NoXi.visual_subsystem.pose_subsystem.sequence_model.sequence_model_training_cross_corpus import \
+    load_cross_corpus_data
 
 
 def validate_model(model, data_loader, device):
@@ -39,18 +41,22 @@ def validate_model(model, data_loader, device):
     model.train()
     return s
 
-def main():
+def main(language:str):
     print('FOCAL LOSS!')
+    print(language)
     # params
     BATCH_SIZE = 64
-    test_params = pd.read_csv("/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/All_languages/Pose_model_all_languages/Pose_models_focal_loss/testing_params.csv")
-    test_params = test_params.iloc[42:]
-    path_to_all_weights = "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments/All_languages/Pose_model_all_languages/Pose_models_crossentropy/"
+    test_params = pd.read_csv("/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments"\
+                              "/Cross_corpus/Pose_model/%s/testing_params.csv"%language.capitalize())
+    test_params = test_params.iloc[:19]
+    path_to_all_weights = "/work/home/dsu/Model_weights/weights_of_best_models/sequence_to_one_experiments"\
+                              "/Cross_corpus/Pose_model/%s/"%language.capitalize()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # load data
-    train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
-    dev = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_dev.csv")
-    test = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_test.csv")
+    train, dev, test = load_cross_corpus_data(language)
+    #train = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_train.csv")
+    #dev = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_dev.csv")
+    #test = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/All_languages/Pose_model/embeddings_test.csv")
 
 
     val_s = ''
@@ -61,8 +67,8 @@ def main():
         weights_path = os.path.join(path_to_all_weights, row['ID']+ ".pt")
         print('The ID is:%s, window_length is:%s' % (row['ID'], window_length))
         # load model
-        num_neurons = int(row['num_neurons'])
-        num_layers = int(row['num_layers'])
+        num_neurons = int(row['num_lstm_neurons'])
+        num_layers = int(row['num_lstm_layers'])
         num_embeddings = 256
         model = Seq2One_model(input_shape=(BATCH_SIZE, window_length, num_embeddings), LSTM_neurons=tuple(num_neurons for i in range(num_layers)),
                           dropout=0.3,
@@ -99,4 +105,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main("french")

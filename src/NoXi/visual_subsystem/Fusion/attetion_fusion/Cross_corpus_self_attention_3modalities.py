@@ -44,6 +44,7 @@ class SelfAttentionModel_3modalities(torch.nn.Module):
         super(SelfAttentionModel_3modalities, self).__init__()
         # instance of the input shape is (n_flows, sequence_length, num_features)
         self.input_shapes = input_shapes
+        self.sequence_length = input_shapes[0][1]
         self.num_flows = len(input_shapes)
         self.num_heads = num_heads
         self.dropout = dropout
@@ -61,8 +62,12 @@ class SelfAttentionModel_3modalities(torch.nn.Module):
                                                          num_heads=self.num_heads, dropout=self.dropout)
         self.self_attention_layer2 = MultiHeadAttention(input_dim=num_features,
                                                        num_heads=self.num_heads, dropout=self.dropout)
+        # create averaging 2D 1x1 Conv
+        self.averaging_conv = torch.nn.Conv1d(in_channels=num_features, out_channels=1,
+                                              kernel_size=1, stride=1, padding="same")
+
         # create output layer
-        self.output_layer = torch.nn.Linear(in_features=num_features, out_features=self.output_neurons)
+        self.output_layer = torch.nn.Linear(in_features=self.sequence_length, out_features=self.output_neurons)
 
 
     def forward(self, flow_0, flow_1, flow_2):
@@ -73,7 +78,13 @@ class SelfAttentionModel_3modalities(torch.nn.Module):
         output = self.self_attention_layer1(concatenated_flows, concatenated_flows, concatenated_flows)
         # apply second self-attention layer
         output = self.self_attention_layer2(output, output, output)
-        # apply output layer
+        # permute channels and time dimensions
+        output = output.permute(0, 2, 1)
+        output = self.averaging_conv(output)
+        # squeeze the channel dimension
+        output = torch.squeeze(output, dim=1)
+
+        # apply output layer (Conv1D)
         output = self.output_layer(output)
         return output
 
@@ -115,9 +126,9 @@ def load_data(language:str, window_length:int, window_shift:int):
     train_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
                           "pose_model/embeddings_train.csv"%language.capitalize())
     train_2 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
-                          "facial_model/embeddings_train.csv"%language.capitalize())
+                          "facial_model/train_embeddings.csv"%language.capitalize())
     train_3 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
-                            "emotional_model/embeddings_train.csv"%language.capitalize())
+                            "EmoVGGFace2/train_embeddings.csv"%language.capitalize())
     train_1, train_2, train_3 = cut_filenames_to_original_names(train_1), cut_filenames_to_original_names(train_2), \
                                 cut_filenames_to_original_names(train_3)
     # change the filenames to the same format for all dataframes
@@ -129,9 +140,9 @@ def load_data(language:str, window_length:int, window_shift:int):
     dev_1 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
                           "pose_model/embeddings_dev.csv"%language.capitalize())
     dev_2 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
-                          "facial_model/embeddings_dev.csv"%language.capitalize())
+                          "facial_model/dev_embeddings.csv"%language.capitalize())
     dev_3 = pd.read_csv("/work/home/dsu/NoXi/NoXi_embeddings/Cross-corpus/%s/"
-                            "emotional_model/embeddings_dev.csv"%language.capitalize())
+                            "EmoVGGFace2/dev_embeddings.csv"%language.capitalize())
     dev_1, dev_2, dev_3 = cut_filenames_to_original_names(dev_1), cut_filenames_to_original_names(dev_2), \
                           cut_filenames_to_original_names(dev_3)
     # change the filenames to the same format for all dataframes
@@ -191,7 +202,7 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
                                        num_heads=config.num_heads, dropout=0.1, output_neurons=5)
     model.to(device)
     # check the model graph
-    input = [torch.rand(1, *data_shape[0]), torch.rand(1, *data_shape[1]), torch.rand(1, *data_shape[2])]
+    input = [torch.rand(*data_shape[0]), torch.rand(*data_shape[1]), torch.rand(*data_shape[2])]
     input = [input[0].to(device), input[1].to(device), input[2].to(device)]
     summary(model, input_data=input)
 
@@ -328,7 +339,7 @@ def run(window_length:int, language:str):
     sweep_id = wandb.sweep(sweep_config, project='Engagement_recognition_fusion')
     wandb.agent(sweep_id, function=lambda: train_model(train_generator, dev_generator, epochs=100,
                                                        loss_function="Focal_loss", class_weights=class_weights),
-                count=50,
+                count=100,
                 project='Engagement_recognition_fusion')
     gc.collect()
     torch.cuda.empty_cache()

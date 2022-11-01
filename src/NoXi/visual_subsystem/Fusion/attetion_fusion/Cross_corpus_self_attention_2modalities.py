@@ -29,7 +29,7 @@ from src.NoXi.visual_subsystem.Fusion.utils_seq2one import Nflow_FusionSequenceD
 from pytorch_utils.layers.attention_layers import MultiHeadAttention
 
 
-class SelfAttentionModel_3modalities(torch.nn.Module):
+class SelfAttentionModel_2modalities(torch.nn.Module):
     activation_functions_mapping = {'relu': torch.nn.ReLU,
                                     'sigmoid': torch.nn.Sigmoid,
                                     'tanh': torch.nn.Tanh,
@@ -41,7 +41,7 @@ class SelfAttentionModel_3modalities(torch.nn.Module):
 
     def __init__(self, input_shapes:Tuple[Tuple[int,...],...], num_heads:int, dropout:Optional[float]=None,
                  output_neurons:Union[Tuple[int],int]=5):
-        super(SelfAttentionModel_3modalities, self).__init__()
+        super(SelfAttentionModel_2modalities, self).__init__()
         # instance of the input shape is (n_flows, sequence_length, num_features)
         self.input_shapes = input_shapes
         self.sequence_length = input_shapes[0][1]
@@ -70,10 +70,10 @@ class SelfAttentionModel_3modalities(torch.nn.Module):
         self.output_layer = torch.nn.Linear(in_features=self.sequence_length, out_features=self.output_neurons)
 
 
-    def forward(self, flow_0, flow_1, flow_2):
+    def forward(self, flow_0, flow_1):
         # flow_n has a shape of (batch_size, sequence_length, num_features)
         # concatenate them first
-        concatenated_flows = torch.cat([flow_0, flow_1, flow_2], dim=-1)
+        concatenated_flows = torch.cat([flow_0, flow_1], dim=-1)
         # apply first self-attention layer
         output = self.self_attention_layer1(concatenated_flows, concatenated_flows, concatenated_flows)
         # apply second self-attention layer
@@ -99,7 +99,7 @@ def train_step(model:torch.nn.Module, train_generator:torch.utils.data.DataLoade
     for i, data in enumerate(train_generator):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
-        inputs = inputs[0].float().to(device), inputs[1].float().to(device), inputs[2].float().to(device)
+        inputs = inputs[0].float().to(device), inputs[1].float().to(device)
         labels = labels.to(device)
 
         # zero the parameter gradients
@@ -190,12 +190,12 @@ def train_model(train:torch.utils.data.DataLoader, dev:torch.utils.data.DataLoad
     # create model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = SelfAttentionModel_3modalities(input_shapes=config.input_shapes,
+    model = SelfAttentionModel_2modalities(input_shapes=config.input_shapes,
                                        num_heads=config.num_heads, dropout=0.1, output_neurons=5)
     model.to(device)
     # check the model graph
-    input = [torch.rand(*data_shape[0]), torch.rand(*data_shape[1]), torch.rand(*data_shape[2])]
-    input = [input[0].to(device), input[1].to(device), input[2].to(device)]
+    input = [torch.rand(*data_shape[0]), torch.rand(*data_shape[1])]
+    input = [input[0].to(device), input[1].to(device)]
     summary(model, input_data=input)
 
     # Select optimizer

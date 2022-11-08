@@ -21,7 +21,7 @@ def download_models_from_sweep(sweep_id:str, top_n:int, metric:str, output_path:
     if not os.path.exists(output_path):
         os.makedirs(output_path, exist_ok=True)
 
-    needed_info = ['gru_neurons', 'optimizer', 'lr_scheduller', 'learning_rate_max']
+    needed_info = ['optimizer', 'lr_scheduller', 'learning_rate_max']
     runs = get_top_n_sweep_runs(sweep_id, top_n, metric)
     info = get_config_info_about_runs(runs, needed_info)
     metainfo = pd.DataFrame(columns=["ID"]+needed_info)
@@ -33,7 +33,7 @@ def download_models_from_sweep(sweep_id:str, top_n:int, metric:str, output_path:
         os.rename(os.path.join(output_path, model_name), os.path.join(output_path, new_model_name))
         print("Model %s downloaded from run %s"%(new_model_name, run.name))
         info[run.name]['ID'] = new_model_name
-        df_to_append = np.array([info[run.name]['ID'], info[run.name]['gru_neurons'], info[run.name]['optimizer'],
+        df_to_append = np.array([info[run.name]['ID'], info[run.name]['optimizer'],
                                  info[run.name]['lr_scheduller'], info[run.name]['learning_rate_max']])[np.newaxis,...]
         df_to_append = pd.DataFrame(df_to_append, columns=metainfo.columns)
         metainfo = metainfo.append(df_to_append)
@@ -43,12 +43,12 @@ def download_models_from_sweep(sweep_id:str, top_n:int, metric:str, output_path:
 
 def main():
     language = "french"
-    sweep_ids = ["denisdresvyanskiy/Engagement_recognition_fusion/k99s4vxa", # cross_attention_2Flow_all_vs_english_window_80
-                 "denisdresvyanskiy/Engagement_recognition_fusion/2zm4tkr5", # cross_attention_2Flow_all_vs_english_window_60
-                 "denisdresvyanskiy/Engagement_recognition_fusion/ksu91ruh", # cross_attention_2Flow_all_vs_english_window_40
-                 "denisdresvyanskiy/Engagement_recognition_fusion/2rzwky0h"] # cross_attention_2Flow_all_vs_english_window_20
+    sweep_ids = ["denisdresvyanskiy/Engagement_recognition_fusion/2uh2sz5f", # self_attention_2Flow_all_vs_french_window_80
+                 "denisdresvyanskiy/Engagement_recognition_fusion/98b53t4g", # self_attention_2Flow_all_vs_french_window_60
+                 "denisdresvyanskiy/Engagement_recognition_fusion/ts34dcd4", # self_attention_2Flow_all_vs_french_window_40
+                 "denisdresvyanskiy/Engagement_recognition_fusion/71snknoh"] # self_attention_2Flow_all_vs_french_window_20
     output_path = "/work/home/dsu/Model_weights/weights_of_best_models/Fusion/Cross_corpus/%s/%s"\
-                  %(language.capitalize(), "cross_attention_2Flow")
+                  %(language.capitalize(), "self_attention_2Flow")
     metainfos = []
     for sweep_id in sweep_ids:
         sweep_info = get_sweep_info(sweep_id)
@@ -59,7 +59,7 @@ def main():
                                             output_path=output_path, model_name="best_model.pt",
                                new_model_name_prefix=new_model_name_prefix)
         metainfo["window_length"] = window_length
-        metainfo= metainfo[["ID","window_length", "gru_neurons", "optimizer", "lr_scheduller", "learning_rate_max" ]]
+        metainfo= metainfo[["ID","window_length", "optimizer", "lr_scheduller", "learning_rate_max" ]]
         metainfos.append(metainfo)
 
     # print all metainfos

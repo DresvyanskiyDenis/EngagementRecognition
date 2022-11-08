@@ -347,7 +347,8 @@ def run(window_length:int, language:str):
     }
     BATCH_SIZE = 128
     # load data
-    train_generator, dev_generator = load_data_cross_corpus(window_length, window_shift=window_length//2)
+    train_generator, dev_generator = load_data_cross_corpus(language=language,
+                                                            window_length=window_length, window_shift=window_length//2)
 
     # compute class weights
     train_data = np.concatenate([y[np.newaxis, ...] for x, y in train_generator], axis=0)
@@ -374,7 +375,17 @@ def run(window_length:int, language:str):
 
 
 if __name__ == '__main__':
-    run(window_length=80)
-    run(window_length=60)
-    run(window_length=40)
-    run(window_length=20)
+    #run(window_length=80, language="german")
+    #run(window_length=60, language="german")
+    #run(window_length=40, language="german")
+    run(window_length=20, language="german")
+
+    run(window_length=80, language="english")
+    run(window_length=60, language="english")
+    run(window_length=40, language="english")
+    run(window_length=20, language="english")
+
+    run(window_length=80, language="french")
+    run(window_length=60, language="french")
+    run(window_length=40, language="french")
+    run(window_length=20, language="french")

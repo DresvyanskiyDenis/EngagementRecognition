@@ -108,6 +108,7 @@ def crop_faces_in_all_videos(paths_to_videos:List[str], output_path:str, detecto
     # metadata
     metadata = pd.DataFrame(columns=["path_to_frame", "timestamp", "detected"])
     # go through all videos
+    counter = 0
     for path_to_video in paths_to_videos:
         # create subfolder for the video
         subfolder = path_to_video.split(os.path.sep)[-positions_for_output_path:]
@@ -118,7 +119,9 @@ def crop_faces_in_all_videos(paths_to_videos:List[str], output_path:str, detecto
         # crop faces
         video_metadata = crop_faces_in_video(path_to_video, subfolder, detector, final_FPS)
         metadata = pd.concat([metadata, video_metadata], ignore_index=True)
-        print("Video %s has been processed." % path_to_video)
+        # increment counter
+        counter += 1
+        print("Video %s has been processed. The number of remained videos is: %i" % (path_to_video, len(paths_to_videos) - counter))
     return metadata
 
 
@@ -211,6 +214,7 @@ def crop_pose_in_all_videos(paths_to_videos:List[str], output_path:str, detector
     # metadata
     metadata = pd.DataFrame(columns=["path_to_frame", "timestamp", "detected"])
     # go through all videos
+    counter = 0
     for path_to_video in paths_to_videos:
         # create subfolder for the video
         subfolder = path_to_video.split(os.path.sep)[-positions_for_output_path:]
@@ -221,12 +225,15 @@ def crop_pose_in_all_videos(paths_to_videos:List[str], output_path:str, detector
         # crop faces
         video_metadata = crop_pose_in_video(path_to_video, subfolder, detector, final_FPS)
         metadata = pd.concat([metadata, video_metadata], ignore_index=True)
-        print("Video %s has been processed." % path_to_video)
+        # increment counter
+        counter += 1
+        print("Video %s has been processed. The number of remained videos is: %i" % (
+        path_to_video, len(paths_to_videos) - counter))
     return metadata
 
 
-if __name__ == "__main__":
-    # params
+def preprocess_NoXi():
+    # params for NoXi
     path_to_data = "/media/external_hdd_2/NoXi/Sessions"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*.mp4"))
     output_path_faces = "/media/external_hdd_2/NoXi/prepared_data/faces"
@@ -234,32 +241,84 @@ if __name__ == "__main__":
     final_FPS = 5
 
     # face extraction
+    path_to_video_files = path_to_video_files[49:]
     face_detector = load_and_prepare_detector_retinaFace_mobileNet()
     metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
                                               positions_for_output_path=2)
-        # clear metadata from NaNs
+    # clear metadata from NaNs
     print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
     metadata_faces = metadata_faces[~metadata_faces["path_to_frame"].isna()]
     metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
-        # clear RAM
+    # clear RAM
     del face_detector
     gc.collect()
     torch.cuda.empty_cache()
 
-
     # pose extraction
+    path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*.mp4"))
     pose_detector = SimpleHigherHRNet(c=32, nof_joints=17,
-                              checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
-                              return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
-                              device="cuda")
+                                      checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
+                                      return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
+                                      device="cuda")
     metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
                                              positions_for_output_path=2)
-        # clear metadata from NaNs
+    # clear metadata from NaNs
     print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
     metadata_poses = metadata_poses[~metadata_poses["path_to_frame"].isna()]
     metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
-        # clear RAM
+    # clear RAM
     del pose_detector
     gc.collect()
     torch.cuda.empty_cache()
+
+
+
+def preprocess_DAiSEE():
+    # params for DAiSEE
+    path_to_data = "/media/external_hdd_2/DAiSEE/DAiSEE/DataSet"
+    path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*", "*", "*.avi"))
+    output_path_faces = "/media/external_hdd_2/DAiSEE/prepared_data/faces"
+    output_path_poses = "/media/external_hdd_2/DAiSEE/prepared_data/poses"
+    final_FPS = 5
+
+    # face extraction
+    face_detector = load_and_prepare_detector_retinaFace_mobileNet()
+    metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
+                                              positions_for_output_path=4)
+    # clear metadata from NaNs
+    print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
+    metadata_faces = metadata_faces[~metadata_faces["path_to_frame"].isna()]
+    metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
+    # clear RAM
+    del face_detector
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # pose extraction
+    pose_detector = SimpleHigherHRNet(c=32, nof_joints=17,
+                                      checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
+                                      return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
+                                      device="cuda")
+    metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
+                                             positions_for_output_path=4)
+    # clear metadata from NaNs
+    print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
+    metadata_poses = metadata_poses[~metadata_poses["path_to_frame"].isna()]
+    metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
+    # clear RAM
+    del pose_detector
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+
+
+if __name__ == "__main__":
+    preprocess_DAiSEE()
+    preprocess_NoXi()
+
+
+
+
+
 

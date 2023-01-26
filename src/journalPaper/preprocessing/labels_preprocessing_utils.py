@@ -120,7 +120,7 @@ def align_labels_with_frames_for_NoXi(df_with_frame_paths:pd.DataFrame, df_with_
             Dataframe with aligned paths to frames and labels. The columns are: ['path_to_frame', 'timestamp', 'label_0', 'label_1', 'label_2', 'label_3', 'label_4']
     """
     # form path_to_frame from 'path_to_frame' and 'timestamp'
-    df_with_labels['path_to_frame'] = df_with_labels['filename'] + '_' + (df_with_labels['timestamp']/1).astype(str)+'_'+
+    df_with_labels['path_to_frame'] = df_with_labels['filename'] + '_' + (df_with_labels['timestamp']/1).astype(str)+'_'+ \
     (df_with_labels['timestamp'] % 1).astype(str)+'.png'
     # merge two dataframes based on path_to_frame
     result_df = pd.merge(df_with_frame_paths, df_with_labels, on='path_to_frame', how='left')

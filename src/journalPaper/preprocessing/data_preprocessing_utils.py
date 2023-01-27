@@ -276,8 +276,8 @@ def preprocess_DAiSEE():
     # params for DAiSEE
     path_to_data = "/media/external_hdd_2/DAiSEE/DAiSEE/DataSet"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*", "*", "*.avi"))
-    output_path_faces = "/DataSets/prepared_data/faces"
-    output_path_poses = "/DataSets/prepared_data/poses"
+    output_path_faces = "/DataSets/DAiSEE/prepared_data/faces"
+    output_path_poses = "/DataSets/DAiSEE/prepared_data/poses"
     final_FPS = 5
 
     # pose extraction

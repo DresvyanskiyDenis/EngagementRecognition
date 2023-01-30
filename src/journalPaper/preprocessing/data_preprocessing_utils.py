@@ -119,11 +119,16 @@ def crop_faces_in_all_videos(paths_to_videos:List[str], output_path:str, detecto
         if not os.path.exists(subfolder):
             os.makedirs(subfolder, exist_ok=True)
         # crop faces
-        video_metadata = crop_faces_in_video(path_to_video, subfolder, detector, final_FPS)
-        metadata = pd.concat([metadata, video_metadata], ignore_index=True)
-        # increment counter
-        counter += 1
-        print("Video %s has been processed. The number of remained videos is: %i" % (path_to_video, len(paths_to_videos) - counter))
+        try:
+            video_metadata = crop_faces_in_video(path_to_video, subfolder, detector, final_FPS)
+            metadata = pd.concat([metadata, video_metadata], ignore_index=True)
+            print("Video %s has been processed. The number of remained videos is: %i" % (
+            path_to_video, len(paths_to_videos) - counter))
+            counter += 1
+        except Exception as e:
+            print("Video %s has been skipped due to the following error: %s" % (path_to_video, e))
+            counter += 1
+
     return metadata
 
 
@@ -227,12 +232,16 @@ def crop_pose_in_all_videos(paths_to_videos:List[str], output_path:str, detector
         if not os.path.exists(subfolder):
             os.makedirs(subfolder, exist_ok=True)
         # crop faces
-        video_metadata = crop_pose_in_video(path_to_video, subfolder, detector, final_FPS)
-        metadata = pd.concat([metadata, video_metadata], ignore_index=True)
-        # increment counter
-        counter += 1
-        print("Video %s has been processed. The number of remained videos is: %i" % (
-        path_to_video, len(paths_to_videos) - counter))
+        try:
+            video_metadata = crop_pose_in_video(path_to_video, subfolder, detector, final_FPS)
+            metadata = pd.concat([metadata, video_metadata], ignore_index=True)
+            counter += 1
+            print("Video %s has been processed. The number of remained videos is: %i" % (
+                path_to_video, len(paths_to_videos) - counter))
+        except Exception as e:
+            print("Video %s has been skipped due to the following error: %s" % (path_to_video, e))
+            counter+=1
+
     return metadata
 
 

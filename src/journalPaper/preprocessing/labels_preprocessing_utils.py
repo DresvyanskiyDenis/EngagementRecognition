@@ -22,8 +22,7 @@ def turn_class_indices_into_one_hot(class_indices: List[int], number_of_classes:
     :return: np.ndarray
             One-hot vectors.
     """
-    one_hot = np.zeros(number_of_classes)
-    one_hot[class_indices] = 1
+    one_hot = np.eye(number_of_classes)[np.array(class_indices).reshape((-1,))]
     return one_hot
 
 
@@ -38,12 +37,15 @@ def align_labels_with_frames_for_DAiSEE(df_with_frame_paths:pd.DataFrame, df_wit
             Dataframe with aligned paths to frames and labels. The columns are: ['path_to_frame', 'timestamp', 'engagement']
     """
     df_with_labels['ClipID'] = df_with_labels['ClipID'].astype(str).apply(lambda x: x.split('.')[0])
-    df_with_labels = df_with_labels.drop(columns=["Boredom", "Confusion", "Frustration"])
-    df_with_labels = df_with_labels.rename(columns={"Engagement": "engagement"})
+    df_with_labels = df_with_labels.drop(columns=["Boredom", "Confusion", "Frustration "])
+    df_with_labels = df_with_labels.rename(columns={"Engagement": "engagement",
+                                                    "ClipID": "filename"})
     df_with_frame_paths['filename'] = df_with_frame_paths['path_to_frame'].astype(str).apply(lambda x: x.split('/')[-1].split('_')[0])
 
+    # merge dataframes upon their filenames
     result_df = pd.merge(df_with_frame_paths, df_with_labels, on='filename', how='left')
-    result_df = result_df.drop(columns=['filename']).reset_index(drop=True)
+    # drop NaN values (the filenames, which did not exist either in df_with_frame_paths or in df_with_labels) and drop the abundunt filename column
+    result_df = result_df.drop(columns=['filename']).dropna().reset_index(drop=True)
     return result_df
 
 def prepare_df_for_DAiSEE(df_with_frame_paths:pd.DataFrame, df_with_labels: pd.DataFrame) -> pd.DataFrame:
@@ -65,7 +67,7 @@ def prepare_df_for_DAiSEE(df_with_frame_paths:pd.DataFrame, df_with_labels: pd.D
     # align (match) labels with frames
     aligned_df = align_labels_with_frames_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # turn class indices to one-hot vectors
-    one_hot_vectors = turn_class_indices_into_one_hot(class_indices=aligned_df['engagement'].values,
+    one_hot_vectors = turn_class_indices_into_one_hot(class_indices=aligned_df['engagement'].values.astype(int),
                                                       number_of_classes=4)
     one_hot_vectors = pd.DataFrame(one_hot_vectors, columns=['label_0', 'label_1', 'label_2', 'label_3'])
     # drop engagement column and add one-hot vectors instead of it
@@ -76,7 +78,7 @@ def prepare_df_for_DAiSEE(df_with_frame_paths:pd.DataFrame, df_with_labels: pd.D
 
 
 
-def form_df_with_labels_from_NoXi_labels(path_to_labels:str, FPS:int=30)->pd.DataFrame:
+def form_df_with_labels_from_NoXi_labels(path_to_labels:str, FPS:int=25)->pd.DataFrame:
     """
     Forms dataframe with labels from NoXi labels.
     :param path_to_labels: str
@@ -117,15 +119,26 @@ def align_labels_with_frames_for_NoXi(df_with_frame_paths:pd.DataFrame, df_with_
     :param df_with_labels: pd.DataFrame
             Dataframe with labels. The columns are: ['filename', 'frame', 'timestep', 'label_0', 'label_1', 'label_2', 'label_3', 'label_4']
     :return: pd.DataFrame
-            Dataframe with aligned paths to frames and labels. The columns are: ['path_to_frame', 'timestamp', 'label_0', 'label_1', 'label_2', 'label_3', 'label_4']
+            Dataframe with aligned paths to frames and labels. The columns are: ['path_to_frame', 'timestep', 'label_0', 'label_1', 'label_2', 'label_3', 'label_4']
     """
     # form path_to_frame from 'path_to_frame' and 'timestamp'
-    df_with_labels['path_to_frame'] = df_with_labels['filename'] + '_' + (df_with_labels['timestamp']/1).astype(str)+'_'+ \
-    (df_with_labels['timestamp'] % 1).astype(str)+'.png'
+    df_with_labels['path_to_frame'] = df_with_labels['filename'].str.split(os.path.sep).str[0]+str(os.path.sep)+\
+                                      df_with_labels['filename'].str.split(os.path.sep).str[1].str.capitalize()+'_video'+str(os.path.sep)+\
+                                      df_with_labels['filename'].str.split(os.path.sep).str[1].str.capitalize()+\
+                                      '_video_'+round(df_with_labels['timestep'],2).astype(str).str.replace('.','_')+'.png'
+
+    # make path_to_frame column of df_with_frame_paths to be the same as in df_with_labels
+    # the absolute path to all frames is saved and added at the end of the function
+    general_path_to_data = os.path.join(*df_with_frame_paths.iloc[0,0].split(os.path.sep)[:-3])
+    df_with_frame_paths['path_to_frame'] = df_with_frame_paths['path_to_frame'].apply(lambda x: os.path.join(*x.split(os.path.sep)[-3:]))
     # merge two dataframes based on path_to_frame
-    result_df = pd.merge(df_with_frame_paths, df_with_labels, on='path_to_frame', how='left')
+    df_with_labels['path_to_frame'] = df_with_labels['path_to_frame'].astype(str)
+    df_with_frame_paths['path_to_frame'] = df_with_frame_paths['path_to_frame'].astype(str)
+    result_df = pd.merge(df_with_frame_paths, df_with_labels, on='path_to_frame', how='left').dropna()
     # drop unnecessary columns
-    result_df = result_df.drop(columns=['filename', 'frame']).reset_index(drop=True)
+    result_df = result_df.drop(columns=['filename', 'frame', 'timestamp']).reset_index(drop=True)
+    # add absolute path to all frames
+    result_df['path_to_frame'] = result_df['path_to_frame'].apply(lambda x: os.path.join(general_path_to_data, x))
     return result_df
 
 
@@ -145,7 +158,7 @@ def prepare_df_for_NoXi(df_with_frame_paths:pd.DataFrame, path_to_labels: str) -
     df_with_frame_paths = df_with_frame_paths.drop(columns=['detected'])
     df_with_frame_paths = df_with_frame_paths.dropna().reset_index(drop=True)
     # get labels packed in dataframe from NoXi labels
-    df_with_labels = form_df_with_labels_from_NoXi_labels(path_to_labels=path_to_labels, FPS=30)
+    df_with_labels = form_df_with_labels_from_NoXi_labels(path_to_labels=path_to_labels, FPS=25)
     # align (match) labels with frames
     aligned_df = align_labels_with_frames_for_NoXi(df_with_frame_paths, df_with_labels)
 
@@ -153,13 +166,12 @@ def prepare_df_for_NoXi(df_with_frame_paths:pd.DataFrame, path_to_labels: str) -
 
 
 if __name__=="__main__":
-    # TODO: CHECK EVERY FUNCTION
     # process the NoXi dataset
     # params
-    path_to_labels = '/media/external_hdd_2/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
-    path_to_frames = 'FILL_IT_IN'
-    path_to_df_with_frame_paths = 'FILL_IT_IN'
-    output_path = 'FILL_IT_IN'
+    path_to_labels = '/DataSets/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
+    path_to_frames = '/DataSets/NoXi/prepared_data/faces/'
+    path_to_df_with_frame_paths = '/DataSets/NoXi/prepared_data/faces/metadata.csv'
+    output_path = '/DataSets/NoXi/prepared_data/faces/'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load and prepare labels
@@ -186,9 +198,10 @@ if __name__=="__main__":
     # process DAiSEE dataset (train)
     # params
     path_to_frames = 'FILL_IT_IN'
-    path_to_df_with_frame_paths = 'FILL_IT_IN'
+    path_to_df_with_frame_paths = "FILL_IT_IN"
     path_to_df_with_labels = 'FILL_IT_IN'
     output_path = 'FILL_IT_IN'
+    filename = 'train_DAiSEE.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load dataframe with labels
@@ -196,7 +209,7 @@ if __name__=="__main__":
     # prepare dataframe for DAiSEE dataset
     df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # save dataframe
-    df_with_labels.to_csv(os.path.join(output_path, 'train_DAiSEE.csv'), index=False)
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
     # process DAiSEE dataset (dev)
     # params

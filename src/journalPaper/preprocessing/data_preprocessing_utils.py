@@ -258,7 +258,7 @@ def preprocess_NoXi():
     face_detector = load_and_prepare_detector_retinaFace_mobileNet()
     metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
                                               positions_for_output_path=2)
-    # clear metadata from NaNs
+    # save metadata
     print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
     metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
     # clear RAM
@@ -273,7 +273,7 @@ def preprocess_NoXi():
                                       device="cuda")
     metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
                                              positions_for_output_path=2)
-    # clear metadata from NaNs
+    # save metadata
     print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
     metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
     # clear RAM
@@ -298,7 +298,7 @@ def preprocess_DAiSEE():
                                       device="cuda")
     metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
                                              positions_for_output_path=4)
-    # clear metadata from NaNs
+    # save metadata
     print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
     metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
     # clear RAM
@@ -310,7 +310,7 @@ def preprocess_DAiSEE():
     face_detector = load_and_prepare_detector_retinaFace_mobileNet()
     metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
                                               positions_for_output_path=4)
-    # clear metadata from NaNs
+    # save metadata
     print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
     metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
     # clear RAM

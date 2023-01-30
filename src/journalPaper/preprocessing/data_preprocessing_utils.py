@@ -150,12 +150,15 @@ def crop_pose_in_video(path_to_video:str, output_path:str, detector:object, fina
     # get FPS
     FPS = video.get(cv2.CAP_PROP_FPS)
     FPS_in_seconds = 1. / FPS
+    # calculate every which frame should be taken
+    # TODO: check it
+    every_n_frame = int(round(FPS / final_FPS))
     # go through all frames
     counter = 0
     while video.isOpened():
         ret, frame = video.read()
         if ret:
-            if counter % final_FPS == 0:
+            if counter % every_n_frame == 0:
                 # convert BGR to RGB
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 # calculate timestamp
@@ -237,8 +240,8 @@ def preprocess_NoXi():
     # params for NoXi
     path_to_data = "/media/external_hdd_2/NoXi/Sessions"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*.mp4"))
-    output_path_faces = "/DataSets/NoXi/prepared_data/faces"
-    output_path_poses = "/DataSets/NoXi/prepared_data/poses"
+    output_path_faces = "/work/home/dsu/NoXi/journal_paper/prepared_data/faces"
+    output_path_poses = "/work/home/dsu/NoXi/journal_paper/prepared_data/poses"
     final_FPS = 5
 
     # face extraction
@@ -276,8 +279,8 @@ def preprocess_DAiSEE():
     # params for DAiSEE
     path_to_data = "/media/external_hdd_2/DAiSEE/DAiSEE/DataSet"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*", "*", "*.avi"))
-    output_path_faces = "/DataSets/DAiSEE/prepared_data/faces"
-    output_path_poses = "/DataSets/DAiSEE/prepared_data/poses"
+    output_path_faces = "/work/home/dsu/DAiSEE/prepared_data/faces"
+    output_path_poses = "/work/home/dsu/DAiSEE/prepared_data/poses"
     final_FPS = 5
 
     # pose extraction

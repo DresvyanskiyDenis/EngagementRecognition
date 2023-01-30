@@ -46,12 +46,14 @@ def crop_faces_in_video(path_to_video:str, output_path:str, detector:object, fin
     # get FPS
     FPS = video.get(cv2.CAP_PROP_FPS)
     FPS_in_seconds = 1. / FPS
+    # calculate every which frame should be taken
+    every_n_frame = int(round(FPS / final_FPS))
     # go through all frames
     counter = 0
     while video.isOpened():
         ret, frame = video.read()
         if ret:
-            if counter % final_FPS == 0:
+            if counter % every_n_frame == 0:
                 # convert BGR to RGB
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 # calculate timestamp
@@ -151,7 +153,6 @@ def crop_pose_in_video(path_to_video:str, output_path:str, detector:object, fina
     FPS = video.get(cv2.CAP_PROP_FPS)
     FPS_in_seconds = 1. / FPS
     # calculate every which frame should be taken
-    # TODO: check it
     every_n_frame = int(round(FPS / final_FPS))
     # go through all frames
     counter = 0

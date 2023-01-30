@@ -260,7 +260,6 @@ def preprocess_NoXi():
                                               positions_for_output_path=2)
     # clear metadata from NaNs
     print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
-    metadata_faces = metadata_faces[~metadata_faces["path_to_frame"].isna()]
     metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
     # clear RAM
     del face_detector
@@ -276,7 +275,6 @@ def preprocess_NoXi():
                                              positions_for_output_path=2)
     # clear metadata from NaNs
     print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
-    metadata_poses = metadata_poses[~metadata_poses["path_to_frame"].isna()]
     metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
     # clear RAM
     del pose_detector
@@ -302,7 +300,6 @@ def preprocess_DAiSEE():
                                              positions_for_output_path=4)
     # clear metadata from NaNs
     print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
-    metadata_poses = metadata_poses[~metadata_poses["path_to_frame"].isna()]
     metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
     # clear RAM
     del pose_detector
@@ -315,7 +312,6 @@ def preprocess_DAiSEE():
                                               positions_for_output_path=4)
     # clear metadata from NaNs
     print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
-    metadata_faces = metadata_faces[~metadata_faces["path_to_frame"].isna()]
     metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
     # clear RAM
     del face_detector

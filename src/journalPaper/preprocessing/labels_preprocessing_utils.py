@@ -125,7 +125,7 @@ def align_labels_with_frames_for_NoXi(df_with_frame_paths:pd.DataFrame, df_with_
     df_with_labels['path_to_frame'] = df_with_labels['filename'].str.split(os.path.sep).str[0]+str(os.path.sep)+\
                                       df_with_labels['filename'].str.split(os.path.sep).str[1].str.capitalize()+'_video'+str(os.path.sep)+\
                                       df_with_labels['filename'].str.split(os.path.sep).str[1].str.capitalize()+\
-                                      '_video_'+round(df_with_labels['timestep'],2).astype(str).str.replace('.','_')+'.png'
+                                      '_video_'+df_with_labels['timestep'].astype(float).round(2).astype(str).str.replace('.','_')+'.png'
 
     # make path_to_frame column of df_with_frame_paths to be the same as in df_with_labels
     # the absolute path to all frames is saved and added at the end of the function
@@ -168,10 +168,10 @@ def prepare_df_for_NoXi(df_with_frame_paths:pd.DataFrame, path_to_labels: str) -
 if __name__=="__main__":
     # process the NoXi dataset
     # params
-    path_to_labels = '/DataSets/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
-    path_to_frames = '/DataSets/NoXi/prepared_data/faces/'
-    path_to_df_with_frame_paths = '/DataSets/NoXi/prepared_data/faces/metadata.csv'
-    output_path = '/DataSets/NoXi/prepared_data/faces/'
+    path_to_labels = '/media/external_hdd_2/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
+    path_to_frames = '/work/home/dsu/NoXi/journal_paper/prepared_data/poses/'
+    path_to_df_with_frame_paths = '/work/home/dsu/NoXi/journal_paper/prepared_data/poses/metadata.csv'
+    output_path = '/work/home/dsu/NoXi/journal_paper/prepared_data/poses/'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load and prepare labels
@@ -189,19 +189,19 @@ if __name__=="__main__":
     dev_NoXi = pd.concat([english_dev, german_dev, french_dev], axis=0).reset_index(drop=True)
     test_NoXi = pd.concat([english_test, german_test, french_test], axis=0).reset_index(drop=True)
     # save dataframes
-    train_NoXi.to_csv(os.path.join(output_path, 'train_NoXi.csv'), index=False)
-    dev_NoXi.to_csv(os.path.join(output_path, 'dev_NoXi.csv'), index=False)
-    test_NoXi.to_csv(os.path.join(output_path, 'test_NoXi.csv'), index=False)
+    train_NoXi.to_csv(os.path.join(output_path, 'NoXi_pose_train.csv'), index=False)
+    dev_NoXi.to_csv(os.path.join(output_path, 'NoXi_pose_dev.csv'), index=False)
+    test_NoXi.to_csv(os.path.join(output_path, 'NoXi_pose_test.csv'), index=False)
 
 
 
     # process DAiSEE dataset (train)
     # params
-    path_to_frames = 'FILL_IT_IN'
-    path_to_df_with_frame_paths = "FILL_IT_IN"
-    path_to_df_with_labels = 'FILL_IT_IN'
-    output_path = 'FILL_IT_IN'
-    filename = 'train_DAiSEE.csv'
+    path_to_frames = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/work/home/dsu/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TrainLabels.csv'
+    output_path = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    filename = 'DAiSEE_pose_train_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load dataframe with labels
@@ -213,10 +213,11 @@ if __name__=="__main__":
 
     # process DAiSEE dataset (dev)
     # params
-    path_to_frames = 'FILL_IT_IN'
-    path_to_df_with_frame_paths = 'FILL_IT_IN'
-    path_to_df_with_labels = 'FILL_IT_IN'
-    output_path = 'FILL_IT_IN'
+    path_to_frames = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/work/home/dsu/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/ValidationLabels.csv'
+    output_path = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    filename = 'DAiSEE_pose_dev_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load dataframe with labels
@@ -224,14 +225,15 @@ if __name__=="__main__":
     # prepare dataframe for DAiSEE dataset
     df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # save dataframe
-    df_with_labels.to_csv(os.path.join(output_path, 'dev_DAiSEE.csv'), index=False)
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
     # process DAiSEE dataset (test)
     # params
-    path_to_frames = 'FILL_IT_IN'
-    path_to_df_with_frame_paths = 'FILL_IT_IN'
-    path_to_df_with_labels = 'FILL_IT_IN'
-    output_path = 'FILL_IT_IN'
+    path_to_frames = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/work/home/dsu/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TestLabels.csv'
+    output_path = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    filename = 'DAiSEE_pose_test_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load dataframe with labels
@@ -239,7 +241,7 @@ if __name__=="__main__":
     # prepare dataframe for DAiSEE dataset
     df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # save dataframe
-    df_with_labels.to_csv(os.path.join(output_path, 'test_DAiSEE.csv'), index=False)
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
 
 

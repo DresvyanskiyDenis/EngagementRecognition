@@ -1,9 +1,6 @@
-from typing import Tuple
-
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from fastai.layers import TimeDistributed
 from torchinfo import summary
 
@@ -39,6 +36,8 @@ class Facial_engagement_recognition_model(nn.Module):
         self.squeeze_layer_1 = nn.Conv1d(num_timesteps, 1, 1)
         self.squeeze_layer_2 = nn.Linear(embeddings_layer_neurons, embeddings_layer_neurons//2)
         self.batch_norm = nn.BatchNorm1d(embeddings_layer_neurons//2)
+        self.activation_squeeze_layer = nn.Tanh()
+        self.end_dropout = nn.Dropout(0.2)
 
         # create classifier
         self.classifier = nn.Linear(embeddings_layer_neurons//2, num_classes)
@@ -59,7 +58,8 @@ class Facial_engagement_recognition_model(nn.Module):
         # one more linear layer
         x = self.squeeze_layer_2(x)
         x = self.batch_norm(x)
-        x = torch.tanh(x)
+        x = self.activation_squeeze_layer(x)
+        x = self.end_dropout(x)
         # classifier
         x_classifier = self.classifier(x)
         # regression
@@ -98,6 +98,8 @@ class Pose_engagement_recognition_model(nn.Module):
         self.squeeze_layer_1 = nn.Conv1d(num_timesteps, 1, 1)
         self.squeeze_layer_2 = nn.Linear(embeddings_layer_neurons, embeddings_layer_neurons//2)
         self.batch_norm = nn.BatchNorm1d(embeddings_layer_neurons//2)
+        self.activation_squeeze_layer = nn.Tanh()
+        self.end_dropout = nn.Dropout(0.2)
 
         # create classifier
         self.classifier = nn.Linear(embeddings_layer_neurons//2, num_classes)
@@ -118,7 +120,8 @@ class Pose_engagement_recognition_model(nn.Module):
         # one more linear layer
         x = self.squeeze_layer_2(x)
         x = self.batch_norm(x)
-        x = torch.tanh(x)
+        x = self.activation_squeeze_layer(x)
+        x = self.end_dropout(x)
         # classifier
         x_classifier = self.classifier(x)
         # regression
@@ -132,11 +135,20 @@ if __name__ == "__main__":
     image_resolution = (3,160,160)
     x = np.zeros((2,num_timesteps)+image_resolution)
     pose_model = Modified_MobileNetV2_pose_estimation(n_locations=16, pretrained=True)
-    unimodal_model = Pose_engagement_recognition_model(pose_model=pose_model,
+    facial_model = Modified_InceptionResnetV1(dense_layer_neurons=256, num_classes=None, pretrained='vggface2')
+    unimodal_model_pose = Pose_engagement_recognition_model(pose_model=pose_model,
                                                             embeddings_layer_neurons=256,
                                                             num_classes=5,
                                                             transformer_num_heads=8,
                                                             num_timesteps=num_timesteps)
-    summary(unimodal_model, input_size=(2,num_timesteps)+image_resolution)
+    unimodal_model_facial = Facial_engagement_recognition_model(facial_model=facial_model,
+                                                                embeddings_layer_neurons=256,
+                                                                num_classes=5,
+                                                                transformer_num_heads=8,
+                                                                num_timesteps=num_timesteps)
+    summary(unimodal_model_pose, input_size=(2,num_timesteps)+image_resolution)
+    print("-------------------------------------------------")
+    image_resolution = (3, 160, 160)
+    summary(unimodal_model_facial, input_size=(2,num_timesteps)+image_resolution)
 
 

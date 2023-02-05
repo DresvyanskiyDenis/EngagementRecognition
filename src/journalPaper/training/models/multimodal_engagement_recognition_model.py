@@ -40,10 +40,11 @@ class Multimodal_engagement_recognition_model(nn.Module):
         self.squeeze_layer_1 = nn.Conv1d(num_timesteps, 1, 1)
         self.squeeze_layer_2 = nn.Linear(embeddings_layer_neurons, embeddings_layer_neurons//2)
         self.batch_norm = nn.BatchNorm1d(embeddings_layer_neurons//2)
+        self.activation_squeeze_layer = nn.Tanh()
+        self.dropout_sqeeze_layer = nn.Dropout(0.2)
 
         # create classifier
         self.classifier = nn.Linear(embeddings_layer_neurons//2, num_classes)
-
 
         # create regression
         self.regression = nn.Linear(embeddings_layer_neurons//2, 1)
@@ -62,7 +63,8 @@ class Multimodal_engagement_recognition_model(nn.Module):
         # one more linear layer
         x = self.squeeze_layer_2(x)
         x = self.batch_norm(x)
-        x = torch.tanh(x)
+        x = self.activation_squeeze_layer(x)
+        x = self.dropout_sqeeze_layer(x)
         # classifier
         x_classifier = self.classifier(x)
         # regression
@@ -77,7 +79,7 @@ if __name__ == "__main__":
     # device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # facial model
-    facial_model = Modified_InceptionResnetV1(embeddings_layer_neurons=256,
+    facial_model = Modified_InceptionResnetV1(dense_layer_neurons=256,
                                                 num_classes=None, pretrained='vggface2',
                                                 device=None)
     facial_model = facial_model.to(device)

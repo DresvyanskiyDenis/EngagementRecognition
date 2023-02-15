@@ -1,11 +1,7 @@
-import numpy as np
-import torch
 import torch.nn as nn
 from fastai.layers import TimeDistributed
-from torchinfo import summary
 
 from pytorch_utils.layers.attention_layers import Transformer_layer
-from pytorch_utils.models.CNN_models import Modified_MobileNetV2_pose_estimation, Modified_InceptionResnetV1
 
 
 class Facial_engagement_recognition_model(nn.Module):
@@ -129,26 +125,11 @@ class Pose_engagement_recognition_model(nn.Module):
 
         return x_classifier, x_regression
 
-
 if __name__ == "__main__":
-    num_timesteps = 10
-    image_resolution = (3,160,160)
-    x = np.zeros((2,num_timesteps)+image_resolution)
-    pose_model = Modified_MobileNetV2_pose_estimation(n_locations=16, pretrained=True)
-    facial_model = Modified_InceptionResnetV1(dense_layer_neurons=256, num_classes=None, pretrained='vggface2')
-    unimodal_model_pose = Pose_engagement_recognition_model(pose_model=pose_model,
-                                                            embeddings_layer_neurons=256,
-                                                            num_classes=5,
-                                                            transformer_num_heads=8,
-                                                            num_timesteps=num_timesteps)
-    unimodal_model_facial = Facial_engagement_recognition_model(facial_model=facial_model,
-                                                                embeddings_layer_neurons=256,
-                                                                num_classes=5,
-                                                                transformer_num_heads=8,
-                                                                num_timesteps=num_timesteps)
-    summary(unimodal_model_pose, input_size=(2,num_timesteps)+image_resolution)
-    print("-------------------------------------------------")
-    image_resolution = (3, 160, 160)
-    summary(unimodal_model_facial, input_size=(2,num_timesteps)+image_resolution)
+    pass
+
+
+
+
 
 

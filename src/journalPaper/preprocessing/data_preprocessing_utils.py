@@ -1,4 +1,7 @@
 import sys
+
+from utils.warnings_processing import IgnoreWarnings
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 sys.path.extend(["/work/home/dsu/simpleHigherHRNet/"])
@@ -318,24 +321,57 @@ def preprocess_DAiSEE():
     gc.collect()
     torch.cuda.empty_cache()
 
-import warnings
-class IgnoreWarnings(object):
-    def __init__(self, message):
-        self.message = message
+def preprocess_MHHRI(part:str):
+    if part not in ["HHI_Ego_Recordings", "HRI_Ego_Recordings"]:
+        raise ValueError(f"Part should be either HHI_Ego_Recordings or HRI_Ego_Recordings. Got {part} instead.")
+    # params for MHHRI
+    path_to_data = "/media/external_hdd_2/MHHRI/mhhri/dataset/HHI_Ego_Recordings".replace("HHI_Ego_Recordings", part)
+    paths_to_video_files = glob.glob(os.path.join(path_to_data, "*.MOV"))
+    output_path_faces = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/faces".replace("HHI_Ego_Recordings", part)
+    output_path_poses = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/poses".replace("HHI_Ego_Recordings", part)
+    final_FPS = 5
 
-    def __enter__(self):
-        warnings.filterwarnings("ignore", message=f".*{self.message}.*")
+    # pose extraction
+    pose_detector = SimpleHigherHRNet(c=32, nof_joints=17,
+                                      checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
+                                      return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
+                                      device="cuda")
 
-    def __exit__(self, *_):
-        warnings.filterwarnings("default", message=f".*{self.message}.*")
+    metadata_poses = crop_pose_in_all_videos(paths_to_video_files, output_path_poses, pose_detector, final_FPS,
+                                             positions_for_output_path=4)
+    # save metadata
+    print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
+    metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
+    # clear RAM
+    del pose_detector
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # face extraction
+    face_detector = load_and_prepare_detector_retinaFace_mobileNet()
+    metadata_faces = crop_faces_in_all_videos(paths_to_video_files, output_path_faces, face_detector, final_FPS,
+                                              positions_for_output_path=4)
+    # save metadata
+    print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
+    metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
+    # clear RAM
+    del face_detector
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+
 
 
 
 
 if __name__ == "__main__":
     with IgnoreWarnings("deprecated"):
-        preprocess_DAiSEE()
-        preprocess_NoXi()
+        #preprocess_DAiSEE()
+        #preprocess_NoXi()
+        preprocess_MHHRI("HHI_Ego_Recordings")
+        preprocess_MHHRI("HRI_Ego_Recordings")
+
 
 
 

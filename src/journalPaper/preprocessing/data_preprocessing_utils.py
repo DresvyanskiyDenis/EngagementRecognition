@@ -325,7 +325,7 @@ def preprocess_MHHRI(part:str):
     if part not in ["HHI_Ego_Recordings", "HRI_Ego_Recordings"]:
         raise ValueError(f"Part should be either HHI_Ego_Recordings or HRI_Ego_Recordings. Got {part} instead.")
     # params for MHHRI
-    path_to_data = "/media/external_hdd_2/MHHRI/mhhri/dataset/HHI_Ego_Recordings".replace("HHI_Ego_Recordings", part)
+    path_to_data = "/media/external_hdd_2/MHHRI/mhhri/dataset/HHI_Ego_Recordings/HHI_Ego_Recordings".replace("HHI_Ego_Recordings", part)
     paths_to_video_files = glob.glob(os.path.join(path_to_data, "*.MOV"))
     output_path_faces = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/faces".replace("HHI_Ego_Recordings", part)
     output_path_poses = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/poses".replace("HHI_Ego_Recordings", part)
@@ -338,7 +338,7 @@ def preprocess_MHHRI(part:str):
                                       device="cuda")
 
     metadata_poses = crop_pose_in_all_videos(paths_to_video_files, output_path_poses, pose_detector, final_FPS,
-                                             positions_for_output_path=4)
+                                             positions_for_output_path=1)
     # save metadata
     print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
     metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
@@ -350,7 +350,7 @@ def preprocess_MHHRI(part:str):
     # face extraction
     face_detector = load_and_prepare_detector_retinaFace_mobileNet()
     metadata_faces = crop_faces_in_all_videos(paths_to_video_files, output_path_faces, face_detector, final_FPS,
-                                              positions_for_output_path=4)
+                                              positions_for_output_path=1)
     # save metadata
     print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
     metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)

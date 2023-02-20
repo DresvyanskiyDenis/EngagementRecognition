@@ -1,7 +1,4 @@
 import sys
-
-from utils.warnings_processing import IgnoreWarnings
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 sys.path.extend(["/work/home/dsu/simpleHigherHRNet/"])
@@ -22,6 +19,7 @@ from decorators.common_decorators import timer
 from feature_extraction.face_recognition_utils import recognize_one_face_bbox, extract_face_according_bbox, \
     load_and_prepare_detector_retinaFace_mobileNet
 from feature_extraction.pose_recognition_utils import get_pose_bbox, crop_frame_to_pose
+from utils.warnings_processing import IgnoreWarnings
 
 
 @timer

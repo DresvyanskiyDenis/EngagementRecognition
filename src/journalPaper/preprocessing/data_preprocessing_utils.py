@@ -1,7 +1,7 @@
 import sys
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
-sys.path.extend(["/work/home/dsu/simpleHigherHRNet/"])
+sys.path.extend(["/work/home/dsu/simple-HRNet-master/"])
 
 import gc
 import glob
@@ -14,12 +14,12 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 
-from SimpleHigherHRNet import SimpleHigherHRNet
 from decorators.common_decorators import timer
 from feature_extraction.face_recognition_utils import recognize_one_face_bbox, extract_face_according_bbox, \
     load_and_prepare_detector_retinaFace_mobileNet
 from feature_extraction.pose_recognition_utils import get_pose_bbox, crop_frame_to_pose
 from utils.warnings_processing import IgnoreWarnings
+from SimpleHRNet import SimpleHRNet
 
 
 @timer
@@ -246,80 +246,91 @@ def crop_pose_in_all_videos(paths_to_videos:List[str], output_path:str, detector
     return metadata
 
 
-def preprocess_NoXi():
+def preprocess_NoXi(device, extract_faces=True, extract_poses=True):
 
     # params for NoXi
     path_to_data = "/media/external_hdd_2/NoXi/Sessions"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*.mp4"))
-    output_path_faces = "/work/home/dsu/NoXi/journal_paper/prepared_data/faces"
-    output_path_poses = "/work/home/dsu/NoXi/journal_paper/prepared_data/poses"
+    output_path_faces = "/media/external_hdd_2/NoXi/prepared_data/faces"
+    output_path_poses = "/media/external_hdd_2/NoXi/prepared_data/poses"
     final_FPS = 5
 
     # face extraction
-    face_detector = load_and_prepare_detector_retinaFace_mobileNet()
-    metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
-                                              positions_for_output_path=2)
-    # save metadata
-    print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
-    metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
-    # clear RAM
-    del face_detector
-    gc.collect()
-    torch.cuda.empty_cache()
+    if extract_faces:
+        face_detector = load_and_prepare_detector_retinaFace_mobileNet(device=device)
+        metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
+                                                  positions_for_output_path=2)
+        # save metadata
+        print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
+        metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
+        # clear RAM
+        del face_detector
+        gc.collect()
+        torch.cuda.empty_cache()
 
     # pose extraction
-    pose_detector = SimpleHigherHRNet(c=32, nof_joints=17,
-                                      checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
-                                      return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
-                                      device="cuda")
-    metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
-                                             positions_for_output_path=2)
-    # save metadata
-    print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
-    metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
-    # clear RAM
-    del pose_detector
-    gc.collect()
-    torch.cuda.empty_cache()
+    if extract_poses:
+        pose_detector = SimpleHRNet(c=48, nof_joints=17, multiperson=True,
+                               yolo_version = 'v3',
+                               yolo_model_def=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
+                               yolo_class_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
+                               yolo_weights_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
+                               checkpoint_path="/work/home/dsu/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
+                               return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1, device=torch.device(device))
+
+        metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
+                                                 positions_for_output_path=2)
+        # save metadata
+        print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
+        metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
+        # clear RAM
+        del pose_detector
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 
-def preprocess_DAiSEE():
+def preprocess_DAiSEE(device, extract_faces=True, extract_poses=True):
     # params for DAiSEE
     path_to_data = "/media/external_hdd_2/DAiSEE/DAiSEE/DataSet"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*", "*", "*.avi"))
-    output_path_faces = "/work/home/dsu/DAiSEE/prepared_data/faces"
-    output_path_poses = "/work/home/dsu/DAiSEE/prepared_data/poses"
+    output_path_faces = "/media/external_hdd_2/DAiSEE/prepared_data/faces"
+    output_path_poses = "/media/external_hdd_2/DAiSEE/prepared_data/poses"
     final_FPS = 5
 
     # pose extraction
-    pose_detector = SimpleHigherHRNet(c=32, nof_joints=17,
-                                      checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
-                                      return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
-                                      device="cuda")
-    metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
-                                             positions_for_output_path=4)
-    # save metadata
-    print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
-    metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
-    # clear RAM
-    del pose_detector
-    gc.collect()
-    torch.cuda.empty_cache()
+    if extract_poses:
+        pose_detector = SimpleHRNet(c=48, nof_joints=17, multiperson=True,
+                                   yolo_version = 'v3',
+                                   yolo_model_def=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
+                                   yolo_class_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
+                                   yolo_weights_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
+                                   checkpoint_path="/work/home/dsu/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
+                                   return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1, device=torch.device(device))
+        metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
+                                                 positions_for_output_path=4)
+        # save metadata
+        print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
+        metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
+        # clear RAM
+        del pose_detector
+        gc.collect()
+        torch.cuda.empty_cache()
 
     # face extraction
-    face_detector = load_and_prepare_detector_retinaFace_mobileNet()
-    metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
-                                              positions_for_output_path=4)
-    # save metadata
-    print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
-    metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
-    # clear RAM
-    del face_detector
-    gc.collect()
-    torch.cuda.empty_cache()
+    if extract_faces:
+        face_detector = load_and_prepare_detector_retinaFace_mobileNet(device=device)
+        metadata_faces = crop_faces_in_all_videos(path_to_video_files, output_path_faces, face_detector, final_FPS,
+                                                  positions_for_output_path=4)
+        # save metadata
+        print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
+        metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
+        # clear RAM
+        del face_detector
+        gc.collect()
+        torch.cuda.empty_cache()
 
-def preprocess_MHHRI(part:str):
+def preprocess_MHHRI(part:str, device, extract_faces=True, extract_poses=True):
     if part not in ["HHI_Ego_Recordings", "HRI_Ego_Recordings"]:
         raise ValueError(f"Part should be either HHI_Ego_Recordings or HRI_Ego_Recordings. Got {part} instead.")
     # params for MHHRI
@@ -330,32 +341,37 @@ def preprocess_MHHRI(part:str):
     final_FPS = 5
 
     # pose extraction
-    pose_detector = SimpleHigherHRNet(c=32, nof_joints=17,
-                                      checkpoint_path="/work/home/dsu/simpleHigherHRNet/pose_higher_hrnet_w32_512.pth",
-                                      return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1,
-                                      device="cuda")
+    if extract_poses:
+        pose_detector = SimpleHRNet(c=48, nof_joints=17, multiperson=True,
+                                   yolo_version = 'v3',
+                                   yolo_model_def=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
+                                   yolo_class_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
+                                   yolo_weights_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
+                                   checkpoint_path="/work/home/dsu/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
+                                   return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1, device=torch.device(device))
 
-    metadata_poses = crop_pose_in_all_videos(paths_to_video_files, output_path_poses, pose_detector, final_FPS,
-                                             positions_for_output_path=1)
-    # save metadata
-    print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
-    metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
-    # clear RAM
-    del pose_detector
-    gc.collect()
-    torch.cuda.empty_cache()
+        metadata_poses = crop_pose_in_all_videos(paths_to_video_files, output_path_poses, pose_detector, final_FPS,
+                                                 positions_for_output_path=1)
+        # save metadata
+        print("Pose detection: dropped %s frames" % (metadata_poses.shape[0] - metadata_poses.dropna().shape[0]))
+        metadata_poses.to_csv(os.path.join(output_path_poses, "metadata.csv"), index=False)
+        # clear RAM
+        del pose_detector
+        gc.collect()
+        torch.cuda.empty_cache()
 
     # face extraction
-    face_detector = load_and_prepare_detector_retinaFace_mobileNet()
-    metadata_faces = crop_faces_in_all_videos(paths_to_video_files, output_path_faces, face_detector, final_FPS,
-                                              positions_for_output_path=1)
-    # save metadata
-    print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
-    metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
-    # clear RAM
-    del face_detector
-    gc.collect()
-    torch.cuda.empty_cache()
+    if extract_faces:
+        face_detector = load_and_prepare_detector_retinaFace_mobileNet(device=device)
+        metadata_faces = crop_faces_in_all_videos(paths_to_video_files, output_path_faces, face_detector, final_FPS,
+                                                  positions_for_output_path=1)
+        # save metadata
+        print("Face detection: dropped %s frames" % (metadata_faces.shape[0] - metadata_faces.dropna().shape[0]))
+        metadata_faces.to_csv(os.path.join(output_path_faces, "metadata.csv"), index=False)
+        # clear RAM
+        del face_detector
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 
@@ -365,10 +381,15 @@ def preprocess_MHHRI(part:str):
 
 if __name__ == "__main__":
     with IgnoreWarnings("deprecated"):
-        #preprocess_DAiSEE()
-        #preprocess_NoXi()
-        preprocess_MHHRI("HHI_Ego_Recordings")
-        preprocess_MHHRI("HRI_Ego_Recordings")
+        # identify device
+        device = "cpu"
+        extract_faces = True
+        extract_poses = True
+        # extract poses
+        preprocess_DAiSEE(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
+        preprocess_NoXi(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
+        #preprocess_MHHRI("HHI_Ego_Recordings", device=device,extract_faces=extract_faces, extract_poses=extract_poses)
+        #preprocess_MHHRI("HRI_Ego_Recordings", device=device,extract_faces=extract_faces, extract_poses=extract_poses)
 
 
 

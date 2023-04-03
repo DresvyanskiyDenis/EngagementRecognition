@@ -1,7 +1,7 @@
 import sys
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
-sys.path.extend(["/work/home/dsu/simpleHigherHRNet/"])
+sys.path.extend(["/work/home/dsu/simple-HRNet-master/"])
 
 import gc
 import glob
@@ -165,13 +165,99 @@ def prepare_df_for_NoXi(df_with_frame_paths:pd.DataFrame, path_to_labels: str) -
     return aligned_df
 
 
+def prepare_df_for_MHHRI(df_with_frame_paths:pd.DataFrame, path_to_labels: str) -> pd.DataFrame:
+    """ TODO: check it
+    Prepares dataframe for NoXi dataset. The labels will be aligned to image frames.
+    :param df_with_frame_paths: pd.DataFrame
+            Dataframe with paths to frames. The columns are: ['path_to_frame', 'timestamp', 'detected']
+    :param df_with_labels: str
+            Path to dir with labels.
+    :return: pd.DataFrame
+            Dataframe with aligned paths to frames and labels. The columns are: ['path_to_frame', 'timestamp', 'label_0', 'label_1', 'label_2', 'label_3', 'label_4']
+    """
+    # clear df_with_frame_paths from NaN and False values in detected columns
+    df_with_frame_paths = df_with_frame_paths[df_with_frame_paths['detected'] == True].reset_index(drop=True)
+    df_with_frame_paths = df_with_frame_paths.drop(columns=['detected'])
+    df_with_frame_paths = df_with_frame_paths.dropna().reset_index(drop=True)
+    # load labels from csv file
+    df_with_labels = load_MHHRI_labels(path_to_labels=path_to_labels)
+    # align (match) labels with frames
+    aligned_df = align_MHHRI_labels_with_frames(df_with_frame_paths, df_with_labels)
+
+    return aligned_df
+
+
+
+def load_MHHRI_labels(path_to_labels:str)->pd.DataFrame:
+    """ Loads MHHRI labels from csv file. The MHHRI labels file is presented in format:
+    column1:U002,U001, ..., U001 (identifier of the assesed participant)
+    column2:S02,S01,...,S02 (identifier of the session)
+    column3:5,1,...,4 (label 0)
+    etc
+
+    We need label 0 (engagement in the human-human conversation) and label 6 (engagement in the human-robot conversation)
+    All labels are in range [1, 10]
+
+    :param path_to_labels: str
+            Path to the labels file.
+    :return: pd.DataFrame
+            Dataframe with labels. The columns are: ['participant_id', 'session_id', 'engagement_hhi', 'engagement_hri']
+    """
+
+    labels = pd.read_csv(path_to_labels, header=None)
+    # transform dataframe to required format
+    labels = labels.T
+    labels.columns = ['participant_id', 'session_id', 'engagement_hhi', 'label_1', 'label_2', 'label_3', 'label_4', 'label_5', 'engagement_hri']
+    # drop unnecessary columns
+    labels = labels.drop(columns=['label_1', 'label_2', 'label_3', 'label_4', 'label_5'])
+
+    return labels
+
+
+def align_MHHRI_labels_with_frames(df_with_frame_paths:pd.DataFrame, df_with_labels:pd.DataFrame)->pd.DataFrame:
+    """ Aligns MHHRI labels with already extracted frames. Basically, since one interaction has only one label values,
+    it assigns to all frames from all videos of this interaction the same label value.
+
+    :param df_with_frame_paths: pd.DataFrame
+            Dataframe with paths to frames. The columns are: ['path_to_frame', 'timestamp', 'detected']
+    :param df_with_labels: pd.DataFrame
+            Dataframe with labels. The columns are: ['participant_id', 'session_', 'engagement_hhi', 'engagement_hri']
+    :return: pd.DataFrame
+            Dataframe with aligned paths to frames and labels. The columns are: ['path_to_frame', 'timestamp', 'engagement_hhi', 'engagement_hri']
+    """
+    # extract from df_with_frame_paths['path_to_frame'] the id of the second person (the person, which is seen on EGO camera)
+    # and the id of the session
+    df_with_frame_paths['visible_person'] = df_with_frame_paths['path_to_frame'].apply(lambda x:
+                                                                                    os.path.basename(x).split('/')[4])
+    df_with_frame_paths['session_id'] = df_with_frame_paths['path_to_frame'].apply(lambda x:
+                                                                                    os.path.basename(x).split('/')[0])
+    # depending on the id session and id of the second person, we can find the corresponding label
+    df_with_frame_paths['engagement_hhi'] = df_with_frame_paths.apply(lambda x:
+                df_with_labels[(df_with_labels['participant_id'] == x['visible_person']) &
+                (df_with_labels['session_id'] == x['session_id'])]['engagement_hhi'].values[0],
+                                                                      axis=1)
+
+    df_with_frame_paths['engagement_hri'] = df_with_frame_paths.apply(lambda x:
+                df_with_labels[(df_with_labels['participant_id'] == x['visible_person']) &
+                (df_with_labels['session_id'] == x['session_id'])]['engagement_hri'].values[0],
+                                                                        axis=1)
+
+    # drop unnecessary columns
+    df_with_frame_paths = df_with_frame_paths.drop(columns=['visible_person', 'session_id'])
+
+    return df_with_frame_paths
+
+
+
+
+
 if __name__=="__main__":
-    # process the NoXi dataset
+    # process the NoXi dataset, pose frames
     # params
-    path_to_labels = '/media/external_hdd_2/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
-    path_to_frames = '/work/home/dsu/NoXi/journal_paper/prepared_data/poses/'
-    path_to_df_with_frame_paths = '/work/home/dsu/NoXi/journal_paper/prepared_data/poses/metadata.csv'
-    output_path = '/work/home/dsu/NoXi/journal_paper/prepared_data/poses/'
+    path_to_labels = '/media/external_hdd_2/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
+    path_to_frames = '/media/external_hdd_2/NoXi/prepared_data/poses/'
+    path_to_df_with_frame_paths = '/media/external_hdd_2/NoXi/prepared_data/poses/metadata.csv'
+    output_path = '/media/external_hdd_2/NoXi/prepared_data/poses/'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load and prepare labels
@@ -194,13 +280,47 @@ if __name__=="__main__":
     test_NoXi.to_csv(os.path.join(output_path, 'NoXi_pose_test.csv'), index=False)
 
 
-
-    # process DAiSEE dataset (train)
+    # process the NoXi dataset, face frames
     # params
-    path_to_frames = '/work/home/dsu/DAiSEE/prepared_data/poses/'
-    path_to_df_with_frame_paths = "/work/home/dsu/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_labels = '/media/external_hdd_2/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
+    path_to_frames = '/media/external_hdd_2/NoXi/prepared_data/faces/'
+    path_to_df_with_frame_paths = '/media/external_hdd_2/NoXi/prepared_data/faces/metadata.csv'
+    output_path = '/media/external_hdd_2/NoXi/prepared_data/faces/'
+    # load dataframe with paths to frames
+    df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
+    # load and prepare labels
+    english_train = prepare_df_for_NoXi(df_with_frame_paths,
+                                        path_to_labels=os.path.join(path_to_labels, 'English', 'train'))
+    english_dev = prepare_df_for_NoXi(df_with_frame_paths,
+                                      path_to_labels=os.path.join(path_to_labels, 'English', 'dev'))
+    english_test = prepare_df_for_NoXi(df_with_frame_paths,
+                                       path_to_labels=os.path.join(path_to_labels, 'English', 'test'))
+    german_train = prepare_df_for_NoXi(df_with_frame_paths,
+                                       path_to_labels=os.path.join(path_to_labels, 'German', 'train'))
+    german_dev = prepare_df_for_NoXi(df_with_frame_paths, path_to_labels=os.path.join(path_to_labels, 'German', 'dev'))
+    german_test = prepare_df_for_NoXi(df_with_frame_paths,
+                                      path_to_labels=os.path.join(path_to_labels, 'German', 'test'))
+    french_train = prepare_df_for_NoXi(df_with_frame_paths,
+                                       path_to_labels=os.path.join(path_to_labels, 'French', 'train'))
+    french_dev = prepare_df_for_NoXi(df_with_frame_paths, path_to_labels=os.path.join(path_to_labels, 'French', 'dev'))
+    french_test = prepare_df_for_NoXi(df_with_frame_paths,
+                                      path_to_labels=os.path.join(path_to_labels, 'French', 'test'))
+    # concatenate train, dev and test dataframes
+    train_NoXi = pd.concat([english_train, german_train, french_train], axis=0).reset_index(drop=True)
+    dev_NoXi = pd.concat([english_dev, german_dev, french_dev], axis=0).reset_index(drop=True)
+    test_NoXi = pd.concat([english_test, german_test, french_test], axis=0).reset_index(drop=True)
+    # save dataframes
+    train_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_train.csv'), index=False)
+    dev_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_dev.csv'), index=False)
+    test_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_test.csv'), index=False)
+
+
+    # process DAiSEE dataset (train), pose frames
+    # params
+    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/poses/metadata.csv"
     path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TrainLabels.csv'
-    output_path = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
     filename = 'DAiSEE_pose_train_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
@@ -211,12 +331,12 @@ if __name__=="__main__":
     # save dataframe
     df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
-    # process DAiSEE dataset (dev)
+    # process DAiSEE dataset (dev), pose frames
     # params
-    path_to_frames = '/work/home/dsu/DAiSEE/prepared_data/poses/'
-    path_to_df_with_frame_paths = "/work/home/dsu/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/poses/metadata.csv"
     path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/ValidationLabels.csv'
-    output_path = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
     filename = 'DAiSEE_pose_dev_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
@@ -227,13 +347,61 @@ if __name__=="__main__":
     # save dataframe
     df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
-    # process DAiSEE dataset (test)
+    # process DAiSEE dataset (test), pose frames
     # params
-    path_to_frames = '/work/home/dsu/DAiSEE/prepared_data/poses/'
-    path_to_df_with_frame_paths = "/work/home/dsu/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/poses/metadata.csv"
     path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TestLabels.csv'
-    output_path = '/work/home/dsu/DAiSEE/prepared_data/poses/'
+    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
     filename = 'DAiSEE_pose_test_labels.csv'
+    # load dataframe with paths to frames
+    df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
+    # load dataframe with labels
+    df_with_labels = pd.read_csv(path_to_df_with_labels)
+    # prepare dataframe for DAiSEE dataset
+    df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
+    # save dataframe
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
+
+    # process DAiSEE dataset (train), face frames
+    # params
+    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
+    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/faces/metadata.csv"
+    path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TrainLabels.csv'
+    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
+    filename = 'DAiSEE_facial_train_labels.csv'
+    # load dataframe with paths to frames
+    df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
+    # load dataframe with labels
+    df_with_labels = pd.read_csv(path_to_df_with_labels)
+    # prepare dataframe for DAiSEE dataset
+    df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
+    # save dataframe
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
+
+    # process DAiSEE dataset (dev), face frames
+    # params
+    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
+    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/faces/metadata.csv"
+    path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/ValidationLabels.csv'
+    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
+    filename = 'DAiSEE_facial_dev_labels.csv'
+    # load dataframe with paths to frames
+    df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
+    # load dataframe with labels
+    df_with_labels = pd.read_csv(path_to_df_with_labels)
+    # prepare dataframe for DAiSEE dataset
+    df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
+    # save dataframe
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
+
+    # process DAiSEE dataset (test), face frames
+    # params
+    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
+    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/faces/metadata.csv"
+    path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TestLabels.csv'
+    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
+    filename = 'DAiSEE_facial_test_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load dataframe with labels

@@ -228,9 +228,9 @@ def align_MHHRI_labels_with_frames(df_with_frame_paths:pd.DataFrame, df_with_lab
     # extract from df_with_frame_paths['path_to_frame'] the id of the second person (the person, which is seen on EGO camera)
     # and the id of the session
     df_with_frame_paths['visible_person'] = df_with_frame_paths['path_to_frame'].apply(lambda x:
-                                                                                    os.path.basename(x).split('/')[4])
+                                                                                    os.path.basename(x).split('_')[4])
     df_with_frame_paths['session_id'] = df_with_frame_paths['path_to_frame'].apply(lambda x:
-                                                                                    os.path.basename(x).split('/')[0])
+                                                                                    os.path.basename(x).split('_')[0])
     # depending on the id session and id of the second person, we can find the corresponding label
     df_with_frame_paths['engagement_hhi'] = df_with_frame_paths.apply(lambda x:
                 df_with_labels[(df_with_labels['participant_id'] == x['visible_person']) &
@@ -252,7 +252,7 @@ def align_MHHRI_labels_with_frames(df_with_frame_paths:pd.DataFrame, df_with_lab
 
 
 if __name__=="__main__":
-    # process the NoXi dataset, pose frames
+    """# process the NoXi dataset, pose frames
     # params
     path_to_labels = '/media/external_hdd_2/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
     path_to_frames = '/media/external_hdd_2/NoXi/prepared_data/poses/'
@@ -409,7 +409,47 @@ if __name__=="__main__":
     # prepare dataframe for DAiSEE dataset
     df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # save dataframe
-    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)"""
+
+
+    # process MHHRI dataset (HHI), face frames
+    # params
+    path_to_df_with_frame_paths = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/faces/metadata.csv"
+    path_to_df_with_labels = "/media/external_hdd_2/MHHRI/mhhri/dataset/annotations/MHHRI_labels/post_questionnaire.csv"
+    output_path = '/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/faces/'
+    metadata = pd.read_csv(path_to_df_with_frame_paths)
+    prepared_labels = prepare_df_for_MHHRI(df_with_frame_paths=metadata, path_to_labels=path_to_df_with_labels)
+    prepared_labels.to_csv(os.path.join(output_path, 'MHHRI_facial_labels.csv'), index=False)
+
+    # process MHHRI dataset (HHI), pose frames
+    # params
+    path_to_df_with_frame_paths = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/poses/metadata.csv"
+    path_to_df_with_labels = "/media/external_hdd_2/MHHRI/mhhri/dataset/annotations/MHHRI_labels/post_questionnaire.csv"
+    output_path = '/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/poses/'
+    metadata = pd.read_csv(path_to_df_with_frame_paths)
+    prepared_labels = prepare_df_for_MHHRI(df_with_frame_paths=metadata, path_to_labels=path_to_df_with_labels)
+    prepared_labels.to_csv(os.path.join(output_path, 'MHHRI_pose_labels.csv'), index=False)
+
+    # process MHHRI dataset (HRI), face frames
+    # params
+    path_to_df_with_frame_paths = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HRI_Ego_Recordings/faces/metadata.csv"
+    path_to_df_with_labels = "/media/external_hdd_2/MHHRI/mhhri/dataset/annotations/MHHRI_labels/post_questionnaire.csv"
+    output_path = '/media/external_hdd_2/MHHRI/mhhri/prepared_data/HRI_Ego_Recordings/faces/'
+    metadata = pd.read_csv(path_to_df_with_frame_paths)
+    prepared_labels = prepare_df_for_MHHRI(df_with_frame_paths=metadata, path_to_labels=path_to_df_with_labels)
+    prepared_labels.to_csv(os.path.join(output_path, 'MHHRI_facial_labels.csv'), index=False)
+
+    # process MHHRI dataset (HRI), pose frames
+    # params
+    path_to_df_with_frame_paths = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HRI_Ego_Recordings/poses/metadata.csv"
+    path_to_df_with_labels = "/media/external_hdd_2/MHHRI/mhhri/dataset/annotations/MHHRI_labels/post_questionnaire.csv"
+    output_path = '/media/external_hdd_2/MHHRI/mhhri/prepared_data/HRI_Ego_Recordings/poses/'
+    metadata = pd.read_csv(path_to_df_with_frame_paths)
+    prepared_labels = prepare_df_for_MHHRI(df_with_frame_paths=metadata, path_to_labels=path_to_df_with_labels)
+    prepared_labels.to_csv(os.path.join(output_path, 'MHHRI_pose_labels.csv'), index=False)
+
+
+
 
 
 

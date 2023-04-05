@@ -41,6 +41,15 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     DAiSEE_dev = pd.read_csv(path_to_DAiSEE_dev)
     DAiSEE_test = pd.read_csv(path_to_DAiSEE_test)
 
+    # clear from NaNs
+    NoXi_train = NoXi_train.dropna()
+    NoXi_dev = NoXi_dev.dropna()
+    NoXi_test = NoXi_test.dropna()
+
+    DAiSEE_train = DAiSEE_train.dropna()
+    DAiSEE_dev = DAiSEE_dev.dropna()
+    DAiSEE_test = DAiSEE_test.dropna()
+
     # drop timestamps
     NoXi_train = NoXi_train.drop(columns=['timestamp'])
     NoXi_dev = NoXi_dev.drop(columns=['timestamp'])

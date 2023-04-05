@@ -1,0 +1,266 @@
+from functools import partial
+from typing import Tuple, List, Callable, Optional, Dict, Union
+
+import pandas as pd
+import torch
+from torch.utils.data import DataLoader
+
+import training_config
+from decorators.common_decorators import timer
+from pytorch_utils.data_loaders.ImageDataLoader_new import ImageDataLoader
+from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_factor, grayscale_image, \
+    collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
+    random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
+    random_horizontal_flip_image, random_vertical_flip_image
+from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
+
+
+def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+     Loads all dataframes for the datasets AFEW-VA, AffectNet, RECOLA, SEMAINE, and SEWA, and split them into
+        train, dev, and test sets.
+    Returns: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
+        The tuple of train, dev, and test data.
+
+    """
+
+    path_to_NoXi_train = "/media/external_hdd_2/NoXi/prepared_data/faces/NoXi_facial_train.csv"
+    path_to_NoXi_dev = "/media/external_hdd_2/NoXi/prepared_data/faces/NoXi_facial_dev.csv"
+    path_to_NoXi_test = "/media/external_hdd_2/NoXi/prepared_data/faces/NoXi_facial_test.csv"
+
+    path_to_DAiSEE_train = "/media/external_hdd_2/DAiSEE/prepared_data/faces/DAiSEE_facial_train_labels.csv"
+    path_to_DAiSEE_dev = "/media/external_hdd_2/DAiSEE/prepared_data/faces/DAiSEE_facial_dev_labels.csv"
+    path_to_DAiSEE_test = "/media/external_hdd_2/DAiSEE/prepared_data/faces/DAiSEE_facial_test_labels.csv"
+
+    # load dataframes
+    NoXi_train = pd.read_csv(path_to_NoXi_train)
+    NoXi_dev = pd.read_csv(path_to_NoXi_dev)
+    NoXi_test = pd.read_csv(path_to_NoXi_test)
+
+    DAiSEE_train = pd.read_csv(path_to_DAiSEE_train)
+    DAiSEE_dev = pd.read_csv(path_to_DAiSEE_dev)
+    DAiSEE_test = pd.read_csv(path_to_DAiSEE_test)
+
+    # drop timestamps
+    NoXi_train = NoXi_train.drop(columns=['timestamp'])
+    NoXi_dev = NoXi_dev.drop(columns=['timestamp'])
+    NoXi_test = NoXi_test.drop(columns=['timestamp'])
+
+    DAiSEE_train = DAiSEE_train.drop(columns=['timestamp'])
+    DAiSEE_dev = DAiSEE_dev.drop(columns=['timestamp'])
+    DAiSEE_test = DAiSEE_test.drop(columns=['timestamp'])
+
+    # change path_to_frame column name to path
+    NoXi_train = NoXi_train.rename(columns={"path_to_frame": "path"})
+    NoXi_dev = NoXi_dev.rename(columns={"path_to_frame": "path"})
+    NoXi_test = NoXi_test.rename(columns={"path_to_frame": "path"})
+
+    DAiSEE_train = DAiSEE_train.rename(columns={"path_to_frame": "path"})
+    DAiSEE_dev = DAiSEE_dev.rename(columns={"path_to_frame": "path"})
+    DAiSEE_test = DAiSEE_test.rename(columns={"path_to_frame": "path"})
+
+    # map 4-class labels to 3-class labels for DAiSEE. 4 classes were: highly disengaged, disengaged, engaged, highly engaged.
+    # Now it would be 3 classes: disengaged, neutral, engaged
+    # Remember that they are presented as one-hot vectors
+        # we can simply add two columns that represent middle classes, while keep the other two columns as they are
+        # then, drop old columns and rename new columns to the template 'label_0', 'label_1', 'label_2',
+    DAiSEE_train['new_label_0'] = DAiSEE_train['label_0']
+    DAiSEE_train['new_label_1'] = DAiSEE_train['label_1'] + DAiSEE_train['label_2']
+    DAiSEE_train['new_label_2'] = DAiSEE_train['label_3']
+    DAiSEE_train = DAiSEE_train.drop(columns=['label_0', 'label_1', 'label_2', 'label_3'])
+    DAiSEE_train = DAiSEE_train.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+
+    DAiSEE_dev['new_label_0'] = DAiSEE_dev['label_0']
+    DAiSEE_dev['new_label_1'] = DAiSEE_dev['label_1'] + DAiSEE_dev['label_2']
+    DAiSEE_dev['new_label_2'] = DAiSEE_dev['label_3']
+    DAiSEE_dev = DAiSEE_dev.drop(columns=['label_0', 'label_1', 'label_2', 'label_3'])
+    DAiSEE_dev = DAiSEE_dev.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+
+    DAiSEE_test['new_label_0'] = DAiSEE_test['label_0']
+    DAiSEE_test['new_label_1'] = DAiSEE_test['label_1'] + DAiSEE_test['label_2']
+    DAiSEE_test['new_label_2'] = DAiSEE_test['label_3']
+    DAiSEE_test = DAiSEE_test.drop(columns=['label_0', 'label_1', 'label_2', 'label_3'])
+    DAiSEE_test = DAiSEE_test.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+
+    # map 5-class labels to 3-class labels for NoXi dataset. 5 classes were: highly disengaged, disengaged, neutral, engaged, highly engaged.
+    # Now it would be 3 classes: disengaged, neutral, engaged
+    # Remember that they are presented as one-hot vectors
+        # we can add two first columns that represent disengagemend state (it would be then disengagement class in 3-class classification)
+        # then, add two last columns that represent engagement state (it would be then engagement class in 3-class classification)
+        # then, drop old columns and rename new columns to the template 'label_0', 'label_1', 'label_2'
+    NoXi_train['new_label_0'] = NoXi_train['label_0'] + NoXi_train['label_1']
+    NoXi_train['new_label_1'] = NoXi_train['label_2']
+    NoXi_train['new_label_2'] = NoXi_train['label_3'] + NoXi_train['label_4']
+    NoXi_train = NoXi_train.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
+    NoXi_train = NoXi_train.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+
+    NoXi_dev['new_label_0'] = NoXi_dev['label_0'] + NoXi_dev['label_1']
+    NoXi_dev['new_label_1'] = NoXi_dev['label_2']
+    NoXi_dev['new_label_2'] = NoXi_dev['label_3'] + NoXi_dev['label_4']
+    NoXi_dev = NoXi_dev.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
+    NoXi_dev = NoXi_dev.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+
+    NoXi_test['new_label_0'] = NoXi_test['label_0'] + NoXi_test['label_1']
+    NoXi_test['new_label_1'] = NoXi_test['label_2']
+    NoXi_test['new_label_2'] = NoXi_test['label_3'] + NoXi_test['label_4']
+    NoXi_test = NoXi_test.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
+    NoXi_test = NoXi_test.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+
+    # concatenate datasets
+    train = pd.concat([DAiSEE_train, NoXi_train], ignore_index=True)
+    dev = pd.concat([DAiSEE_dev, NoXi_dev], ignore_index=True)
+    test = pd.concat([DAiSEE_test, NoXi_test], ignore_index=True)
+
+    return train, dev, test
+
+
+
+
+def get_augmentation_function(probability:float)->Dict[Callable, float]:
+    """
+    Returns a dictionary of augmentation functions and the probabilities of their application.
+    Args:
+        probability: float
+            The probability of applying the augmentation function.
+
+    Returns: Dict[Callable, float]
+        A dictionary of augmentation functions and the probabilities of their application.
+
+    """
+    augmentation_functions = {
+        pad_image_random_factor: probability,
+        grayscale_image: probability,
+        partial(collor_jitter_image_random, brightness=0.5, hue=0.3, contrast=0.3,
+                saturation=0.3): probability,
+        partial(gaussian_blur_image_random, kernel_size=(5, 9), sigma=(0.1, 5)): training_config.AUGMENT_PROB,
+        random_perspective_image: probability,
+        random_rotation_image: probability,
+        partial(random_crop_image, cropping_factor_limits=(0.7, 0.9)): probability,
+        random_posterize_image: probability,
+        partial(random_adjust_sharpness_image, sharpness_factor_limits=(0.1, 3)): probability,
+        random_equalize_image: probability,
+        random_horizontal_flip_image: probability,
+        random_vertical_flip_image: probability,
+    }
+    return augmentation_functions
+
+
+def construct_data_loaders(train:pd.DataFrame, dev:pd.DataFrame, test:pd.DataFrame,
+                           preprocessing_functions:List[Callable],
+                           batch_size:int,
+                           augmentation_functions:Optional[Dict[Callable, float]]=None,
+                           num_workers:int=8)\
+        ->Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    """ Constructs the data loaders for the train, dev and test sets.
+
+    Args:
+        train: pd.DataFrame
+            The train set. It should contain the columns 'path'
+        dev: pd.DataFrame
+            The dev set. It should contain the columns 'path'
+        test: pd.DataFrame
+            The test set. It should contain the columns 'path'
+        preprocessing_functions: List[Callable]
+            A list of preprocessing functions to be applied to the images.
+        batch_size: int
+            The batch size.
+        augmentation_functions: Optional[Dict[Callable, float]]
+            A dictionary of augmentation functions and the probabilities of their application.
+        num_workers: int
+            The number of workers to be used by the data loaders.
+
+    Returns: Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]
+        The data loaders for the train, dev and test sets.
+
+    """
+
+    train_data_loader = ImageDataLoader(paths_with_labels=train, preprocessing_functions=preprocessing_functions,
+                 augmentation_functions=augmentation_functions, shuffle=True)
+
+    dev_data_loader = ImageDataLoader(paths_with_labels=dev, preprocessing_functions=preprocessing_functions,
+                    augmentation_functions=None, shuffle=False)
+
+    test_data_loader = ImageDataLoader(paths_with_labels=test, preprocessing_functions=preprocessing_functions,
+                    augmentation_functions=None, shuffle=False)
+
+    train_dataloader = DataLoader(train_data_loader, batch_size=batch_size, num_workers=num_workers, drop_last = True, shuffle=True)
+    dev_dataloader = DataLoader(dev_data_loader, batch_size=batch_size, num_workers=num_workers//2, shuffle=False)
+    test_dataloader = DataLoader(test_data_loader, batch_size=batch_size, num_workers=num_workers//4, shuffle=False)
+
+    return (train_dataloader, dev_dataloader, test_dataloader)
+
+
+def load_data_and_construct_dataloaders(model_type:str, batch_size:int, return_class_weights:Optional[bool]=False)->\
+        Union[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader],
+              Tuple[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]]:
+    """
+        Args:
+            model_type: str
+            The type of the model.
+            batch_size: int
+            The batch size.
+            return_class_weights: Optional[bool]
+            If True, the function returns the class weights as well.
+
+    Loads the data presented in pd.DataFrames and constructs the data loaders using them. It is a general function
+    to assemble all functions defined above.
+    Returns: Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]
+        The train, dev and test data loaders.
+        or
+        Tuple[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]
+        The train, dev and test data loaders and the class weights calculated based on the training labels.
+
+    """
+    if model_type not in ['EfficientNet-B1', 'EfficientNet-B4']:
+        raise ValueError('The model type should be either "EfficientNet-B1" or "EfficientNet-B4".')
+    # load pd.DataFrames
+    train, dev, test = load_all_dataframes()
+    # define preprocessing functions
+    if model_type == 'EfficientNet-B1':
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size = 240),
+                                   EfficientNet_image_preprocessor()]
+    elif model_type == 'EfficientNet-B4':
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size = 380),
+                                   EfficientNet_image_preprocessor()]
+    else:
+        raise ValueError(f'The model type should be either "EfficientNet-B1" or "EfficientNet-B4".'
+                         f'Got {model_type} instead.')
+    # define augmentation functions
+    augmentation_functions = get_augmentation_function(training_config.AUGMENT_PROB)
+    # construct data loaders
+    train_dataloader, dev_dataloader, test_dataloader = construct_data_loaders(train, dev, test,
+                                                                               preprocessing_functions,
+                                                                               batch_size,
+                                                                               augmentation_functions,
+                                                                               num_workers=training_config.NUM_WORKERS)
+
+    if return_class_weights:
+        num_classes = train.iloc[:, -1].nunique()
+        labels = pd.DataFrame(train.iloc[:,-1])
+        labels = labels.dropna()
+        labels = labels.astype(int)
+        class_weights = torch.nn.functional.one_hot(torch.tensor(labels.values), num_classes=num_classes)
+        class_weights = class_weights.sum(axis=0)
+        class_weights = 1. / (class_weights / class_weights.sum())
+        # normalize class weights
+        class_weights = class_weights / class_weights.sum()
+        return ((train_dataloader, dev_dataloader, test_dataloader), class_weights)
+
+    return (train_dataloader, dev_dataloader, test_dataloader)
+
+
+
+@timer
+def main():
+    train_data_loader, dev_data_loader, test_data_loader = load_data_and_construct_dataloaders()
+    for x, y in train_data_loader:
+        print(x.shape, y.shape)
+        print("-------------------")
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+

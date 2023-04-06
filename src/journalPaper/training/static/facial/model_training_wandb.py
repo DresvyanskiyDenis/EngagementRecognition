@@ -24,7 +24,7 @@ from pytorch_utils.training_utils.losses import SoftFocalLoss, RMSELoss
 
 import wandb
 
-from src.journalPaper.training.static.facial.data_preparation import load_data_and_construct_dataloaders
+from data_preparation import load_data_and_construct_dataloaders
 
 def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[object, float]:
     evaluation_metrics_classification = {'val_accuracy_classification': accuracy_score,

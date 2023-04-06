@@ -2,8 +2,6 @@ import sys
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/emotion_recognition_project/"])
 
-
-
 import argparse
 from torchinfo import summary
 import gc
@@ -26,6 +24,7 @@ from pytorch_utils.training_utils.losses import SoftFocalLoss, RMSELoss
 
 import wandb
 
+from src.journalPaper.training.static.facial.data_preparation import load_data_and_construct_dataloaders
 
 def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[object, float]:
     evaluation_metrics_classification = {'val_accuracy_classification': accuracy_score,
@@ -236,18 +235,12 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
 
     # create model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if config.MODEL_TYPE == "MobileNetV3_large":
-        model = Modified_MobileNetV3_large(embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                                           num_regression_neurons=config.NUM_REGRESSION_NEURONS)
-    elif config.MODEL_TYPE == "EfficientNet-B1":
+    if config.MODEL_TYPE == "EfficientNet-B1":
         model = Modified_EfficientNet_B1(embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                                         num_regression_neurons=config.NUM_REGRESSION_NEURONS)
+                                         num_regression_neurons=None)
     elif config.MODEL_TYPE == "EfficientNet-B4":
         model = Modified_EfficientNet_B4(embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                                         num_regression_neurons=config.NUM_REGRESSION_NEURONS)
-    elif config.MODEL_TYPE == "ViT_B_16":
-        model = Modified_ViT_B_16(embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                                  num_regression_neurons=config.NUM_REGRESSION_NEURONS)
+                                          num_regression_neurons=None)
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
     model = model.to(device)
@@ -255,28 +248,11 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     summary(model, (2, 3, 380, 380))
 
     # define all model layers (params), which will be used by optimizer
-    if config.MODEL_TYPE == "MobileNetV3_large":
-        model_layers = [
-            *list(list(list(model.children())[0].children())[0].children()),
-            *list(list(model.children())[0].children())[1:],
-            *list(model.children())[1:]  # added layers
-        ]
-    elif config.MODEL_TYPE == "EfficientNet-B1" or config.MODEL_TYPE == "EfficientNet-B4":
+    if config.MODEL_TYPE == "EfficientNet-B1" or config.MODEL_TYPE == "EfficientNet-B4":
         model_layers = [
             *list(list(model.children())[0].features.children()),
             *list(list(model.children())[0].children())[1:],
             *list(model.children())[1:]  # added layers
-        ]
-    elif config.MODEL_TYPE == "ViT_B_16":
-        model_layers = [ list(model.model.children())[0], # first conv layer
-                         # encoder
-                         list(list(model.model.children())[1].children())[0], # Dropout of encoder
-                            # the encoder itself
-                            *list(list(list(model.model.children())[1].children())[1].children()), # blocks of encoder
-                            # end of the encoder itself
-                         list(list(model.model.children())[1].children())[2], # LayerNorm of encoder
-                         list(model.model.children())[2], # last linear layer
-            *list(model.children())[1:] # added layers
         ]
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
@@ -307,7 +283,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                              weight_decay=config.WEIGHT_DECAY)
     # Loss functions
     class_weights = class_weights.to(device)
-    criterions = (RMSELoss(), RMSELoss(), SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2))
+    criterion = SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)
     # create LR scheduler
     lr_schedullers = {
         'Cyclic': torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.ANNEALING_PERIOD,
@@ -332,9 +308,6 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
             optimizer.param_groups[0]['lr'] = config.LR_MIN_WARMUP
 
     # early stopping
-    best_val_metric_value = -np.inf  # we do maximization
-    best_val_rmse_arousal = np.inf
-    best_val_rmse_valence = np.inf
     best_val_recall_classification = 0
     early_stopping_callback = TorchEarlyStopping(verbose=True, patience=config.EARLY_STOPPING_PATIENCE,
                                                  save_path=config.BEST_MODEL_SAVE_PATH,
@@ -345,7 +318,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         print("Epoch: %i" % epoch)
         # train the model
         model.train()
-        train_loss = train_epoch(model, train_generator, optimizer, criterions, device, print_step=100,
+        train_loss = train_epoch(model, train_generator, optimizer, criterion, device, print_step=100,
                                  accumulate_gradients=ACCUMULATE_GRADIENTS,
                                  warmup_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None)
         print("Train loss: %.10f" % train_loss)
@@ -353,51 +326,31 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         # validate the model
         model.eval()
         print("Evaluation of the model on dev set.")
-        val_metric_arousal, val_metric_valence, val_metrics_classification = evaluate_model(model, dev_generator,
-                                                                                            device)
+        val_metrics_classification = evaluate_model(model, dev_generator, device)
 
         # update best val metrics got on validation set and log them using wandb
-        if val_metric_arousal['val_arousal_rmse'] < best_val_rmse_arousal:
-            best_val_rmse_arousal = val_metric_arousal['val_arousal_rmse']
-            wandb.config.update({'best_val_rmse_arousal': best_val_rmse_arousal}, allow_val_change=True)
-        if val_metric_valence['val_valence_rmse'] < best_val_rmse_valence:
-            best_val_rmse_valence = val_metric_valence['val_valence_rmse']
-            wandb.config.update({'best_val_rmse_valence': best_val_rmse_valence}, allow_val_change=True)
+        # also, save model if we got better recall
         if val_metrics_classification['val_recall_classification'] > best_val_recall_classification:
             best_val_recall_classification = val_metrics_classification['val_recall_classification']
             wandb.config.update({'best_val_recall_classification': best_val_recall_classification}, allow_val_change=True)
-
-        # calculate general metric as average of (1.-RMSE_arousal), (1.-RMSE_valence), and RECALL_classification
-        metric_value = (1. - val_metric_arousal['val_arousal_rmse']) + \
-                       (1. - val_metric_valence['val_valence_rmse']) + \
-                       val_metrics_classification['val_recall_classification']
-        metric_value = metric_value / 3.
-        print("Validation metric (Average sum of (1.-RMSE_arousal), (1.-RMSE_valence), and RECALL_classification): %.10f" % metric_value)
+            # save best model
+            if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
+                os.makedirs(config.BEST_MODEL_SAVE_PATH)
+            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_recall.pth'))
 
         # log everything using wandb
         wandb.log({'epoch': epoch}, commit=False)
         wandb.log({'learning_rate': optimizer.param_groups[0]["lr"]}, commit=False)
-        wandb.log(val_metric_arousal, commit=False)
-        wandb.log(val_metric_valence, commit=False)
         wandb.log(val_metrics_classification, commit=False)
-        wandb.log({'val_general_metric': metric_value}, commit=False)
-        wandb.log({'train_loss (rmse+rmse+crossentropy)': train_loss})
+        wandb.log({'train_loss': train_loss})
         # update LR if needed
         if config.LR_SCHEDULLER == 'ReduceLRonPlateau':
-            lr_scheduller.step(metric_value)
+            lr_scheduller.step(best_val_recall_classification)
         elif config.LR_SCHEDULLER == 'Cyclic':
             lr_scheduller.step()
 
-        # save best model
-        if metric_value > best_val_metric_value:
-            if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
-                os.makedirs(config.BEST_MODEL_SAVE_PATH)
-            best_val_metric_value = metric_value
-            wandb.config.update({'best_val_metric_value\n(Average sum of (1.-RMSE_arousal), (1.-RMSE_valence), and RECALL_classification)':
-                                     best_val_metric_value}, allow_val_change=True)
-            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_metric.pth'))
         # check early stopping
-        early_stopping_result = early_stopping_callback(metric_value, model)
+        early_stopping_result = early_stopping_callback(best_val_recall_classification, model)
         if early_stopping_result:
             print("Early stopping")
             break
@@ -437,8 +390,8 @@ if __name__ == "__main__":
     # turn passed args from int to bool
     print("Passed args: ", args)
     # check arguments
-    if args.model_type not in ['MobileNetV3_large', 'EfficientNet-B1', 'EfficientNet-B4', 'ViT_B_16']:
-        raise ValueError("model_type should be either MobileNetV3_large, EfficientNet-B1, EfficientNet-B4, or ViT_B_16. Got %s" % args.model_type)
+    if args.model_type not in ['EfficientNet-B1', 'EfficientNet-B4']:
+        raise ValueError("model_type should be either EfficientNet-B1 or EfficientNet-B4. Got %s" % args.model_type)
     if args.batch_size < 1:
         raise ValueError("batch_size should be greater than 0")
     if args.accumulate_gradients < 1:

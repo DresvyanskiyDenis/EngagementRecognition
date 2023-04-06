@@ -24,13 +24,13 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     """
 
-    path_to_NoXi_train = "/media/external_hdd_2/NoXi/prepared_data/faces/NoXi_facial_train.csv"
-    path_to_NoXi_dev = "/media/external_hdd_2/NoXi/prepared_data/faces/NoXi_facial_dev.csv"
-    path_to_NoXi_test = "/media/external_hdd_2/NoXi/prepared_data/faces/NoXi_facial_test.csv"
+    path_to_NoXi_train = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_train.csv"
+    path_to_NoXi_dev = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_dev.csv"
+    path_to_NoXi_test = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_test.csv"
 
-    path_to_DAiSEE_train = "/media/external_hdd_2/DAiSEE/prepared_data/faces/DAiSEE_facial_train_labels.csv"
-    path_to_DAiSEE_dev = "/media/external_hdd_2/DAiSEE/prepared_data/faces/DAiSEE_facial_dev_labels.csv"
-    path_to_DAiSEE_test = "/media/external_hdd_2/DAiSEE/prepared_data/faces/DAiSEE_facial_test_labels.csv"
+    path_to_DAiSEE_train = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_train_labels.csv"
+    path_to_DAiSEE_dev = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_dev_labels.csv"
+    path_to_DAiSEE_test = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_test_labels.csv"
 
     # load dataframes
     NoXi_train = pd.read_csv(path_to_NoXi_train)
@@ -51,9 +51,9 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     DAiSEE_test = DAiSEE_test.dropna()
 
     # drop timestamps
-    NoXi_train = NoXi_train.drop(columns=['timestamp'])
-    NoXi_dev = NoXi_dev.drop(columns=['timestamp'])
-    NoXi_test = NoXi_test.drop(columns=['timestamp'])
+    NoXi_train = NoXi_train.drop(columns=['timestep'])
+    NoXi_dev = NoXi_dev.drop(columns=['timestep'])
+    NoXi_test = NoXi_test.drop(columns=['timestep'])
 
     DAiSEE_train = DAiSEE_train.drop(columns=['timestamp'])
     DAiSEE_dev = DAiSEE_dev.drop(columns=['timestamp'])
@@ -119,6 +119,11 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train = pd.concat([DAiSEE_train, NoXi_train], ignore_index=True)
     dev = pd.concat([DAiSEE_dev, NoXi_dev], ignore_index=True)
     test = pd.concat([DAiSEE_test, NoXi_test], ignore_index=True)
+
+    # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
+    train['path'] = train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    dev['path'] = dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    test['path'] = test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
 
     return train, dev, test
 
@@ -244,15 +249,14 @@ def load_data_and_construct_dataloaders(model_type:str, batch_size:int, return_c
                                                                                num_workers=training_config.NUM_WORKERS)
 
     if return_class_weights:
-        num_classes = train.iloc[:, -1].nunique()
-        labels = pd.DataFrame(train.iloc[:,-1])
+        num_classes = train.iloc[:, 1:].shape[1]
+        labels = train.iloc[:, 1:]
         labels = labels.dropna()
-        labels = labels.astype(int)
-        class_weights = torch.nn.functional.one_hot(torch.tensor(labels.values), num_classes=num_classes)
-        class_weights = class_weights.sum(axis=0)
+        class_weights = labels.sum(axis=0)
         class_weights = 1. / (class_weights / class_weights.sum())
         # normalize class weights
         class_weights = class_weights / class_weights.sum()
+        class_weights = torch.tensor(class_weights.values, dtype=torch.float32)
         return ((train_dataloader, dev_dataloader, test_dataloader), class_weights)
 
     return (train_dataloader, dev_dataloader, test_dataloader)

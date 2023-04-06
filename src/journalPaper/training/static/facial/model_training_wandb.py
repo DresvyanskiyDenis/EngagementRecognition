@@ -116,7 +116,8 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
                 optimizer: torch.optim.Optimizer, criterion: torch.nn.Module,
                 device: torch.device, print_step: int = 100,
                 accumulate_gradients: Optional[int] = 1,
-                warmup_lr_scheduller: Optional[object] = None) -> float:
+                warmup_lr_scheduller: Optional[object] = None,
+                loss_multiplication_factor:Optional[float]=None) -> float:
     """ Performs one epoch of training for a model.
 
     :param model: torch.nn.Module
@@ -158,6 +159,8 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
             step_losses = [step_loss / accumulate_gradients for step_loss in step_losses]
             # backward pass
             sum_losses = sum(step_losses)
+            if loss_multiplication_factor is not None:
+                sum_losses = sum_losses * loss_multiplication_factor
             sum_losses.backward()
             # update weights if we have accumulated enough gradients
             if (i + 1) % accumulate_gradients == 0 or (i + 1 == len(train_generator)):
@@ -183,7 +186,8 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
 
 def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: torch.utils.data.DataLoader,
                 class_weights: torch.Tensor, MODEL_TYPE:str, BATCH_SIZE:int, ACCUMULATE_GRADIENTS:int, GRADUAL_UNFREEZING:Optional[bool]=False,
-                DISCRIMINATIVE_LEARNING:Optional[bool]=False) -> None:
+                DISCRIMINATIVE_LEARNING:Optional[bool]=False,
+                loss_multiplication_factor:Optional[float]=None) -> None:
     print("Start of the model training. Gradual_unfreezing:%s, Discriminative_lr:%s" % (GRADUAL_UNFREEZING,
                                                                                        DISCRIMINATIVE_LEARNING))
     # metaparams
@@ -222,6 +226,8 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         "DISCRIMINATIVE_LEARNING_MULTIPLICATOR": training_config.DISCRIMINATIVE_LEARNING_MULTIPLICATOR,
         "DISCRIMINATIVE_LEARNING_STEP": training_config.DISCRIMINATIVE_LEARNING_STEP,
         "DISCRIMINATIVE_LEARNING_START_LAYER": training_config.DISCRIMINATIVE_LEARNING_START_LAYER,
+        # loss params
+        "loss_multiplication_factor": loss_multiplication_factor,
     }
     print("____________________________________________________")
     print("Training params:")
@@ -320,7 +326,8 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         model.train()
         train_loss = train_epoch(model, train_generator, optimizer, criterion, device, print_step=100,
                                  accumulate_gradients=ACCUMULATE_GRADIENTS,
-                                 warmup_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None)
+                                 warmup_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None,
+                                 loss_multiplication_factor= config.loss_multiplication_factor)
         print("Train loss: %.10f" % train_loss)
 
         # validate the model
@@ -363,7 +370,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     torch.cuda.empty_cache()
 
 
-def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discriminative_learning):
+def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discriminative_learning, loss_multiplication_factor):
     print("Start of the script....")
     # get data loaders
     (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
@@ -373,7 +380,8 @@ def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discr
     # train the model
     train_model(train_generator=train_generator, dev_generator=dev_generator,class_weights=class_weights,
                 MODEL_TYPE=model_type, BATCH_SIZE=batch_size, ACCUMULATE_GRADIENTS=accumulate_gradients,
-                GRADUAL_UNFREEZING=gradual_unfreezing, DISCRIMINATIVE_LEARNING=discriminative_learning)
+                GRADUAL_UNFREEZING=gradual_unfreezing, DISCRIMINATIVE_LEARNING=discriminative_learning,
+                loss_multiplication_factor=loss_multiplication_factor)
 
 
 
@@ -386,6 +394,7 @@ if __name__ == "__main__":
     parser.add_argument('--accumulate_gradients', type=int, required=True)
     parser.add_argument('--gradual_unfreezing', type=int, required=True)
     parser.add_argument('--discriminative_learning', type=int, required=True)
+    parser.add_argument('--loss_multiplication_factor', type=float, required=False, default=1.0)
     args = parser.parse_args()
     # turn passed args from int to bool
     print("Passed args: ", args)
@@ -406,10 +415,12 @@ if __name__ == "__main__":
     model_type = args.model_type
     batch_size = args.batch_size
     accumulate_gradients = args.accumulate_gradients
+    loss_multiplication_factor = args.loss_multiplication_factor
     # run main script with passed args
     main(model_type = model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
          gradual_unfreezing=gradual_unfreezing,
-         discriminative_learning=discriminative_learning )
+         discriminative_learning=discriminative_learning,
+         loss_multiplication_factor=loss_multiplication_factor)
     # clear RAM
     gc.collect()
     torch.cuda.empty_cache()

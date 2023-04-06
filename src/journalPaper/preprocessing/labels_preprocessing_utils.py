@@ -252,7 +252,7 @@ def align_MHHRI_labels_with_frames(df_with_frame_paths:pd.DataFrame, df_with_lab
 
 
 if __name__=="__main__":
-    """# process the NoXi dataset, pose frames
+    # process the NoXi dataset, pose frames
     # params
     path_to_labels = '/media/external_hdd_2/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
     path_to_frames = '/media/external_hdd_2/NoXi/prepared_data/poses/'
@@ -409,10 +409,10 @@ if __name__=="__main__":
     # prepare dataframe for DAiSEE dataset
     df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # save dataframe
-    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)"""
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
 
-    # process MHHRI dataset (HHI), face frames
+    """# process MHHRI dataset (HHI), face frames
     # params
     path_to_df_with_frame_paths = "/media/external_hdd_2/MHHRI/mhhri/prepared_data/HHI_Ego_Recordings/faces/metadata.csv"
     path_to_df_with_labels = "/media/external_hdd_2/MHHRI/mhhri/dataset/annotations/MHHRI_labels/post_questionnaire.csv"
@@ -446,7 +446,7 @@ if __name__=="__main__":
     output_path = '/media/external_hdd_2/MHHRI/mhhri/prepared_data/HRI_Ego_Recordings/poses/'
     metadata = pd.read_csv(path_to_df_with_frame_paths)
     prepared_labels = prepare_df_for_MHHRI(df_with_frame_paths=metadata, path_to_labels=path_to_df_with_labels)
-    prepared_labels.to_csv(os.path.join(output_path, 'MHHRI_pose_labels.csv'), index=False)
+    prepared_labels.to_csv(os.path.join(output_path, 'MHHRI_pose_labels.csv'), index=False)"""
 
 
 

@@ -11,16 +11,14 @@ from typing import Tuple, List, Dict, Optional
 
 import numpy as np
 import torch
-from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score, mean_squared_error, \
-    mean_absolute_error
-from torch.nn.functional import one_hot
+from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
 
 import training_config
 from pytorch_utils.lr_schedullers import WarmUpScheduler
-from pytorch_utils.models.CNN_models import Modified_MobileNetV3_large, Modified_EfficientNet_B1, \
-    Modified_EfficientNet_B4, Modified_ViT_B_16
+from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
+    Modified_EfficientNet_B4
 from pytorch_utils.training_utils.callbacks import TorchEarlyStopping, GradualLayersUnfreezer, gradually_decrease_lr
-from pytorch_utils.training_utils.losses import SoftFocalLoss, RMSELoss
+from pytorch_utils.training_utils.losses import SoftFocalLoss
 
 import wandb
 

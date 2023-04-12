@@ -11,7 +11,7 @@ MODEL_INPUT_SIZE:Dict[str, int] = {
 NUM_EPOCHS:int = 100
 OPTIMIZER:str = "AdamW"
 AUGMENT_PROB:float = 0.05
-EARLY_STOPPING_PATIENCE:int = 35
+EARLY_STOPPING_PATIENCE:int = 10
 WEIGHT_DECAY:float = 0.0001
 
 # scheduller

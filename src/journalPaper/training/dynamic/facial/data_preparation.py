@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Tuple, List, Callable, Optional, Dict, Union
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -16,7 +17,7 @@ from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_fa
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
 
 
-def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
     """
      Loads all dataframes for the datasets AFEW-VA, AffectNet, RECOLA, SEMAINE, and SEWA, and split them into
         train, dev, and test sets.
@@ -119,17 +120,61 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     NoXi_test = NoXi_test.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
     NoXi_test = NoXi_test.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
-    # concatenate datasets
-    train = pd.concat([DAiSEE_train, NoXi_train], ignore_index=True)
-    dev = pd.concat([DAiSEE_dev, NoXi_dev], ignore_index=True)
-    test = pd.concat([DAiSEE_test, NoXi_test], ignore_index=True)
-
+    # transform dataframes to Dict[str, pd.DataFrame] type, where keys are video names, and values are dataframes with
+    # paths and labels for each frame
+    NoXi_train = split_data_by_videoname(NoXi_train, position_of_videoname=-3)
+    NoXi_dev = split_data_by_videoname(NoXi_dev, position_of_videoname=-3)
+    NoXi_test = split_data_by_videoname(NoXi_test, position_of_videoname=-3)
+    DAiSEE_train = split_data_by_videoname(DAiSEE_train, position_of_videoname=-3)
+    DAiSEE_dev = split_data_by_videoname(DAiSEE_dev, position_of_videoname=-3)
+    DAiSEE_test = split_data_by_videoname(DAiSEE_test, position_of_videoname=-3)
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    train['path'] = train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    dev['path'] = dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    test['path'] = test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    NoXi_train['path'] = NoXi_train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    NoXi_dev['path'] = NoXi_dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    NoXi_test['path'] = NoXi_test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    DAiSEE_train['path'] = DAiSEE_train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    DAiSEE_dev['path'] = DAiSEE_dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    DAiSEE_test['path'] = DAiSEE_test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+
+    # concatenate datasets
+    train = {**NoXi_train, **DAiSEE_train}
+    dev = {**NoXi_dev, **DAiSEE_dev}
+    test = {**NoXi_test, **DAiSEE_test}
 
     return train, dev, test
+
+def split_data_by_videoname(df:pd.DataFrame, position_of_videoname:int)->Dict[str, pd.DataFrame]:
+    """ Splits data represented in dataframes by video names.
+    The provided data is represented as one big pd.DataFrame. The video names are stored in 'path' column,
+    The function separates the data by video names and returns a dictionary where keys are video names and values are
+    pd.DataFrames with data for each video.
+
+    Args:
+        df: pd.DataFrame
+            The data to be separated by video names.
+        position_of_videoname: int
+            The position of video name in the 'path' column. For example, if the 'path' column contains
+            '/work/DAiSEE/5993322/DAiSEE_train_0001.mp4', then the position of video name is -2.
+
+
+    :return: Dict[str, pd.DataFrame]
+        A dictionary where keys are video names and values are pd.DataFrames with data for each video.
+    """
+    if position_of_videoname >= 0:
+        raise ValueError('The position of video name in the path column must be negative.')
+    result = {}
+    # create additional columns with names of video
+    tmp_df = df.copy(deep=True)
+    tmp_df['video_name'] = tmp_df['path'].apply(lambda x: x.split('/')[position_of_videoname])
+    # get unique video names
+    video_names = tmp_df['video_name'].unique()
+    # split data by video names. Small trick - we embrace the video_name with '/' to make sure that we get only
+    # the video name and not the part of the path
+    for video_name in video_names:
+        result[video_name] = tmp_df[tmp_df['path'].str.contains('/' + video_name + '/')]
+    return result
+
+
 
 
 def get_augmentation_function(probability: float) -> Dict[Callable, float]:
@@ -162,7 +207,7 @@ def get_augmentation_function(probability: float) -> Dict[Callable, float]:
 
 
 def construct_data_loaders(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.DataFrame],
-                           window_size: int, stride: int, consider_timestamps: bool,
+                           window_size: float, stride: float, consider_timestamps: bool,
                            label_columns: List[str],
                            preprocessing_functions: List[Callable],
                            batch_size: int,
@@ -191,13 +236,14 @@ def construct_data_loaders(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.Dat
 
 
 def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
-                                        window_size: int, stride: int, consider_timestamps: bool,
+                                        window_size: float, stride: float, consider_timestamps: bool,
                                         return_class_weights: Optional[bool] = False) -> \
         Union[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader],
               Tuple[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]]:
     if model_type not in ['EfficientNet-B1', 'EfficientNet-B4']:
         raise ValueError('The model type should be either "EfficientNet-B1" or "EfficientNet-B4".')
-    # load pd.DataFrames
+    # load data. The data is represented as Dict[str, pd.DataFrame] where keys are video names and values are
+    # pd.DataFrames with data for each video
     train, dev, test = load_all_dataframes()
     # define preprocessing functions
     if model_type == 'EfficientNet-B1':
@@ -220,10 +266,12 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
                                                               label_columns=training_config.LABEL_COLUMNS)
 
     if return_class_weights:
-        num_classes = train.iloc[:, 1:].shape[1]
-        labels = train.iloc[:, 1:]
-        labels = labels.dropna()
-        class_weights = labels.sum(axis=0)
+        # get all classes from Dict[str, pd.DataFrame] and calculate class weights
+        all_labels = pd.concat([value for key, value in train.items()], axis=0)
+        all_labels = all_labels.dropna()
+        all_labels = np.array(all_labels[training_config.LABEL_COLUMNS].values)
+        num_classes = all_labels.shape[1]
+        class_weights = all_labels.sum(axis=0)
         class_weights = 1. / (class_weights / class_weights.sum())
         # normalize class weights
         class_weights = class_weights / class_weights.sum()

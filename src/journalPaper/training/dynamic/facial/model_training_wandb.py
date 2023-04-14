@@ -1,4 +1,8 @@
 import sys
+
+from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import \
+    Facial_engagement_recognition_model
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -24,6 +28,30 @@ import wandb
 
 from data_preparation import load_data_and_construct_dataloaders
 
+
+
+
+def construct_model(base_model:torch.nn.Module, cut_n_last_layers:int, num_classes:int,
+                    num_timesteps:int, pretrained:Optional[str]=None)->torch.nn.Module:
+
+    # if pretrained is not None:
+    base_model.load_state_dict(torch.load(pretrained))
+    # cut off last layers
+    base_model = torch.nn.Sequential(*list(base_model.children())[:-cut_n_last_layers])
+    # construct sequence_to_one model
+    model = Facial_engagement_recognition_model(facial_model=base_model,
+                                                embeddings_layer_neurons=256,
+                                                num_classes=num_classes,
+                                                transformer_num_heads=4,
+                                                num_timesteps=num_timesteps)
+    return model
+
+
+
+
+
+
+
 def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[object, float]:
     evaluation_metrics_classification = {'val_accuracy_classification': accuracy_score,
                                          'val_precision_classification': partial(precision_score, average='macro'),
@@ -40,10 +68,16 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
     with torch.no_grad():
         for i, data in enumerate(generator):
             # get the inputs; data is a list of [inputs, labels]
-            # TODO: the labels will be the sequence of values. You need to average/take mode of them
             inputs, labels = data
             inputs = inputs.float()
             inputs = inputs.to(device)
+
+            # the labels originally are the sequence of values, since we have several images per one instance
+            # however, we transform it to the sequence-to-one problem. Thus, we take the mode of the sequence, but
+            # firstly we should get rid of the one-hot encoding
+            labels = torch.argmax(labels, dim=-1)
+            # then we take the mode
+            labels = torch.mode(labels, dim=-1)[0]
 
             # forward pass
             outputs = model(inputs)
@@ -147,14 +181,21 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
     counter = 0
     for i, data in enumerate(train_generator):
         # get the inputs; data is a list of [inputs, labels]
-        # TODO: the labels will be the sequence of values. You need to average/take mode of them
         inputs, labels = data
         inputs = inputs.float()
         inputs = inputs.to(device)
 
+        # tranfrorm labels to the sequence-to-one problem
+        # hovewer, here, in the training, we have soft labels. Therefore, we do not take mode, instead, we
+        # average them and normalize so that the sum of the values is 1
+        # labels shape: (batch_size, sequence_length, num_classes)
+        # TODO: check the working of the formula
+        labels = labels.sum(axis=-2)/labels.sum(axis=-2).sum(axis=-1)
+        # labels shape after transformation: (batch_size, num_classes)
+
         # do train step
         with torch.set_grad_enabled(True):
-            # form indecex of labels which should be one-hot encoded
+            # form indices of labels which should be one-hot encoded
             step_losses = train_step(model, criterion, inputs, labels, device)
             # normalize losses by number of accumulate gradient steps
             step_losses = [step_loss / accumulate_gradients for step_loss in step_losses]
@@ -186,19 +227,24 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
 
 # TODO: rewrite function in terms of the sequence-to-one training
 def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: torch.utils.data.DataLoader,
-                class_weights: torch.Tensor, MODEL_TYPE:str, BATCH_SIZE:int, ACCUMULATE_GRADIENTS:int, GRADUAL_UNFREEZING:Optional[bool]=False,
-                DISCRIMINATIVE_LEARNING:Optional[bool]=False,
+                window_size:float, stride:float, consider_timestamps:bool,
+                class_weights: torch.Tensor, MODEL_TYPE:str, BATCH_SIZE:int, ACCUMULATE_GRADIENTS:int,
                 loss_multiplication_factor:Optional[float]=None) -> None:
-    print("Start of the model training. Gradual_unfreezing:%s, Discriminative_lr:%s" % (GRADUAL_UNFREEZING,
-                                                                                       DISCRIMINATIVE_LEARNING))
+    print("Start of the model training.")
     # metaparams
     metaparams = {
         # general params
         "architecture": MODEL_TYPE,
         "MODEL_TYPE": MODEL_TYPE,
+        "pretrained:": training_config.PRETRAINED,
+        "PATH_TO_WEIGHTS": training_config.PATH_TO_WEIGHTS,
         "dataset": "NoXi, DAiSEE",
         "BEST_MODEL_SAVE_PATH": training_config.BEST_MODEL_SAVE_PATH,
         "NUM_WORKERS": training_config.NUM_WORKERS,
+        # temporal params
+        "window_size": window_size,
+        "stride": stride,
+        "consider_timestamps": consider_timestamps,
         # model architecture
         "NUM_CLASSES": training_config.NUM_CLASSES,
         # training metaparams
@@ -216,17 +262,6 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         "LR_MIN_WARMUP": training_config.LR_MIN_WARMUP,
         "WARMUP_STEPS": training_config.WARMUP_STEPS,
         "WARMUP_MODE": training_config.WARMUP_MODE,
-        # gradual unfreezing (if applied)
-        "GRADUAL_UNFREEZING": GRADUAL_UNFREEZING,
-        "UNFREEZING_LAYERS_PER_EPOCH": training_config.UNFREEZING_LAYERS_PER_EPOCH,
-        "LAYERS_TO_UNFREEZE_BEFORE_START": training_config.LAYERS_TO_UNFREEZE_BEFORE_START,
-        # discriminative learning
-        "DISCRIMINATIVE_LEARNING": DISCRIMINATIVE_LEARNING,
-        "DISCRIMINATIVE_LEARNING_INITIAL_LR": training_config.DISCRIMINATIVE_LEARNING_INITIAL_LR,
-        "DISCRIMINATIVE_LEARNING_MINIMAL_LR": training_config.DISCRIMINATIVE_LEARNING_MINIMAL_LR,
-        "DISCRIMINATIVE_LEARNING_MULTIPLICATOR": training_config.DISCRIMINATIVE_LEARNING_MULTIPLICATOR,
-        "DISCRIMINATIVE_LEARNING_STEP": training_config.DISCRIMINATIVE_LEARNING_STEP,
-        "DISCRIMINATIVE_LEARNING_START_LAYER": training_config.DISCRIMINATIVE_LEARNING_START_LAYER,
         # loss params
         "loss_multiplication_factor": loss_multiplication_factor,
     }
@@ -236,7 +271,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         print(f"{key}: {value}")
     print("____________________________________________________")
     # initialization of Weights and Biases
-    wandb.init(project="Engagement_recognition_F2F", config=metaparams)
+    wandb.init(project="engagement_recognition_seq2one", config=metaparams)
     config = wandb.config
     wandb.config.update({'BEST_MODEL_SAVE_PATH':wandb.run.dir}, allow_val_change=True)
 
@@ -250,38 +285,17 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                           num_regression_neurons=None)
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
+    # construct sequence-to-one model out of base model
+    model = construct_model(base_model=model, cut_n_last_layers=-1, num_classes=config.NUM_CLASSES,
+                    num_timesteps=train_generator.get_sequence_length(), pretrained=config.PATH_TO_WEIGHTS)
+
     model = model.to(device)
     # print model architecture
-    summary(model, (2, 3, 380, 380))
+    summary(model, (2, train_generator.get_sequence_length(), 3, config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
+                    config.MODEL_INPUT_SIZE[config.MODEL_TYPE]))
 
-    # define all model layers (params), which will be used by optimizer
-    if config.MODEL_TYPE == "EfficientNet-B1" or config.MODEL_TYPE == "EfficientNet-B4":
-        model_layers = [
-            *list(list(model.children())[0].features.children()),
-            *list(list(model.children())[0].children())[1:],
-            *list(model.children())[1:]  # added layers
-        ]
-    else:
-        raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
-    # layers unfreezer
-    if GRADUAL_UNFREEZING:
-        layers_unfreezer = GradualLayersUnfreezer(model=model, layers=model_layers,
-                                                  layers_per_epoch=config.UNFREEZING_LAYERS_PER_EPOCH,
-                                                  layers_to_unfreeze_before_start=config.LAYERS_TO_UNFREEZE_BEFORE_START,
-                                                  input_shape=(config.BATCH_SIZE, 3, training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
-                                                               training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE]),
-                                                  verbose=True)
-    # if discriminative learning is applied
-    if DISCRIMINATIVE_LEARNING:
-        model_parameters = gradually_decrease_lr(layers=model_layers, initial_lr=config.DISCRIMINATIVE_LEARNING_INITIAL_LR,
-                          multiplicator=config.DISCRIMINATIVE_LEARNING_MULTIPLICATOR, minimal_lr=config.DISCRIMINATIVE_LEARNING_MINIMAL_LR,
-                          step=config.DISCRIMINATIVE_LEARNING_STEP, start_layer=config.DISCRIMINATIVE_LEARNING_START_LAYER)
-        for param_group in model_parameters:
-            print("size: {}, lr: {}".format(param_group['params'].shape, param_group['lr']))
-        print('The learning rate was changed for each layer according to discriminative learning approach. The new learning rates are:')
-    else:
-        model_parameters = model.parameters()
     # select optimizer
+    model_parameters = model.parameters()
     optimizers = {'Adam': torch.optim.Adam,
                   'SGD': torch.optim.SGD,
                   'RMSprop': torch.optim.RMSprop,
@@ -306,13 +320,10 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                          warmup_mode=config.WARMUP_MODE)
     }
     # if we use discriminative learning, we don't need LR scheduler
-    if DISCRIMINATIVE_LEARNING:
-        lr_scheduller = None
-    else:
-        lr_scheduller = lr_schedullers[config.LR_SCHEDULLER]
-        # if lr_scheduller is warmup_cyclic, we need to change the learning rate of optimizer
-        if config.LR_SCHEDULLER == 'Warmup_cyclic':
-            optimizer.param_groups[0]['lr'] = config.LR_MIN_WARMUP
+    lr_scheduller = lr_schedullers[config.LR_SCHEDULLER]
+    # if lr_scheduller is warmup_cyclic, we need to change the learning rate of optimizer
+    if config.LR_SCHEDULLER == 'Warmup_cyclic':
+        optimizer.param_groups[0]['lr'] = config.LR_MIN_WARMUP
 
     # early stopping
     best_val_recall_classification = 0
@@ -362,39 +373,39 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         if early_stopping_result:
             print("Early stopping")
             break
-        # unfreeze next n layers
-        if GRADUAL_UNFREEZING:
-            layers_unfreezer()
     # clear RAM
     del model
     gc.collect()
     torch.cuda.empty_cache()
 
-# TODO: rewrite function in terms of the sequence-to-one training
-def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discriminative_learning, loss_multiplication_factor):
+def main(window_size, stride, consider_timestamps, model_type, batch_size, accumulate_gradients,
+         loss_multiplication_factor):
     print("Start of the script....")
     # get data loaders
     (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
+        window_size=window_size,
+        stride=stride,
+        consider_timestamps=consider_timestamps,
         model_type=model_type,
         batch_size=batch_size,
         return_class_weights=True)
     # train the model
-    train_model(train_generator=train_generator, dev_generator=dev_generator,class_weights=class_weights,
+    train_model(window_size=window_size, stride=stride, consider_timestamps=consider_timestamps,
+                train_generator=train_generator, dev_generator=dev_generator,class_weights=class_weights,
                 MODEL_TYPE=model_type, BATCH_SIZE=batch_size, ACCUMULATE_GRADIENTS=accumulate_gradients,
-                GRADUAL_UNFREEZING=gradual_unfreezing, DISCRIMINATIVE_LEARNING=discriminative_learning,
                 loss_multiplication_factor=loss_multiplication_factor)
 
 
-# TODO: rewrite function in terms of the sequence-to-one training (new parameters should be added)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog='Emotion Recognition model training',
-        epilog='Parameters: model_type, batch_size, accumulate_gradients, gradual_unfreezing, discriminative_learning')
+        epilog='Parameters: model_type, batch_size, accumulate_gradients.')
     parser.add_argument('--model_type', type=str, required=True)
+    parser.add_argument('--window_size', type=float, required=True)
+    parser.add_argument('--stride', type=float, required=True)
+    parser.add_argument('--consider_timestamps', type=int, required=True)
     parser.add_argument('--batch_size', type=int, required=True)
     parser.add_argument('--accumulate_gradients', type=int, required=True)
-    parser.add_argument('--gradual_unfreezing', type=int, required=True)
-    parser.add_argument('--discriminative_learning', type=int, required=True)
     parser.add_argument('--loss_multiplication_factor', type=float, required=False, default=1.0)
     args = parser.parse_args()
     # turn passed args from int to bool
@@ -406,21 +417,17 @@ if __name__ == "__main__":
         raise ValueError("batch_size should be greater than 0")
     if args.accumulate_gradients < 1:
         raise ValueError("accumulate_gradients should be greater than 0")
-    if args.gradual_unfreezing not in [0,1]:
-        raise ValueError("gradual_unfreezing should be either 0 or 1")
-    if args.discriminative_learning not in [0,1]:
-        raise ValueError("discriminative_learning should be either 0 or 1")
     # convert args to bool
-    gradual_unfreezing = True if args.gradual_unfreezing == 1 else False
-    discriminative_learning = True if args.discriminative_learning == 1 else False
     model_type = args.model_type
     batch_size = args.batch_size
     accumulate_gradients = args.accumulate_gradients
     loss_multiplication_factor = args.loss_multiplication_factor
+    window_size = args.window_size
+    stride = args.stride
+    consider_timestamps = bool(args.consider_timestamps)
     # run main script with passed args
-    main(model_type = model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
-         gradual_unfreezing=gradual_unfreezing,
-         discriminative_learning=discriminative_learning,
+    main(window_size=window_size, stride=stride, consider_timestamps=consider_timestamps,
+        model_type = model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
          loss_multiplication_factor=loss_multiplication_factor)
     # clear RAM
     gc.collect()

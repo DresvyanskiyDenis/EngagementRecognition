@@ -1,8 +1,5 @@
 import sys
 
-from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import \
-    Facial_engagement_recognition_model
-
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 
@@ -27,6 +24,9 @@ from pytorch_utils.training_utils.losses import SoftFocalLoss
 import wandb
 
 from data_preparation import load_data_and_construct_dataloaders
+
+from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import \
+    Facial_engagement_recognition_model
 
 
 
@@ -225,7 +225,6 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
     gc.collect()
     return total_loss / counter
 
-# TODO: rewrite function in terms of the sequence-to-one training
 def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: torch.utils.data.DataLoader,
                 window_size:float, stride:float, consider_timestamps:bool,
                 class_weights: torch.Tensor, MODEL_TYPE:str, BATCH_SIZE:int, ACCUMULATE_GRADIENTS:int,

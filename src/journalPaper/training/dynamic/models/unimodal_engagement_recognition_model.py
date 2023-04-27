@@ -38,10 +38,6 @@ class Facial_engagement_recognition_model(nn.Module):
         # create classifier
         self.classifier = nn.Linear(embeddings_layer_neurons//2, num_classes)
 
-
-        # create regression
-        self.regression = nn.Linear(embeddings_layer_neurons//2, 1)
-
     def forward(self, x):
         # facial model
         x = self.facial_model(x)
@@ -58,10 +54,8 @@ class Facial_engagement_recognition_model(nn.Module):
         x = self.end_dropout(x)
         # classifier
         x_classifier = self.classifier(x)
-        # regression
-        x_regression = self.regression(x)
 
-        return x_classifier, x_regression
+        return x_classifier
 
 
 
@@ -100,10 +94,6 @@ class Pose_engagement_recognition_model(nn.Module):
         # create classifier
         self.classifier = nn.Linear(embeddings_layer_neurons//2, num_classes)
 
-
-        # create regression
-        self.regression = nn.Linear(embeddings_layer_neurons//2, 1)
-
     def forward(self, x):
         # facial model
         x = self.pose_model(x)
@@ -120,13 +110,9 @@ class Pose_engagement_recognition_model(nn.Module):
         x = self.end_dropout(x)
         # classifier
         x_classifier = self.classifier(x)
-        # regression
-        x_regression = self.regression(x)
 
-        return x_classifier, x_regression
+        return x_classifier
 
-if __name__ == "__main__":
-    pass
 
 
 

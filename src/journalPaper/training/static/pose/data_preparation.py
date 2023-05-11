@@ -4,7 +4,7 @@ from typing import Tuple, List, Callable, Optional, Dict, Union
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-
+import torchvision.transforms as T
 import training_config
 from decorators.common_decorators import timer
 from pytorch_utils.data_loaders.ImageDataLoader_new import ImageDataLoader
@@ -12,6 +12,7 @@ from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_fa
     collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
     random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
     random_horizontal_flip_image, random_vertical_flip_image
+from pytorch_utils.data_preprocessing import convert_image_to_float_and_scale
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
 
 
@@ -24,13 +25,13 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     """
 
-    path_to_NoXi_train = "/work/home/dsu/Datasets/NoXi/prepared_data/poses/NoXi_facial_train.csv"
-    path_to_NoXi_dev = "/work/home/dsu/Datasets/NoXi/prepared_data/poses/NoXi_facial_dev.csv"
-    path_to_NoXi_test = "/work/home/dsu/Datasets/NoXi/prepared_data/poses/NoXi_facial_test.csv"
+    path_to_NoXi_train = "/nfs/scratch/ddresvya/Data/NoXi/prepared_data/poses/NoXi_pose_train.csv"
+    path_to_NoXi_dev = "/nfs/scratch/ddresvya/Data/NoXi/prepared_data/poses/NoXi_pose_dev.csv"
+    path_to_NoXi_test = "/nfs/scratch/ddresvya/Data/NoXi/prepared_data/poses/NoXi_pose_test.csv"
 
-    path_to_DAiSEE_train = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/DAiSEE_facial_train_labels.csv"
-    path_to_DAiSEE_dev = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/DAiSEE_facial_dev_labels.csv"
-    path_to_DAiSEE_test = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/DAiSEE_facial_test_labels.csv"
+    path_to_DAiSEE_train = "/nfs/scratch/ddresvya/Data/DAiSEE/prepared_data/poses/DAiSEE_pose_train_labels.csv"
+    path_to_DAiSEE_dev = "/nfs/scratch/ddresvya/Data/DAiSEE/prepared_data/poses/DAiSEE_pose_dev_labels.csv"
+    path_to_DAiSEE_test = "/nfs/scratch/ddresvya/Data/DAiSEE/prepared_data/poses/DAiSEE_pose_test_labels.csv"
 
     # load dataframes
     NoXi_train = pd.read_csv(path_to_NoXi_train)
@@ -121,9 +122,9 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     test = pd.concat([DAiSEE_test, NoXi_test], ignore_index=True)
 
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    train['path'] = train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    dev['path'] = dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    test['path'] = test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    train['path'] = train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/nfs/scratch/ddresvya/Data/'))
+    dev['path'] = dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/nfs/scratch/ddresvya/Data/'))
+    test['path'] = test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/nfs/scratch/ddresvya/Data/'))
 
     return train, dev, test
 

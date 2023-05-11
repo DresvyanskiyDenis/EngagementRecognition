@@ -1,10 +1,10 @@
 import sys
+sys.path.extend(["/nfs/home/ddresvya/scripts/datatools/"])
+sys.path.extend(["/nfs/home/ddresvya/scripts/emotion_recognition_project/"])
+sys.path.extend(["/nfs/home/ddresvya/scripts/simple-HRNet-master/"])
 
-from pytorch_utils.models.Pose_estimation.HRNet import Modified_HRNet
 
-sys.path.extend(["/work/home/dsu/datatools/"])
-sys.path.extend(["/work/home/dsu/emotion_recognition_project/"])
-sys.path.extend(["/work/home/dsu/simple-HRNet-master/"])
+
 
 import argparse
 from torchinfo import summary
@@ -23,6 +23,7 @@ from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
     Modified_EfficientNet_B4
 from pytorch_utils.training_utils.callbacks import TorchEarlyStopping, GradualLayersUnfreezer, gradually_decrease_lr
 from pytorch_utils.training_utils.losses import SoftFocalLoss
+from pytorch_utils.models.Pose_estimation.HRNet import Modified_HRNet
 
 import wandb
 
@@ -237,7 +238,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         print(f"{key}: {value}")
     print("____________________________________________________")
     # initialization of Weights and Biases
-    wandb.init(project="Engagement_recognition_F2F", config=metaparams)
+    wandb.init(project="Engagement_recognition_F2F_pose", config=metaparams)
     config = wandb.config
     wandb.config.update({'BEST_MODEL_SAVE_PATH':wandb.run.dir}, allow_val_change=True)
 
@@ -245,9 +246,9 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if config.MODEL_TYPE == "Modified_HRNet":
         model = Modified_HRNet(pretrained=True,
-                               path_to_weights="/work/home/dsu/simple-HRNet-master/pose_hrnet_w32_256x192.pth",
+                               path_to_weights="/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w32_256x192.pth",
                                embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                               num_regression_neurons=config.NUM_REGRESSION_NEURONS,
+                               num_regression_neurons=None,
                                consider_only_upper_body=True)
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)

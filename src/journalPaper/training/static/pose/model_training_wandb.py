@@ -1,11 +1,3 @@
-import sys
-sys.path.extend(["/nfs/home/ddresvya/scripts/datatools/"])
-sys.path.extend(["/nfs/home/ddresvya/scripts/emotion_recognition_project/"])
-sys.path.extend(["/nfs/home/ddresvya/scripts/simple-HRNet-master/"])
-
-
-
-
 import argparse
 from torchinfo import summary
 import gc
@@ -17,7 +9,6 @@ import numpy as np
 import torch
 from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
 
-import training_config
 from pytorch_utils.lr_schedullers import WarmUpScheduler
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
     Modified_EfficientNet_B4
@@ -27,7 +18,9 @@ from pytorch_utils.models.Pose_estimation.HRNet import Modified_HRNet
 
 import wandb
 
-from data_preparation import load_data_and_construct_dataloaders
+from src.journalPaper.training.static import training_config
+from src.journalPaper.training.static.data_preparation import load_data_and_construct_dataloaders
+
 
 def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[object, float]:
     evaluation_metrics_classification = {'val_accuracy_classification': accuracy_score,
@@ -246,7 +239,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if config.MODEL_TYPE == "Modified_HRNet":
         model = Modified_HRNet(pretrained=True,
-                               path_to_weights="/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w32_256x192.pth",
+                               path_to_weights=training_config.MODIFIED_HRNET_WEIGHTS,
                                embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
                                num_regression_neurons=None,
                                consider_only_upper_body=True)
@@ -377,6 +370,8 @@ def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discr
     print("Start of the script....")
     # get data loaders
     (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
+        path_to_data_NoXi=training_config.NOXI_POSE_PATH,
+        path_to_data_DAiSEE=training_config.DAISEE_POSE_PATH,
         model_type=model_type,
         batch_size=batch_size,
         return_class_weights=True)

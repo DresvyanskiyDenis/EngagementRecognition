@@ -1,7 +1,3 @@
-import sys
-sys.path.extend(["/work/home/dsu/datatools/"]) # TODO: overcome this problem
-sys.path.extend(["/work/home/dsu/emotion_recognition_project/"]) # TODO: overcome this problem
-
 import argparse
 import gc
 import os

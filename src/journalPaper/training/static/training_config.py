@@ -15,7 +15,7 @@ MODEL_INPUT_SIZE:Dict[str, int] = {
     "EfficientNet-B4":380,
     "Modified_HRNet": 256,
 }
-
+MODIFIED_HRNET_WEIGHTS:str = ""
 # training metaparams
 NUM_EPOCHS:int = 100
 OPTIMIZER:str = "AdamW"

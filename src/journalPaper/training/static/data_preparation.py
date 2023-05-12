@@ -37,13 +37,13 @@ def load_NoXi_and_DAiSEE_dataframes(path_to_data_NoXi: str, path_to_data_DAiSEE:
 
     """
 
-    path_to_NoXi_train = os.path.join(path_to_data_NoXi, "NoXi_facial_train.csv")
-    path_to_NoXi_dev = os.path.join(path_to_data_NoXi, "NoXi_facial_dev.csv")
-    path_to_NoXi_test = os.path.join(path_to_data_NoXi, "NoXi_facial_test.csv")
+    path_to_NoXi_train = os.path.join(path_to_data_NoXi, training_config.NOXI_TRAIN_LABELS)
+    path_to_NoXi_dev = os.path.join(path_to_data_NoXi, training_config.NOXI_DEV_LABELS)
+    path_to_NoXi_test = os.path.join(path_to_data_NoXi, training_config.NOXI_TEST_LABELS)
 
-    path_to_DAiSEE_train = os.path.join(path_to_data_DAiSEE, "DAiSEE_facial_train_labels.csv")
-    path_to_DAiSEE_dev = os.path.join(path_to_data_DAiSEE, "DAiSEE_facial_dev_labels.csv")
-    path_to_DAiSEE_test = os.path.join(path_to_data_DAiSEE, "DAiSEE_facial_test_labels.csv")
+    path_to_DAiSEE_train = os.path.join(path_to_data_DAiSEE, training_config.DAISEE_TRAIN_LABELS)
+    path_to_DAiSEE_dev = os.path.join(path_to_data_DAiSEE, training_config.DAISEE_DEV_LABELS)
+    path_to_DAiSEE_test = os.path.join(path_to_data_DAiSEE, training_config.DAISEE_TEST_LABELS)
 
     # load dataframes
     NoXi_train = pd.read_csv(path_to_NoXi_train)
@@ -140,18 +140,24 @@ def load_NoXi_and_DAiSEE_dataframes(path_to_data_NoXi: str, path_to_data_DAiSEE:
     # change paths from 'media/external_hdd_2/*/prepared_data/faces' to provided data paths
     # NoXi
     train['path'] = train['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/faces', path_to_data_NoXi))
+        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/%s' % training_config.DATA_TYPE + 's',
+                            path_to_data_NoXi))
     dev['path'] = dev['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/faces', path_to_data_NoXi))
+        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/%s' % training_config.DATA_TYPE + 's',
+                            path_to_data_NoXi))
     test['path'] = test['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/faces', path_to_data_NoXi))
+        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/%s' % training_config.DATA_TYPE + 's',
+                            path_to_data_NoXi))
     # DAiSEE
     train['path'] = train['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/faces', path_to_data_DAiSEE))
+        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/%s' % training_config.DATA_TYPE + 's',
+                            path_to_data_DAiSEE))
     dev['path'] = dev['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/faces', path_to_data_DAiSEE))
+        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/%s' % training_config.DATA_TYPE + 's',
+                            path_to_data_DAiSEE))
     test['path'] = test['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/faces', path_to_data_DAiSEE))
+        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/%s' % training_config.DATA_TYPE + 's',
+                            path_to_data_DAiSEE))
 
     return train, dev, test
 

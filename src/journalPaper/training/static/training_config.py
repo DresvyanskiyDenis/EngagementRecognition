@@ -1,12 +1,27 @@
 from typing import Dict
 
 # paths to data
-NOXI_POSE_PATH:str = ""
-DAISEE_POSE_PATH:str = ""
-NOXI_FACIAL_PATH:str = ""
-DAISEE_FACIAL_PATH:str = ""
+DATA_TYPE:str = "pose"  # pose or face
+NOXI_DATA_PATH:str = "/nfs/scratch/ddresvya/Data/NoXi/prepared_data/"
+DAISEE_DATA_PATH:str = "/nfs/scratch/ddresvya/Data/DAiSEE/prepared_data/"
 
-PATH_TO_PROJECTS:str = ""
+if DATA_TYPE == "pose":
+    NOXI_DATA_PATH = NOXI_DATA_PATH + DATA_TYPE+"s"
+    DAISEE_DATA_PATH = DAISEE_DATA_PATH + DATA_TYPE+"s"
+elif DATA_TYPE == "face":
+    NOXI_DATA_PATH = NOXI_DATA_PATH + DATA_TYPE+"s"
+    DAISEE_DATA_PATH = DAISEE_DATA_PATH + DATA_TYPE+"s"
+
+# label names
+NOXI_TRAIN_LABELS:str = "NoXi_%s_train.csv"%DATA_TYPE
+NOXI_DEV_LABELS:str = "NoXi_%s_dev.csv"%DATA_TYPE
+NOXI_TEST_LABELS:str = "NoXi_%s_test.csv"%DATA_TYPE
+DAISEE_TRAIN_LABELS:str = "DAiSEE_%s_train_labels.csv"%DATA_TYPE
+DAISEE_DEV_LABELS:str = "DAiSEE_%s_dev_labels.csv"%DATA_TYPE
+DAISEE_TEST_LABELS:str = "DAiSEE_%s_test_labels.csv"%DATA_TYPE
+
+
+
 
 # model architecture params
 NUM_CLASSES:int = 3
@@ -15,7 +30,7 @@ MODEL_INPUT_SIZE:Dict[str, int] = {
     "EfficientNet-B4":380,
     "Modified_HRNet": 256,
 }
-MODIFIED_HRNET_WEIGHTS:str = ""
+MODIFIED_HRNET_WEIGHTS:str = "/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w32_256x192.pth"
 # training metaparams
 NUM_EPOCHS:int = 100
 OPTIMIZER:str = "AdamW"

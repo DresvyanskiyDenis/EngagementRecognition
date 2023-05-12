@@ -1,3 +1,9 @@
+import sys
+sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
+sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
+sys.path.append('/nfs/home/ddresvya/scripts/simple-HRNet-master/')
+
+
 import argparse
 import gc
 import os
@@ -208,8 +214,8 @@ def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discr
     print("Start of the script....")
     # get data loaders
     (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
-        path_to_data_NoXi=training_config.NOXI_POSE_PATH,
-        path_to_data_DAiSEE=training_config.DAISEE_POSE_PATH,
+        path_to_data_NoXi=training_config.NOXI_DATA_PATH,
+        path_to_data_DAiSEE=training_config.DAISEE_DATA_PATH,
         model_type=model_type,
         batch_size=batch_size,
         return_class_weights=True)

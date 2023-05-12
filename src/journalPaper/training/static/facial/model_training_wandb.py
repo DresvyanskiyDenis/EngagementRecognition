@@ -1,9 +1,8 @@
 import sys
-sys.path.extend(["/work/home/dsu/datatools/"])
-sys.path.extend(["/work/home/dsu/emotion_recognition_project/"])
+sys.path.extend(["/work/home/dsu/datatools/"]) # TODO: overcome this problem
+sys.path.extend(["/work/home/dsu/emotion_recognition_project/"]) # TODO: overcome this problem
 
 import argparse
-from torchinfo import summary
 import gc
 import os
 from functools import partial
@@ -11,20 +10,21 @@ from typing import Tuple, List, Dict, Optional
 
 import numpy as np
 import torch
+from torchinfo import summary
+import wandb
 from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
 
-import training_config
 from pytorch_utils.lr_schedullers import WarmUpScheduler
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
     Modified_EfficientNet_B4
 from pytorch_utils.training_utils.callbacks import TorchEarlyStopping, GradualLayersUnfreezer, gradually_decrease_lr
 from pytorch_utils.training_utils.losses import SoftFocalLoss
+from src.journalPaper.training.static.data_preparation import load_data_and_construct_dataloaders
+from src.journalPaper.training.static import training_config
 
-import wandb
 
-from data_preparation import load_data_and_construct_dataloaders
-
-def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[object, float]:
+def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[
+    object, float]:
     evaluation_metrics_classification = {'val_accuracy_classification': accuracy_score,
                                          'val_precision_classification': partial(precision_score, average='macro'),
                                          'val_recall_classification': partial(recall_score, average='macro'),
@@ -32,7 +32,7 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
                                          }
 
     # create arrays for predictions and ground truth labels
-    predictions_classifier= []
+    predictions_classifier = []
     ground_truth_classifier = []
 
     # start evaluation
@@ -64,7 +64,6 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
         # concatenate all predictions and ground truth labels
         predictions_classifier = np.concatenate(predictions_classifier, axis=0)
         ground_truth_classifier = np.concatenate(ground_truth_classifier, axis=0)
-
 
         # calculate evaluation metrics
         evaluation_metrics_classifier = {
@@ -116,7 +115,7 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
                 device: torch.device, print_step: int = 100,
                 accumulate_gradients: Optional[int] = 1,
                 warmup_lr_scheduller: Optional[object] = None,
-                loss_multiplication_factor:Optional[float]=None) -> float:
+                loss_multiplication_factor: Optional[float] = None) -> float:
     """ Performs one epoch of training for a model.
 
     :param model: torch.nn.Module
@@ -184,11 +183,12 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
 
 
 def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: torch.utils.data.DataLoader,
-                class_weights: torch.Tensor, MODEL_TYPE:str, BATCH_SIZE:int, ACCUMULATE_GRADIENTS:int, GRADUAL_UNFREEZING:Optional[bool]=False,
-                DISCRIMINATIVE_LEARNING:Optional[bool]=False,
-                loss_multiplication_factor:Optional[float]=None) -> None:
+                class_weights: torch.Tensor, MODEL_TYPE: str, BATCH_SIZE: int, ACCUMULATE_GRADIENTS: int,
+                GRADUAL_UNFREEZING: Optional[bool] = False,
+                DISCRIMINATIVE_LEARNING: Optional[bool] = False,
+                loss_multiplication_factor: Optional[float] = None) -> None:
     print("Start of the model training. Gradual_unfreezing:%s, Discriminative_lr:%s" % (GRADUAL_UNFREEZING,
-                                                                                       DISCRIMINATIVE_LEARNING))
+                                                                                        DISCRIMINATIVE_LEARNING))
     # metaparams
     metaparams = {
         # general params
@@ -236,7 +236,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     # initialization of Weights and Biases
     wandb.init(project="Engagement_recognition_F2F", config=metaparams)
     config = wandb.config
-    wandb.config.update({'BEST_MODEL_SAVE_PATH':wandb.run.dir}, allow_val_change=True)
+    wandb.config.update({'BEST_MODEL_SAVE_PATH': wandb.run.dir}, allow_val_change=True)
 
     # create model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -245,7 +245,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                          num_regression_neurons=None)
     elif config.MODEL_TYPE == "EfficientNet-B4":
         model = Modified_EfficientNet_B4(embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                                          num_regression_neurons=None)
+                                         num_regression_neurons=None)
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
     model = model.to(device)
@@ -266,17 +266,22 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         layers_unfreezer = GradualLayersUnfreezer(model=model, layers=model_layers,
                                                   layers_per_epoch=config.UNFREEZING_LAYERS_PER_EPOCH,
                                                   layers_to_unfreeze_before_start=config.LAYERS_TO_UNFREEZE_BEFORE_START,
-                                                  input_shape=(config.BATCH_SIZE, 3, training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
+                                                  input_shape=(config.BATCH_SIZE, 3,
+                                                               training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
                                                                training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE]),
                                                   verbose=True)
     # if discriminative learning is applied
     if DISCRIMINATIVE_LEARNING:
-        model_parameters = gradually_decrease_lr(layers=model_layers, initial_lr=config.DISCRIMINATIVE_LEARNING_INITIAL_LR,
-                          multiplicator=config.DISCRIMINATIVE_LEARNING_MULTIPLICATOR, minimal_lr=config.DISCRIMINATIVE_LEARNING_MINIMAL_LR,
-                          step=config.DISCRIMINATIVE_LEARNING_STEP, start_layer=config.DISCRIMINATIVE_LEARNING_START_LAYER)
+        model_parameters = gradually_decrease_lr(layers=model_layers,
+                                                 initial_lr=config.DISCRIMINATIVE_LEARNING_INITIAL_LR,
+                                                 multiplicator=config.DISCRIMINATIVE_LEARNING_MULTIPLICATOR,
+                                                 minimal_lr=config.DISCRIMINATIVE_LEARNING_MINIMAL_LR,
+                                                 step=config.DISCRIMINATIVE_LEARNING_STEP,
+                                                 start_layer=config.DISCRIMINATIVE_LEARNING_START_LAYER)
         for param_group in model_parameters:
             print("size: {}, lr: {}".format(param_group['params'].shape, param_group['lr']))
-        print('The learning rate was changed for each layer according to discriminative learning approach. The new learning rates are:')
+        print(
+            'The learning rate was changed for each layer according to discriminative learning approach. The new learning rates are:')
     else:
         model_parameters = model.parameters()
     # select optimizer
@@ -298,7 +303,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                          lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                                                                  T_max=config.ANNEALING_PERIOD,
                                                                                                  eta_min=config.LR_MIN_CYCLIC),
-                                         len_loader=len(train_generator)//ACCUMULATE_GRADIENTS,
+                                         len_loader=len(train_generator) // ACCUMULATE_GRADIENTS,
                                          warmup_steps=config.WARMUP_STEPS,
                                          warmup_start_lr=config.LR_MIN_WARMUP,
                                          warmup_mode=config.WARMUP_MODE)
@@ -326,7 +331,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         train_loss = train_epoch(model, train_generator, optimizer, criterion, device, print_step=100,
                                  accumulate_gradients=ACCUMULATE_GRADIENTS,
                                  warmup_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None,
-                                 loss_multiplication_factor= config.loss_multiplication_factor)
+                                 loss_multiplication_factor=config.loss_multiplication_factor)
         print("Train loss: %.10f" % train_loss)
 
         # validate the model
@@ -338,7 +343,8 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         # also, save model if we got better recall
         if val_metrics_classification['val_recall_classification'] > best_val_recall_classification:
             best_val_recall_classification = val_metrics_classification['val_recall_classification']
-            wandb.config.update({'best_val_recall_classification': best_val_recall_classification}, allow_val_change=True)
+            wandb.config.update({'best_val_recall_classification': best_val_recall_classification},
+                                allow_val_change=True)
             # save best model
             if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
                 os.makedirs(config.BEST_MODEL_SAVE_PATH)
@@ -369,19 +375,21 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     torch.cuda.empty_cache()
 
 
-def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discriminative_learning, loss_multiplication_factor):
+def main(model_type, batch_size, accumulate_gradients, gradual_unfreezing, discriminative_learning,
+         loss_multiplication_factor):
     print("Start of the script....")
     # get data loaders
     (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
+        path_to_data_NoXi=training_config.NOXI_FACIAL_PATH,
+        path_to_data_DAiSEE=training_config.DAISEE_FACIAL_PATH,
         model_type=model_type,
         batch_size=batch_size,
         return_class_weights=True)
     # train the model
-    train_model(train_generator=train_generator, dev_generator=dev_generator,class_weights=class_weights,
+    train_model(train_generator=train_generator, dev_generator=dev_generator, class_weights=class_weights,
                 MODEL_TYPE=model_type, BATCH_SIZE=batch_size, ACCUMULATE_GRADIENTS=accumulate_gradients,
                 GRADUAL_UNFREEZING=gradual_unfreezing, DISCRIMINATIVE_LEARNING=discriminative_learning,
                 loss_multiplication_factor=loss_multiplication_factor)
-
 
 
 if __name__ == "__main__":
@@ -404,9 +412,9 @@ if __name__ == "__main__":
         raise ValueError("batch_size should be greater than 0")
     if args.accumulate_gradients < 1:
         raise ValueError("accumulate_gradients should be greater than 0")
-    if args.gradual_unfreezing not in [0,1]:
+    if args.gradual_unfreezing not in [0, 1]:
         raise ValueError("gradual_unfreezing should be either 0 or 1")
-    if args.discriminative_learning not in [0,1]:
+    if args.discriminative_learning not in [0, 1]:
         raise ValueError("discriminative_learning should be either 0 or 1")
     # convert args to bool
     gradual_unfreezing = True if args.gradual_unfreezing == 1 else False
@@ -416,11 +424,10 @@ if __name__ == "__main__":
     accumulate_gradients = args.accumulate_gradients
     loss_multiplication_factor = args.loss_multiplication_factor
     # run main script with passed args
-    main(model_type = model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
+    main(model_type=model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
          gradual_unfreezing=gradual_unfreezing,
          discriminative_learning=discriminative_learning,
          loss_multiplication_factor=loss_multiplication_factor)
     # clear RAM
     gc.collect()
     torch.cuda.empty_cache()
-

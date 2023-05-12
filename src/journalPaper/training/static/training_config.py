@@ -6,7 +6,7 @@ DAISEE_POSE_PATH:str = ""
 NOXI_FACIAL_PATH:str = ""
 DAISEE_FACIAL_PATH:str = ""
 
-
+PATH_TO_PROJECTS:str = ""
 
 # model architecture params
 NUM_CLASSES:int = 3

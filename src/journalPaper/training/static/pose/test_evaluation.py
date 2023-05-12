@@ -26,7 +26,7 @@ if __name__=="__main__":
     if model_type == "Modified_HRNet":
         model = Modified_HRNet(pretrained=True,
                                path_to_weights=training_config.MODIFIED_HRNET_WEIGHTS,
-                               embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
+                               embeddings_layer_neurons=256, num_classes=training_config.NUM_CLASSES,
                                num_regression_neurons=None,
                                consider_only_upper_body=True)
     else:

@@ -1,17 +1,26 @@
 from typing import Dict
 
+# paths to data
+NOXI_POSE_PATH:str = ""
+DAISEE_POSE_PATH:str = ""
+NOXI_FACIAL_PATH:str = ""
+DAISEE_FACIAL_PATH:str = ""
+
+
+
 # model architecture params
 NUM_CLASSES:int = 3
 MODEL_INPUT_SIZE:Dict[str, int] = {
     "EfficientNet-B1":224,
     "EfficientNet-B4":380,
+    "Modified_HRNet": 256,
 }
 
 # training metaparams
 NUM_EPOCHS:int = 100
 OPTIMIZER:str = "AdamW"
 AUGMENT_PROB:float = 0.05
-EARLY_STOPPING_PATIENCE:int = 10
+EARLY_STOPPING_PATIENCE:int = 20
 WEIGHT_DECAY:float = 0.0001
 
 # scheduller

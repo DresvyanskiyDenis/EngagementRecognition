@@ -1,36 +1,49 @@
+import os
 from functools import partial
 from typing import Tuple, List, Callable, Optional, Dict, Union
 
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+import torchvision.transforms as T
 
-import training_config
-from decorators.common_decorators import timer
 from pytorch_utils.data_loaders.ImageDataLoader_new import ImageDataLoader
 from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_factor, grayscale_image, \
     collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
     random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
     random_horizontal_flip_image, random_vertical_flip_image
+from pytorch_utils.data_preprocessing import convert_image_to_float_and_scale
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
+from src.journalPaper.training.static import training_config
 
 
-def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-     Loads all dataframes for the datasets AFEW-VA, AffectNet, RECOLA, SEMAINE, and SEWA, and split them into
-        train, dev, and test sets.
+def load_NoXi_and_DAiSEE_dataframes(path_to_data_NoXi: str, path_to_data_DAiSEE: str) -> Tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """ Loads train, dev, and test dataframes from the given paths. This function works only for the DAiSEE or NoXi datasets.
+    The dataframes are stored in the .csv files and should have names:
+    NoXi: [NoXi_facial_train.csv, NoXi_facial_dev.csv, NoXi_facial_test.csv]
+    DAiSEE: [DAiSEE_facial_train_labels.csv, DAiSEE_facial_dev_labels.csv, DAiSEE_facial_test_labels.csv]
+
+    Final train, dev, and test datasets will be concatenated from the dataframes of the same type (NoXi or DAiSEE).
+    The final format of the dataframes is the following: [path, label_0, label_1, label_2]
+
+    :param path_to_data_NoXi: str
+        The path to the folder with the dataframes for NoXi dataset.
+    :param path_to_data_DAiSEE: str
+        The path to the folder with the dataframes for DAiSEE dataset.
+
     Returns: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
         The tuple of train, dev, and test data.
 
     """
 
-    path_to_NoXi_train = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_train.csv"
-    path_to_NoXi_dev = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_dev.csv"
-    path_to_NoXi_test = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_test.csv"
+    path_to_NoXi_train = os.path.join(path_to_data_NoXi, "NoXi_facial_train.csv")
+    path_to_NoXi_dev = os.path.join(path_to_data_NoXi, "NoXi_facial_dev.csv")
+    path_to_NoXi_test = os.path.join(path_to_data_NoXi, "NoXi_facial_test.csv")
 
-    path_to_DAiSEE_train = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_train_labels.csv"
-    path_to_DAiSEE_dev = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_dev_labels.csv"
-    path_to_DAiSEE_test = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_test_labels.csv"
+    path_to_DAiSEE_train = os.path.join(path_to_data_DAiSEE, "DAiSEE_facial_train_labels.csv")
+    path_to_DAiSEE_dev = os.path.join(path_to_data_DAiSEE, "DAiSEE_facial_dev_labels.csv")
+    path_to_DAiSEE_test = os.path.join(path_to_data_DAiSEE, "DAiSEE_facial_test_labels.csv")
 
     # load dataframes
     NoXi_train = pd.read_csv(path_to_NoXi_train)
@@ -71,37 +84,41 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     # map 4-class labels to 3-class labels for DAiSEE. 4 classes were: highly disengaged, disengaged, engaged, highly engaged.
     # Now it would be 3 classes: disengaged, neutral, engaged
     # Remember that they are presented as one-hot vectors
-        # we can simply add two columns that represent middle classes, while keep the other two columns as they are
-        # then, drop old columns and rename new columns to the template 'label_0', 'label_1', 'label_2',
+    # we can simply add two columns that represent middle classes, while keep the other two columns as they are
+    # then, drop old columns and rename new columns to the template 'label_0', 'label_1', 'label_2',
     DAiSEE_train['new_label_0'] = DAiSEE_train['label_0']
     DAiSEE_train['new_label_1'] = DAiSEE_train['label_1'] + DAiSEE_train['label_2']
     DAiSEE_train['new_label_2'] = DAiSEE_train['label_3']
     DAiSEE_train = DAiSEE_train.drop(columns=['label_0', 'label_1', 'label_2', 'label_3'])
-    DAiSEE_train = DAiSEE_train.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+    DAiSEE_train = DAiSEE_train.rename(
+        columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
     DAiSEE_dev['new_label_0'] = DAiSEE_dev['label_0']
     DAiSEE_dev['new_label_1'] = DAiSEE_dev['label_1'] + DAiSEE_dev['label_2']
     DAiSEE_dev['new_label_2'] = DAiSEE_dev['label_3']
     DAiSEE_dev = DAiSEE_dev.drop(columns=['label_0', 'label_1', 'label_2', 'label_3'])
-    DAiSEE_dev = DAiSEE_dev.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+    DAiSEE_dev = DAiSEE_dev.rename(
+        columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
     DAiSEE_test['new_label_0'] = DAiSEE_test['label_0']
     DAiSEE_test['new_label_1'] = DAiSEE_test['label_1'] + DAiSEE_test['label_2']
     DAiSEE_test['new_label_2'] = DAiSEE_test['label_3']
     DAiSEE_test = DAiSEE_test.drop(columns=['label_0', 'label_1', 'label_2', 'label_3'])
-    DAiSEE_test = DAiSEE_test.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+    DAiSEE_test = DAiSEE_test.rename(
+        columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
     # map 5-class labels to 3-class labels for NoXi dataset. 5 classes were: highly disengaged, disengaged, neutral, engaged, highly engaged.
     # Now it would be 3 classes: disengaged, neutral, engaged
     # Remember that they are presented as one-hot vectors
-        # we can add two first columns that represent disengagemend state (it would be then disengagement class in 3-class classification)
-        # then, add two last columns that represent engagement state (it would be then engagement class in 3-class classification)
-        # then, drop old columns and rename new columns to the template 'label_0', 'label_1', 'label_2'
+    # we can add two first columns that represent disengagemend state (it would be then disengagement class in 3-class classification)
+    # then, add two last columns that represent engagement state (it would be then engagement class in 3-class classification)
+    # then, drop old columns and rename new columns to the template 'label_0', 'label_1', 'label_2'
     NoXi_train['new_label_0'] = NoXi_train['label_0'] + NoXi_train['label_1']
     NoXi_train['new_label_1'] = NoXi_train['label_2']
     NoXi_train['new_label_2'] = NoXi_train['label_3'] + NoXi_train['label_4']
     NoXi_train = NoXi_train.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
-    NoXi_train = NoXi_train.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
+    NoXi_train = NoXi_train.rename(
+        columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
     NoXi_dev['new_label_0'] = NoXi_dev['label_0'] + NoXi_dev['label_1']
     NoXi_dev['new_label_1'] = NoXi_dev['label_2']
@@ -120,17 +137,26 @@ def load_all_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     dev = pd.concat([DAiSEE_dev, NoXi_dev], ignore_index=True)
     test = pd.concat([DAiSEE_test, NoXi_test], ignore_index=True)
 
-    # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    train['path'] = train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    dev['path'] = dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    test['path'] = test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
+    # change paths from 'media/external_hdd_2/*/prepared_data/faces' to provided data paths
+    # NoXi
+    train['path'] = train['path'].apply(
+        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/faces', path_to_data_NoXi))
+    dev['path'] = dev['path'].apply(
+        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/faces', path_to_data_NoXi))
+    test['path'] = test['path'].apply(
+        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/faces', path_to_data_NoXi))
+    # DAiSEE
+    train['path'] = train['path'].apply(
+        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/faces', path_to_data_DAiSEE))
+    dev['path'] = dev['path'].apply(
+        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/faces', path_to_data_DAiSEE))
+    test['path'] = test['path'].apply(
+        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/faces', path_to_data_DAiSEE))
 
     return train, dev, test
 
 
-
-
-def get_augmentation_function(probability:float)->Dict[Callable, float]:
+def get_augmentation_function(probability: float) -> Dict[Callable, float]:
     """
     Returns a dictionary of augmentation functions and the probabilities of their application.
     Args:
@@ -159,12 +185,12 @@ def get_augmentation_function(probability:float)->Dict[Callable, float]:
     return augmentation_functions
 
 
-def construct_data_loaders(train:pd.DataFrame, dev:pd.DataFrame, test:pd.DataFrame,
-                           preprocessing_functions:List[Callable],
-                           batch_size:int,
-                           augmentation_functions:Optional[Dict[Callable, float]]=None,
-                           num_workers:int=8)\
-        ->Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+def construct_data_loaders(train: pd.DataFrame, dev: pd.DataFrame, test: pd.DataFrame,
+                           preprocessing_functions: List[Callable],
+                           batch_size: int,
+                           augmentation_functions: Optional[Dict[Callable, float]] = None,
+                           num_workers: int = 8) \
+        -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     """ Constructs the data loaders for the train, dev and test sets.
 
     Args:
@@ -189,24 +215,28 @@ def construct_data_loaders(train:pd.DataFrame, dev:pd.DataFrame, test:pd.DataFra
     """
 
     train_data_loader = ImageDataLoader(paths_with_labels=train, preprocessing_functions=preprocessing_functions,
-                 augmentation_functions=augmentation_functions, shuffle=True)
+                                        augmentation_functions=augmentation_functions, shuffle=True)
 
     dev_data_loader = ImageDataLoader(paths_with_labels=dev, preprocessing_functions=preprocessing_functions,
-                    augmentation_functions=None, shuffle=False)
+                                      augmentation_functions=None, shuffle=False)
 
     test_data_loader = ImageDataLoader(paths_with_labels=test, preprocessing_functions=preprocessing_functions,
-                    augmentation_functions=None, shuffle=False)
+                                       augmentation_functions=None, shuffle=False)
 
-    train_dataloader = DataLoader(train_data_loader, batch_size=batch_size, num_workers=num_workers, drop_last = True, shuffle=True)
-    dev_dataloader = DataLoader(dev_data_loader, batch_size=batch_size, num_workers=num_workers//2, shuffle=False)
-    test_dataloader = DataLoader(test_data_loader, batch_size=batch_size, num_workers=num_workers//4, shuffle=False)
+    train_dataloader = DataLoader(train_data_loader, batch_size=batch_size, num_workers=num_workers, drop_last=True,
+                                  shuffle=True)
+    dev_dataloader = DataLoader(dev_data_loader, batch_size=batch_size, num_workers=num_workers // 2, shuffle=False)
+    test_dataloader = DataLoader(test_data_loader, batch_size=batch_size, num_workers=num_workers // 2, shuffle=False)
 
     return (train_dataloader, dev_dataloader, test_dataloader)
 
 
-def load_data_and_construct_dataloaders(model_type:str, batch_size:int, return_class_weights:Optional[bool]=False)->\
+def load_data_and_construct_dataloaders(path_to_data_NoXi: str, path_to_data_DAiSEE: str, model_type: str,
+                                        batch_size: int,
+                                        return_class_weights: Optional[bool] = False) -> \
         Union[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader],
-              Tuple[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]]:
+              Tuple[Tuple[
+                        torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]]:
     """
         Args:
             model_type: str
@@ -225,19 +255,24 @@ def load_data_and_construct_dataloaders(model_type:str, batch_size:int, return_c
         The train, dev and test data loaders and the class weights calculated based on the training labels.
 
     """
-    if model_type not in ['EfficientNet-B1', 'EfficientNet-B4']:
-        raise ValueError('The model type should be either "EfficientNet-B1" or "EfficientNet-B4".')
+    if model_type not in ['EfficientNet-B1', 'EfficientNet-B4', 'Modified_HRNet']:
+        raise ValueError('The model type should be either "EfficientNet-B1", "EfficientNet-B4" or "Modified_HRNet".')
     # load pd.DataFrames
-    train, dev, test = load_all_dataframes()
+    train, dev, test = load_NoXi_and_DAiSEE_dataframes(path_to_data_NoXi, path_to_data_DAiSEE)
     # define preprocessing functions
     if model_type == 'EfficientNet-B1':
-        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size = 240),
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size=240),
                                    EfficientNet_image_preprocessor()]
     elif model_type == 'EfficientNet-B4':
-        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size = 380),
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size=380),
                                    EfficientNet_image_preprocessor()]
+    elif model_type == 'Modified_HRNet':
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size=256),
+                                   convert_image_to_float_and_scale,
+                                   T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                                   ]  # From HRNet
     else:
-        raise ValueError(f'The model type should be either "EfficientNet-B1" or "EfficientNet-B4".'
+        raise ValueError(f'The model type should be either "EfficientNet-B1", "EfficientNet-B4", or "Modified_HRNet".'
                          f'Got {model_type} instead.')
     # define augmentation functions
     augmentation_functions = get_augmentation_function(training_config.AUGMENT_PROB)
@@ -260,20 +295,3 @@ def load_data_and_construct_dataloaders(model_type:str, batch_size:int, return_c
         return ((train_dataloader, dev_dataloader, test_dataloader), class_weights)
 
     return (train_dataloader, dev_dataloader, test_dataloader)
-
-
-
-@timer
-def main():
-    train_data_loader, dev_data_loader, test_data_loader = load_data_and_construct_dataloaders()
-    for x, y in train_data_loader:
-        print(x.shape, y.shape)
-        print("-------------------")
-
-if __name__ == "__main__":
-    main()
-
-
-
-
-

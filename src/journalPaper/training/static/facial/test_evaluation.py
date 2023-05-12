@@ -3,6 +3,7 @@ from torchinfo import summary
 
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, Modified_EfficientNet_B4
 from src.journalPaper.training.static import training_config
+from src.journalPaper.training.static.data_preparation import load_data_and_construct_dataloaders
 from src.journalPaper.training.static.model_evaluation import evaluate_model
 
 if __name__=="__main__":

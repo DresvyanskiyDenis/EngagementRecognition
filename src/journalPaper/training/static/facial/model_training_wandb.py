@@ -1,126 +1,21 @@
 import argparse
 import gc
 import os
-from functools import partial
-from typing import Tuple, List, Dict, Optional
+from typing import Optional
 
-import numpy as np
 import torch
-from torchinfo import summary
 import wandb
-from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
+from torchinfo import summary
 
 from pytorch_utils.lr_schedullers import WarmUpScheduler
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
     Modified_EfficientNet_B4
 from pytorch_utils.training_utils.callbacks import TorchEarlyStopping, GradualLayersUnfreezer, gradually_decrease_lr
+from pytorch_utils.training_utils.general_functions import train_epoch
 from pytorch_utils.training_utils.losses import SoftFocalLoss
-from src.journalPaper.training.static.data_preparation import load_data_and_construct_dataloaders
 from src.journalPaper.training.static import training_config
+from src.journalPaper.training.static.data_preparation import load_data_and_construct_dataloaders
 from src.journalPaper.training.static.model_evaluation import evaluate_model
-
-
-def train_step(model: torch.nn.Module, criterion: torch.nn.Module,
-               inputs: Tuple[torch.Tensor, ...], ground_truth: torch.Tensor,
-               device: torch.device) -> List:
-    """ Performs one training step for a model.
-
-    :param model: torch.nn.Module
-            Model to train.
-    :param criterion: torch.nn.Module
-            Loss functions for each output of the model.
-    :param inputs: Tuple[torch.Tensor,...]
-            Inputs for the model.
-    :param ground_truth: torch.Tensor
-            Ground truths for the model. SHould be passed as one-hot encoded tensors
-    :param device: torch.device
-            Device to use for training.
-    :return:
-    """
-    # forward pass
-    output = model(inputs)
-    # criterion
-    classification_criterion = criterion
-    # calculate loss based on mask
-    ground_truth = ground_truth.to(device)
-    loss = classification_criterion(output, ground_truth)
-
-    # clear RAM from unused variables
-    del output, ground_truth
-
-    return [loss]
-
-
-def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLoader,
-                optimizer: torch.optim.Optimizer, criterion: torch.nn.Module,
-                device: torch.device, print_step: int = 100,
-                accumulate_gradients: Optional[int] = 1,
-                warmup_lr_scheduller: Optional[object] = None,
-                loss_multiplication_factor: Optional[float] = None) -> float:
-    """ Performs one epoch of training for a model.
-
-    :param model: torch.nn.Module
-            Model to train.
-    :param train_generator: torch.utils.data.DataLoader
-            Generator for training data. Note that it should output the ground truths as a tuple of torch.Tensor
-            (thus, we have several outputs).
-    :param optimizer: torch.optim.Optimizer
-            Optimizer for training.
-    :param criterion: torch.nn.Module
-            Loss functions for each output of the model.
-    :param device: torch.device
-            Device to use for training.
-    :param print_step: int
-            Number of mini-batches between two prints of the running loss.
-    :param accumulate_gradients: Optional[int]
-            Number of mini-batches to accumulate gradients for. If 1, no accumulation is performed.
-    :param warmup_lr_scheduller: Optional[torch.optim.lr_scheduler]
-            Learning rate scheduller in case we have warmup lr scheduller. In that case, the learning rate is being changed
-            after every mini-batch, therefore should be passed to this function.
-    :return: float
-            Average loss for the epoch.
-    """
-
-    running_loss = 0.0
-    total_loss = 0.0
-    counter = 0
-    for i, data in enumerate(train_generator):
-        # get the inputs; data is a list of [inputs, labels]
-        inputs, labels = data
-        inputs = inputs.float()
-        inputs = inputs.to(device)
-
-        # do train step
-        with torch.set_grad_enabled(True):
-            # form indecex of labels which should be one-hot encoded
-            step_losses = train_step(model, criterion, inputs, labels, device)
-            # normalize losses by number of accumulate gradient steps
-            step_losses = [step_loss / accumulate_gradients for step_loss in step_losses]
-            # backward pass
-            sum_losses = sum(step_losses)
-            if loss_multiplication_factor is not None:
-                sum_losses = sum_losses * loss_multiplication_factor
-            sum_losses.backward()
-            # update weights if we have accumulated enough gradients
-            if (i + 1) % accumulate_gradients == 0 or (i + 1 == len(train_generator)):
-                optimizer.step()
-                optimizer.zero_grad()
-                if warmup_lr_scheduller is not None:
-                    warmup_lr_scheduller.step()
-
-        # print statistics
-        running_loss += sum_losses.item()
-        total_loss += sum_losses.item()
-        counter += 1
-        if i % print_step == (print_step - 1):  # print every print_step mini-batches
-            print("Mini-batch: %i, loss: %.10f" % (i, running_loss / print_step))
-            running_loss = 0.0
-        # clear RAM from all the intermediate variables
-        del inputs, labels, step_losses, sum_losses
-    # clear RAM at the end of the epoch
-    torch.cuda.empty_cache()
-    gc.collect()
-    return total_loss / counter
 
 
 def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: torch.utils.data.DataLoader,
@@ -234,7 +129,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                              weight_decay=config.WEIGHT_DECAY)
     # Loss functions
     class_weights = class_weights.to(device)
-    criterion = SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)
+    criterions = [SoftFocalLoss(softmax=True, alpha=class_weights, gamma=2)]
     # create LR scheduler
     lr_schedullers = {
         'Cyclic': torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.ANNEALING_PERIOD,
@@ -269,9 +164,9 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         print("Epoch: %i" % epoch)
         # train the model
         model.train()
-        train_loss = train_epoch(model, train_generator, optimizer, criterion, device, print_step=100,
+        train_loss = train_epoch(model, train_generator, optimizer, criterions, device, print_step=100,
                                  accumulate_gradients=ACCUMULATE_GRADIENTS,
-                                 warmup_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None,
+                                 batch_wise_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None,
                                  loss_multiplication_factor=config.loss_multiplication_factor)
         print("Train loss: %.10f" % train_loss)
 

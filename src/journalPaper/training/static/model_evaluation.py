@@ -28,8 +28,7 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
             inputs = inputs.to(device)
 
             # forward pass
-            outputs = model(inputs)
-            classification_output = outputs
+            classification_output = model(inputs)
 
             # transform classification output to fit labels
             classification_output = torch.softmax(classification_output, dim=-1)
@@ -61,6 +60,6 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
             evaluation_metrics_classifier = {metrics_name_prefix + metric_name: metric_value
                                              for metric_name, metric_value in evaluation_metrics_classifier.items()}
     # clear RAM from unused variables
-    del inputs, labels, outputs, classification_output, classification_ground_truth
+    del inputs, labels, classification_output, classification_ground_truth
     torch.cuda.empty_cache()
     return evaluation_metrics_classifier

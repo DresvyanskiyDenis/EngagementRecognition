@@ -1,9 +1,9 @@
 import gc
 import sys
+
 sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
 sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
 sys.path.append('/nfs/home/ddresvya/scripts/simple-HRNet-master/')
-
 
 import os.path
 
@@ -18,15 +18,14 @@ from src.journalPaper.training.static.data_preparation import load_data_and_cons
 from src.journalPaper.training.static.model_evaluation import evaluate_model
 
 
-
-def test_model(model:torch.nn.Module, generator:torch.utils.data.DataLoader, device:torch.device,
-               metrics_name_prefix:str='test_', print_metrics:bool=True):
+def test_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device,
+               metrics_name_prefix: str = 'test_', print_metrics: bool = True):
     test_metrics = evaluate_model(model, generator, device,
                                   metrics_name_prefix=metrics_name_prefix, print_metrics=print_metrics)
     return test_metrics
 
 
-def get_info_and_download_models_weights_from_project(entity:str, project_name:str, output_path:str)->pd.DataFrame:
+def get_info_and_download_models_weights_from_project(entity: str, project_name: str, output_path: str) -> pd.DataFrame:
     """ Extracts info about run models from the project and downloads the models weights to the output_path.
         The extracted information will be stored as pd.DataFrame with the columns:
         ['ID', 'model_type', 'discriminative_learning', 'gradual_unfreezing', 'loss_multiplication_factor', 'best_val_recall']
@@ -47,8 +46,8 @@ def get_info_and_download_models_weights_from_project(entity:str, project_name:s
     # get runs from the project
     runs = api.runs(f"{entity}/{project}")
     # extract info about the runs
-    info = pd.DataFrame(columns = ['ID', 'model_type', 'discriminative_learning', 'gradual_unfreezing',
-                                   'loss_multiplication_factor', 'best_val_recall'])
+    info = pd.DataFrame(columns=['ID', 'model_type', 'discriminative_learning', 'gradual_unfreezing',
+                                 'loss_multiplication_factor', 'best_val_recall'])
     for run in runs:
         ID = run.name
         model_type = run.config['MODEL_TYPE']
@@ -71,31 +70,27 @@ def get_info_and_download_models_weights_from_project(entity:str, project_name:s
         run.file('best_model_recall.pth').download(final_output_path, replace=True)
         # move the file out of dir and rename file for convenience
         os.rename(os.path.join(final_output_path, 'best_model_recall.pth'),
-                  final_output_path+'.pth')
+                  final_output_path + '.pth')
         # delete the dir
         os.rmdir(final_output_path)
 
     return info
 
 
-
-
-
-
-
-if __name__=="__main__":
+if __name__ == "__main__":
     # params
     batch_size = 32
     project_name = 'Engagement_recognition_F2F'
     entity = 'denisdresvyanskiy'
-    output_path_for_models_weights = "/"+os.path.join(*os.path.abspath(__file__).split(os.path.sep)[:-6], 'weights_best_models/')
+    output_path_for_models_weights = "/" + os.path.join(*os.path.abspath(__file__).split(os.path.sep)[:-6],
+                                                        'weights_best_models/')
 
     if not os.path.exists(output_path_for_models_weights):
         os.makedirs(output_path_for_models_weights)
 
     # get info about all runs (training sessions) and download the models weights
     info = get_info_and_download_models_weights_from_project(entity=entity, project_name=project_name,
-                                                                output_path=output_path_for_models_weights)
+                                                             output_path=output_path_for_models_weights)
 
     # test all models on the test set
     info['test_accuracy'] = -100
@@ -114,7 +109,7 @@ if __name__=="__main__":
         else:
             raise ValueError("Unknown model type: %s" % model_type)
         # load model weights
-        path_to_weights = os.path.join(output_path_for_models_weights, info['ID'].iloc[i]+'.pth')
+        path_to_weights = os.path.join(output_path_for_models_weights, info['ID'].iloc[i] + '.pth')
         model.load_state_dict(torch.load(path_to_weights))
         # define device
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -127,20 +122,19 @@ if __name__=="__main__":
             batch_size=batch_size,
             return_class_weights=True)
 
-
         # test model
         test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
 
         # save test metrics
-        info['test_accuracy'].iloc[i] = test_metrics['test_accuracy_classification']
-        info['test_precision'].iloc[i] = test_metrics['test_precision_classification']
-        info['test_recall'].iloc[i] = test_metrics['test_recall_classification']
-        info['test_f1'].iloc[i] = test_metrics['test_f1_classification']
+        info.loc['test_accuracy', i] = test_metrics['test_accuracy_classification']
+        info.loc['test_precision', i] = test_metrics['test_precision_classification']
+        info.loc['test_recall', i] = test_metrics['test_recall_classification']
+        info.loc['test_f1', i] = test_metrics['test_f1_classification']
 
         # save info
         info.to_csv(os.path.join(output_path_for_models_weights, 'info.csv'), index=False)
 
         # clear RAM and GPU memory
-        del model,train_generator, dev_generator, test_generator, class_weights
+        del model, train_generator, dev_generator, test_generator, class_weights
         torch.cuda.empty_cache()
         gc.collect()

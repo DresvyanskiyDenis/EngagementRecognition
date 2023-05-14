@@ -1,3 +1,4 @@
+import gc
 import sys
 sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
 sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
@@ -57,15 +58,25 @@ def get_info_and_download_models_weights_from_project(entity:str, project_name:s
         best_val_recall = run.config['best_val_recall_classification']
         info = pd.concat([info,
                           pd.DataFrame.from_dict(
-                              {'ID':ID, 'model_type':model_type, 'discriminative_learning':discriminative_learning,
-                            'gradual_unfreezing':gradual_unfreezing, 'loss_multiplication_factor':loss_multiplication_factor,
-                            'best_val_recall':best_val_recall}
-                                                )
+                              {'ID': [ID], 'model_type': [model_type],
+                               'discriminative_learning': [discriminative_learning],
+                               'gradual_unfreezing': [gradual_unfreezing],
+                               'loss_multiplication_factor': [loss_multiplication_factor],
+                               'best_val_recall': [best_val_recall]}
+                          )
                           ]
                          )
         # download the model weights
-        final_output_path = os.path.join(output_path, ID+'.pth')
-        run.file('model.pth').download(final_output_path, replace=True)
+        final_output_path = os.path.join(output_path, ID)
+        run.file('best_model_recall.pth').download(final_output_path, replace=True)
+        # move the file out of dir and rename file for convenience
+        os.rename(os.path.join(final_output_path, 'best_model_recall.pth'),
+                  final_output_path+'.pth')
+        # delete the dir
+        os.rmdir(final_output_path)
+
+    return info
+
 
 
 
@@ -77,7 +88,7 @@ if __name__=="__main__":
     batch_size = 32
     project_name = 'Engagement_recognition_F2F'
     entity = 'denisdresvyanskiy'
-    output_path_for_models_weights = os.path.join(*os.path.abspath(__file__).split(os.path.sep)[:-6], 'weights_best_models/')
+    output_path_for_models_weights = "/"+os.path.join(*os.path.abspath(__file__).split(os.path.sep)[:-6], 'weights_best_models/')
 
     if not os.path.exists(output_path_for_models_weights):
         os.makedirs(output_path_for_models_weights)
@@ -87,9 +98,13 @@ if __name__=="__main__":
                                                                 output_path=output_path_for_models_weights)
 
     # test all models on the test set
+    info['test_accuracy'] = -100
+    info['test_precision'] = -100
+    info['test_recall'] = -100
+    info['test_f1'] = -100
     for i in range(len(info)):
         # create model
-        model_type = info.loc[i, 'model_type']
+        model_type = info['model_type'].iloc[i]
         if model_type == "EfficientNet-B1":
             model = Modified_EfficientNet_B1(embeddings_layer_neurons=256, num_classes=training_config.NUM_CLASSES,
                                              num_regression_neurons=None)
@@ -99,10 +114,10 @@ if __name__=="__main__":
         else:
             raise ValueError("Unknown model type: %s" % model_type)
         # load model weights
-        path_to_weights = os.path.join(output_path_for_models_weights, info.loc[i, 'ID']+'.pth')
+        path_to_weights = os.path.join(output_path_for_models_weights, info['ID'].iloc[i]+'.pth')
         model.load_state_dict(torch.load(path_to_weights))
         # define device
-        device = torch.device("cpu")
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model = model.to(device)
         # get generators, including test generator
         (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
@@ -117,10 +132,15 @@ if __name__=="__main__":
         test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
 
         # save test metrics
-        info.loc[i, 'test_accuracy'] = test_metrics['test_accuracy_classification']
-        info.loc[i, 'test_precision'] = test_metrics['test_precision_classification']
-        info.loc[i, 'test_recall'] = test_metrics['test_recall_classification']
-        info.loc[i, 'test_f1'] = test_metrics['test_f1_classification']
+        info['test_accuracy'].iloc[i] = test_metrics['test_accuracy_classification']
+        info['test_precision'].iloc[i] = test_metrics['test_precision_classification']
+        info['test_recall'].iloc[i] = test_metrics['test_recall_classification']
+        info['test_f1'].iloc[i] = test_metrics['test_f1_classification']
 
         # save info
         info.to_csv(os.path.join(output_path_for_models_weights, 'info.csv'), index=False)
+
+        # clear RAM and GPU memory
+        del model,train_generator, dev_generator, test_generator, class_weights
+        torch.cuda.empty_cache()
+        gc.collect()

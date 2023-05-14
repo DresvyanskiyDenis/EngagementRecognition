@@ -98,6 +98,7 @@ if __name__ == "__main__":
     info['test_recall'] = -100
     info['test_f1'] = -100
     for i in range(len(info)):
+        print("Testing model %d / %s" % (i + 1, info['model_type'].iloc[i]))
         # create model
         model_type = info['model_type'].iloc[i]
         if model_type == "EfficientNet-B1":

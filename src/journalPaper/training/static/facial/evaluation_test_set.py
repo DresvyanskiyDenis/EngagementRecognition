@@ -97,6 +97,7 @@ if __name__ == "__main__":
     info['test_precision'] = -100
     info['test_recall'] = -100
     info['test_f1'] = -100
+    info.reset_index(drop=True, inplace=True)
     for i in range(len(info)):
         print("Testing model %d / %s" % (i + 1, info['model_type'].iloc[i]))
         # create model
@@ -127,10 +128,10 @@ if __name__ == "__main__":
         test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
 
         # save test metrics
-        info.loc['test_accuracy', i] = test_metrics['test_accuracy_classification']
-        info.loc['test_precision', i] = test_metrics['test_precision_classification']
-        info.loc['test_recall', i] = test_metrics['test_recall_classification']
-        info.loc['test_f1', i] = test_metrics['test_f1_classification']
+        info.loc[i, 'test_accuracy'] = test_metrics['test_accuracy_classification']
+        info.loc[i, 'test_precision'] = test_metrics['test_precision_classification']
+        info.loc[i, 'test_recall'] = test_metrics['test_recall_classification']
+        info.loc[i, 'test_f1'] = test_metrics['test_f1_classification']
 
         # save info
         info.to_csv(os.path.join(output_path_for_models_weights, 'info.csv'), index=False)

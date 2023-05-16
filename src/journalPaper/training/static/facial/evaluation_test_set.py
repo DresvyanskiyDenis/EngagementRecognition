@@ -132,6 +132,8 @@ if __name__ == "__main__":
         # test model
         test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
         # draw confusion matrix
+        if not os.path.exists(os.path.join(output_path_for_models_weights, 'confusion_matrices')):
+            os.makedirs(os.path.join(output_path_for_models_weights, 'confusion_matrices'))
         draw_confusion_matrix(model=model, generator=test_generator, device=device,
                               output_path = os.path.join(output_path_for_models_weights, 'confusion_matrices'),
                               filename = info['ID'].iloc[i] + '.png')

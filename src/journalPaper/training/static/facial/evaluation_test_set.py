@@ -1,5 +1,6 @@
 import gc
 import sys
+from typing import Optional
 
 sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
 sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
@@ -15,13 +16,17 @@ from torchinfo import summary
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, Modified_EfficientNet_B4
 from src.journalPaper.training.static import training_config
 from src.journalPaper.training.static.data_preparation import load_data_and_construct_dataloaders
-from src.journalPaper.training.static.model_evaluation import evaluate_model
+from src.journalPaper.training.static.model_evaluation import evaluate_model, draw_confusion_matrix
 
 
 def test_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device,
-               metrics_name_prefix: str = 'test_', print_metrics: bool = True):
+               metrics_name_prefix: str = 'test_', print_metrics: bool = True,
+               draw_cm:Optional[bool]=False, output_path_cm:Optional[str]=None):
     test_metrics = evaluate_model(model, generator, device,
                                   metrics_name_prefix=metrics_name_prefix, print_metrics=print_metrics)
+    # draw confusion matrix if needed
+    if draw_cm:
+        draw_confusion_matrix(model=model, generator=generator, device=device, output_path = output_path_cm)
     return test_metrics
 
 
@@ -126,6 +131,10 @@ if __name__ == "__main__":
 
         # test model
         test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
+        # draw confusion matrix
+        draw_confusion_matrix(model=model, generator=test_generator, device=device,
+                              output_path = os.path.join(output_path_for_models_weights, 'confusion_matrices'),
+                              filename = info['ID'].iloc[i] + '.png')
 
         # save test metrics
         info.loc[i, 'test_accuracy'] = test_metrics['test_accuracy_classification']

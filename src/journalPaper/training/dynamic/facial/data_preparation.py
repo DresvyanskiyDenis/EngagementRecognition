@@ -25,13 +25,13 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
         The tuple of train, dev, and test data.
     """
 
-    path_to_NoXi_train = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_train.csv"
-    path_to_NoXi_dev = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_dev.csv"
-    path_to_NoXi_test = "/work/home/dsu/Datasets/NoXi/prepared_data/faces/NoXi_facial_test.csv"
+    path_to_NoXi_train = "/nfs/home/ddresvya/Data/NoXi/prepared_data/faces/NoXi_face_train.csv"
+    path_to_NoXi_dev = "/nfs/home/ddresvya/Data/NoXi/prepared_data/faces/NoXi_face_dev.csv"
+    path_to_NoXi_test = "/nfs/home/ddresvya/Data/NoXi/prepared_data/faces/NoXi_face_test.csv"
 
-    path_to_DAiSEE_train = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_train_labels.csv"
-    path_to_DAiSEE_dev = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_dev_labels.csv"
-    path_to_DAiSEE_test = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces/DAiSEE_facial_test_labels.csv"
+    path_to_DAiSEE_train = "/nfs/home/ddresvya/Data/DAiSEE/prepared_data/faces/DAiSEE_face_train_labels.csv"
+    path_to_DAiSEE_dev = "/nfs/home/ddresvya/Data/DAiSEE/prepared_data/faces/DAiSEE_face_dev_labels.csv"
+    path_to_DAiSEE_test = "/nfs/home/ddresvya/Data/DAiSEE/prepared_data/faces/DAiSEE_face_test_labels.csv"
 
     # load dataframes
     NoXi_train = pd.read_csv(path_to_NoXi_train)
@@ -129,13 +129,12 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_dev = split_data_by_videoname(DAiSEE_dev, position_of_videoname=-3)
     DAiSEE_test = split_data_by_videoname(DAiSEE_test, position_of_videoname=-3)
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    NoXi_train['path'] = NoXi_train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    NoXi_dev['path'] = NoXi_dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    NoXi_test['path'] = NoXi_test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    DAiSEE_train['path'] = DAiSEE_train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    DAiSEE_dev['path'] = DAiSEE_dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    DAiSEE_test['path'] = DAiSEE_test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-
+    NoXi_train = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_train.items()}
+    NoXi_dev = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_dev.items()}
+    NoXi_test = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_test.items()}
+    DAiSEE_train = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_train.items()}
+    DAiSEE_dev = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_dev.items()}
+    DAiSEE_test = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_test.items()}
     # concatenate datasets
     train = {**NoXi_train, **DAiSEE_train}
     dev = {**NoXi_dev, **DAiSEE_dev}

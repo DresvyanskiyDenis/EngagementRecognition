@@ -1,9 +1,9 @@
 from typing import Dict
 
 # paths to data
-DATA_TYPE:str = "face"  # pose or face
-NOXI_DATA_PATH:str = "/nfs/home/ddresvya/Data/NoXi/prepared_data/"
-DAISEE_DATA_PATH:str = "/nfs/home/ddresvya/Data/DAiSEE/prepared_data/"
+DATA_TYPE:str = "pose"  # pose or face
+NOXI_DATA_PATH:str = "/nfs/scratch/ddresvya/Data/NoXi/prepared_data/"
+DAISEE_DATA_PATH:str = "/nfs/scratch/ddresvya/Data/DAiSEE/prepared_data/"
 
 if DATA_TYPE == "pose":
     NOXI_DATA_PATH = NOXI_DATA_PATH + DATA_TYPE+"s"

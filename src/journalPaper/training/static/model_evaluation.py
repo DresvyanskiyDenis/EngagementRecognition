@@ -35,13 +35,13 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
             # transform classification output to fit labels
             classification_output = torch.softmax(classification_output, dim=-1)
             classification_output = classification_output.cpu().numpy().squeeze()
-            classification_output = np.argmax(classification_output, axis=-1) if classification_output.shape[0] > 1 \
-                else np.argmax(classification_output, axis=-1, keepdims=True)
+            classification_output = np.argmax(classification_output, axis=-1, keepdims=True) if len(classification_output.shape) == 1 \
+                else np.argmax(classification_output, axis=-1)
 
             # transform ground truth labels to fit predictions and sklearn metrics
             classification_ground_truth = labels.cpu().numpy().squeeze()
-            classification_ground_truth = np.argmax(classification_ground_truth, axis=-1) if classification_ground_truth.shape[0] > 1 \
-                else np.argmax(classification_ground_truth, axis=-1, keepdims=True)
+            classification_ground_truth = np.argmax(classification_ground_truth, axis=-1, keepdims=True) if len(classification_ground_truth.shape) == 1 \
+                else np.argmax(classification_ground_truth, axis=-1)
 
             # save ground_truth labels and predictions in arrays to calculate metrics afterwards by one time
             predictions_classifier.append(classification_output)

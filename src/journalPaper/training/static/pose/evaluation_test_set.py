@@ -130,7 +130,7 @@ if __name__ == "__main__":
             return_class_weights=True)
 
         # test model
-        test_metrics = evaluate_model(model, dev_generator, device, metrics_name_prefix='test_', print_metrics=True)
+        test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
         # draw confusion matrix
         if not os.path.exists(os.path.join(output_path_for_models_weights, 'confusion_matrices')):
             os.makedirs(os.path.join(output_path_for_models_weights, 'confusion_matrices'))

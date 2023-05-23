@@ -17,6 +17,21 @@ from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_fa
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
 
 
+
+def replace_str_part_in_column_by(df:pd.DataFrame, column:str, old_part:str, new_part:str) -> pd.DataFrame:
+    """
+    Replaces the part of the string in the column by the new part.
+    Args:
+        df (pd.DataFrame): The dataframe.
+        column (str): The column name.
+        old_part (str): The old part of the string.
+        new_part (str): The new part of the string.
+    Returns:
+        pd.DataFrame: The dataframe with replaced strings.
+    """
+    df[column] = df[column].apply(lambda x: x.replace(old_part, new_part))
+    return df
+
 def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
     """
      Loads all dataframes for the datasets AFEW-VA, AffectNet, RECOLA, SEMAINE, and SEWA, and split them into
@@ -51,14 +66,10 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_dev = DAiSEE_dev.dropna()
     DAiSEE_test = DAiSEE_test.dropna()
 
-    # drop timestamps
-    NoXi_train = NoXi_train.drop(columns=['timestep'])
-    NoXi_dev = NoXi_dev.drop(columns=['timestep'])
-    NoXi_test = NoXi_test.drop(columns=['timestep'])
-
-    DAiSEE_train = DAiSEE_train.drop(columns=['timestamp'])
-    DAiSEE_dev = DAiSEE_dev.drop(columns=['timestamp'])
-    DAiSEE_test = DAiSEE_test.drop(columns=['timestamp'])
+    # rename timestep to timestamp
+    NoXi_train = NoXi_train.rename(columns={"timestep": "timestamp"})
+    NoXi_dev = NoXi_dev.rename(columns={"timestep": "timestamp"})
+    NoXi_test = NoXi_test.rename(columns={"timestep": "timestamp"})
 
     # change path_to_frame column name to path
     NoXi_train = NoXi_train.rename(columns={"path_to_frame": "path"})
@@ -120,6 +131,14 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     NoXi_test = NoXi_test.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
     NoXi_test = NoXi_test.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
+    # TODO: delete this part
+    NoXi_train = NoXi_train.iloc[:30000]
+    NoXi_dev = NoXi_dev.iloc[:30000]
+    NoXi_test = NoXi_test.iloc[:3000]
+    DAiSEE_train = DAiSEE_train.iloc[:10000]
+    DAiSEE_dev = DAiSEE_dev.iloc[:10000]
+    DAiSEE_test = DAiSEE_test.iloc[:3000]
+
     # transform dataframes to Dict[str, pd.DataFrame] type, where keys are video names, and values are dataframes with
     # paths and labels for each frame
     NoXi_train = split_data_by_videoname(NoXi_train, position_of_videoname=-3)
@@ -129,16 +148,26 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_dev = split_data_by_videoname(DAiSEE_dev, position_of_videoname=-3)
     DAiSEE_test = split_data_by_videoname(DAiSEE_test, position_of_videoname=-3)
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    NoXi_train = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_train.items()}
-    NoXi_dev = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_dev.items()}
-    NoXi_test = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_test.items()}
-    DAiSEE_train = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_train.items()}
-    DAiSEE_dev = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_dev.items()}
-    DAiSEE_test = {k: v.replace('media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_test.items()}
+    NoXi_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_train.items()}
+    NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_dev.items()}
+    NoXi_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in NoXi_test.items()}
+    DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_train.items()}
+    DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_dev.items()}
+    DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', '/nfs/home/ddresvya/Data/') for k, v in DAiSEE_test.items()}
     # concatenate datasets
     train = {**NoXi_train, **DAiSEE_train}
     dev = {**NoXi_dev, **DAiSEE_dev}
     test = {**NoXi_test, **DAiSEE_test}
+
+    # TODO: delete it
+    # take only first 20 keys for train, dev and test
+    train = {k: train[k] for k in list(train.keys())[:20]}
+    dev = {k: dev[k] for k in list(dev.keys())[:20]}
+    test = {k: test[k] for k in list(test.keys())[:20]}
+
+
+
+
 
     return train, dev, test
 
@@ -274,7 +303,7 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
         class_weights = 1. / (class_weights / class_weights.sum())
         # normalize class weights
         class_weights = class_weights / class_weights.sum()
-        class_weights = torch.tensor(class_weights.values, dtype=torch.float32)
+        class_weights = torch.tensor(class_weights, dtype=torch.float32)
         return ((train_dataloader, dev_dataloader), class_weights)
 
     return (train_dataloader, dev_dataloader)

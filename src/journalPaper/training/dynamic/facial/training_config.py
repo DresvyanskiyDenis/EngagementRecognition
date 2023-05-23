@@ -7,7 +7,7 @@ MODEL_INPUT_SIZE:Dict[str, int] = {
     "EfficientNet-B4":380,
 }
 PRETRAINED:bool = True
-PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/deep-capybara-42.pth"
+PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/face/deep-capybara-42.pth"
 
 # training metaparams
 NUM_EPOCHS:int = 100

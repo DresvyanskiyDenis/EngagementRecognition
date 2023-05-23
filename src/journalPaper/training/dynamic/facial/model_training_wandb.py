@@ -274,6 +274,10 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     wandb.init(project="engagement_recognition_seq2one", config=metaparams)
     config = wandb.config
     wandb.config.update({'BEST_MODEL_SAVE_PATH':wandb.run.dir}, allow_val_change=True)
+    # get one iteration of train generator to get sequence length
+    inputs, labels = next(iter(train_generator))
+    sequence_length = inputs.shape[1]
+
 
     # create model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -287,12 +291,12 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
     # construct sequence-to-one model out of base model
     model = construct_model(base_model=model, cut_n_last_layers=-1, num_classes=config.NUM_CLASSES,
-                    num_timesteps=train_generator.get_sequence_length(), pretrained=config.PATH_TO_WEIGHTS)
+                    num_timesteps=sequence_length, pretrained=config.PATH_TO_WEIGHTS)
 
     model = model.to(device)
     # print model architecture
-    summary(model, (2, train_generator.get_sequence_length(), 3, config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
-                    config.MODEL_INPUT_SIZE[config.MODEL_TYPE]))
+    summary(model, (2, sequence_length, 3, training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
+                    training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE]))
 
     # select optimizer
     model_parameters = model.parameters()
@@ -382,7 +386,7 @@ def main(window_size, stride, consider_timestamps, model_type, batch_size, accum
          loss_multiplication_factor):
     print("Start of the script....")
     # get data loaders
-    (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
+    (train_generator, dev_generator), class_weights = load_data_and_construct_dataloaders(
         window_size=window_size,
         stride=stride,
         consider_timestamps=consider_timestamps,

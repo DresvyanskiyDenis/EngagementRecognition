@@ -8,14 +8,12 @@ from torch.utils.data import DataLoader
 
 import training_config
 from decorators.common_decorators import timer
-from pytorch_utils.data_loaders.ImageDataLoader_new import ImageDataLoader
 from pytorch_utils.data_loaders.TemporalDataLoader import TemporalDataLoader
 from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_factor, grayscale_image, \
     collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
     random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
     random_horizontal_flip_image, random_vertical_flip_image
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
-
 
 
 def replace_str_part_in_column_by(df:pd.DataFrame, column:str, old_part:str, new_part:str) -> pd.DataFrame:
@@ -131,14 +129,6 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     NoXi_test = NoXi_test.drop(columns=['label_0', 'label_1', 'label_2', 'label_3', 'label_4'])
     NoXi_test = NoXi_test.rename(columns={"new_label_0": "label_0", "new_label_1": "label_1", "new_label_2": "label_2"})
 
-    # TODO: delete this part
-    NoXi_train = NoXi_train.iloc[:30000]
-    NoXi_dev = NoXi_dev.iloc[:30000]
-    NoXi_test = NoXi_test.iloc[:3000]
-    DAiSEE_train = DAiSEE_train.iloc[:10000]
-    DAiSEE_dev = DAiSEE_dev.iloc[:10000]
-    DAiSEE_test = DAiSEE_test.iloc[:3000]
-
     # transform dataframes to Dict[str, pd.DataFrame] type, where keys are video names, and values are dataframes with
     # paths and labels for each frame
     NoXi_train = split_data_by_videoname(NoXi_train, position_of_videoname=-3)
@@ -158,16 +148,6 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     train = {**NoXi_train, **DAiSEE_train}
     dev = {**NoXi_dev, **DAiSEE_dev}
     test = {**NoXi_test, **DAiSEE_test}
-
-    # TODO: delete it
-    # take only first 20 keys for train, dev and test
-    train = {k: train[k] for k in list(train.keys())[:20]}
-    dev = {k: dev[k] for k in list(dev.keys())[:20]}
-    test = {k: test[k] for k in list(test.keys())[:20]}
-
-
-
-
 
     return train, dev, test
 

@@ -19,7 +19,7 @@ import training_config
 from pytorch_utils.lr_schedullers import WarmUpScheduler
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
     Modified_EfficientNet_B4
-from pytorch_utils.training_utils.callbacks import TorchEarlyStopping, GradualLayersUnfreezer, gradually_decrease_lr
+from pytorch_utils.training_utils.callbacks import TorchEarlyStopping
 from pytorch_utils.training_utils.losses import SoftFocalLoss
 
 import wandb
@@ -38,7 +38,10 @@ def construct_model(base_model:torch.nn.Module, cut_n_last_layers:int, num_class
     # if pretrained is not None:
     base_model.load_state_dict(torch.load(pretrained))
     # cut off last layers
-    base_model = torch.nn.Sequential(*list(base_model.children())[:-cut_n_last_layers])
+    base_model = torch.nn.Sequential(*list(base_model.children())[:cut_n_last_layers])
+    # freeze base_model
+    for param in base_model.parameters():
+        param.requires_grad = False
     # construct sequence_to_one model
     model = Facial_engagement_recognition_model(facial_model=base_model,
                                                 embeddings_layer_neurons=256,
@@ -91,7 +94,6 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
 
             # transform ground truth labels to fit predictions and sklearn metrics
             classification_ground_truth = labels.cpu().numpy().squeeze()
-            classification_ground_truth = np.argmax(classification_ground_truth, axis=-1)
 
             # save ground_truth labels and predictions in arrays to calculate metrics afterwards by one time
             predictions_classifier.append(classification_output)
@@ -190,8 +192,7 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
         # hovewer, here, in the training, we have soft labels. Therefore, we do not take mode, instead, we
         # average them and normalize so that the sum of the values is 1
         # labels shape: (batch_size, sequence_length, num_classes)
-        # TODO: check the working of the formula
-        labels = labels.sum(axis=-2)/labels.sum(axis=-2).sum(axis=-1)
+        labels = labels.sum(axis=-2)/labels.sum(axis=-2).sum(axis=-1, keepdims=True)
         # labels shape after transformation: (batch_size, num_classes)
 
         # do train step

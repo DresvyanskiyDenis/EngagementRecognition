@@ -2,6 +2,7 @@ import sys
 
 sys.path.extend(["/nfs/home/ddresvya/scripts/datatools/"])
 sys.path.extend(["/nfs/home/ddresvya/scripts/engagement_recognition_project_server/"])
+sys.path.append('/nfs/home/ddresvya/scripts/simple-HRNet-master/')
 
 import argparse
 from torchinfo import summary
@@ -20,8 +21,7 @@ from pytorch_utils.training_utils.losses import SoftFocalLoss
 
 import wandb
 
-from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import \
-    Facial_engagement_recognition_model
+from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import Pose_engagement_recognition_model
 
 from pytorch_utils.models.Pose_estimation.HRNet import Modified_HRNet
 from src.journalPaper.training.dynamic import training_config
@@ -33,9 +33,12 @@ def construct_model(base_model: torch.nn.Module, cut_n_last_layers: int, num_cla
     # if pretrained is not None:
     base_model.load_state_dict(torch.load(pretrained))
     # cut off last layers
-    base_model = torch.nn.Sequential(*list(base_model.children())[:-cut_n_last_layers])
+    base_model.classifier = torch.nn.Identity()
+    # freeze base_model
+    for param in base_model.parameters():
+        param.requires_grad = False
     # construct sequence_to_one model
-    model = Facial_engagement_recognition_model(facial_model=base_model,
+    model = Pose_engagement_recognition_model(pose_model=base_model,
                                                 embeddings_layer_neurons=256,
                                                 num_classes=num_classes,
                                                 transformer_num_heads=4,
@@ -82,7 +85,6 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
 
             # transform ground truth labels to fit predictions and sklearn metrics
             classification_ground_truth = labels.cpu().numpy().squeeze()
-            classification_ground_truth = np.argmax(classification_ground_truth, axis=-1)
 
             # save ground_truth labels and predictions in arrays to calculate metrics afterwards by one time
             predictions_classifier.append(classification_output)
@@ -180,8 +182,7 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
         # hovewer, here, in the training, we have soft labels. Therefore, we do not take mode, instead, we
         # average them and normalize so that the sum of the values is 1
         # labels shape: (batch_size, sequence_length, num_classes)
-        # TODO: check the working of the formula
-        labels = labels.sum(axis=-2) / labels.sum(axis=-2).sum(axis=-1)
+        labels = labels.sum(axis=-2) / labels.sum(axis=-2).sum(axis=-1, keepdims=True)
         # labels shape after transformation: (batch_size, num_classes)
 
         # do train step
@@ -265,26 +266,28 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     wandb.init(project="engagement_recognition_seq2one", config=metaparams)
     config = wandb.config
     wandb.config.update({'BEST_MODEL_SAVE_PATH': wandb.run.dir}, allow_val_change=True)
+    # get one iteration of train generator to get sequence length
+    inputs, labels = next(iter(train_generator))
+    sequence_length = inputs.shape[1]
 
     # create model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if config.MODEL_TYPE == "Modified_HRNet":
         model = Modified_HRNet(pretrained=True,
-                               path_to_weights="/work/home/dsu/simple-HRNet-master/pose_hrnet_w32_256x192.pth",
+                               path_to_weights=training_config.PATH_TO_WEIGHTS_HRNET,
                                embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                               num_regression_neurons=config.NUM_REGRESSION_NEURONS,
+                               num_regression_neurons=None,
                                consider_only_upper_body=True)
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
     # construct sequence-to-one model out of base model
     model = construct_model(base_model=model, cut_n_last_layers=-1, num_classes=config.NUM_CLASSES,
-                            num_timesteps=train_generator.get_sequence_length(),
-                            pretrained=config.PATH_TO_WEIGHTS)  # TODO: check how much layers should be cut
+                            num_timesteps=sequence_length, pretrained=config.PATH_TO_WEIGHTS)
 
     model = model.to(device)
     # print model architecture
-    summary(model, (2, train_generator.get_sequence_length(), 3, config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
-                    config.MODEL_INPUT_SIZE[config.MODEL_TYPE]))
+    summary(model, (2, sequence_length, 3, training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE],
+                    training_config.MODEL_INPUT_SIZE[config.MODEL_TYPE]))
 
     # select optimizer
     model_parameters = model.parameters()
@@ -376,7 +379,7 @@ def main(window_size, stride, consider_timestamps, model_type, batch_size, accum
          loss_multiplication_factor):
     print("Start of the script....")
     # get data loaders
-    (train_generator, dev_generator, test_generator), class_weights = load_data_and_construct_dataloaders(
+    (train_generator, dev_generator), class_weights = load_data_and_construct_dataloaders(
         window_size=window_size,
         stride=stride,
         consider_timestamps=consider_timestamps,
@@ -406,7 +409,7 @@ if __name__ == "__main__":
     print("Passed args: ", args)
     # check arguments
     if args.model_type not in ['Modified_HRNet']:
-        raise ValueError("model_type should be either EfficientNet-B1 or EfficientNet-B4. Got %s" % args.model_type)
+        raise ValueError("model_type should be Modified_HRNet. Got %s" % args.model_type)
     if args.batch_size < 1:
         raise ValueError("batch_size should be greater than 0")
     if args.accumulate_gradients < 1:

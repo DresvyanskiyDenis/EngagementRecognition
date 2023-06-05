@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+import torchvision.transforms as T
 
-import training_config
 from decorators.common_decorators import timer
 from pytorch_utils.data_loaders.TemporalDataLoader import TemporalDataLoader
 from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_factor, grayscale_image, \
@@ -15,6 +15,7 @@ from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_fa
     random_crop_image, random_posterize_image, random_adjust_sharpness_image, random_equalize_image, \
     random_horizontal_flip_image, random_vertical_flip_image
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
+from src.journalPaper.training.dynamic import training_config
 
 
 def replace_str_part_in_column_by(df:pd.DataFrame, column:str, old_part:str, new_part:str) -> pd.DataFrame:
@@ -143,13 +144,29 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_train = split_data_by_videoname(DAiSEE_train, position_of_videoname=-3)
     DAiSEE_dev = split_data_by_videoname(DAiSEE_dev, position_of_videoname=-3)
     DAiSEE_test = split_data_by_videoname(DAiSEE_test, position_of_videoname=-3)
+
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
     NoXi_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_train.items()}
     NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_dev.items()}
     NoXi_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_test.items()}
-    DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_train.items()}
-    DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_dev.items()}
-    DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_test.items()}
+    DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_train.items()}
+    DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_dev.items()}
+    DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_test.items()}
+
+    # change the paths from '/' + training_config.DATA_TYPE + 's/' to os.path.sep + training_config.DATA_TYPE + os.path.sep (/faces/ -> /face/) or (/poses/ -> /pose/)
+    NoXi_train = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',
+                                                   os.path.sep + training_config.DATA_TYPE + os.path.sep) for k, v in NoXi_train.items()}
+    NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',
+                                                    os.path.sep + training_config.DATA_TYPE + os.path.sep) for k, v in NoXi_dev.items()}
+    NoXi_test = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',
+                                                        os.path.sep + training_config.DATA_TYPE + os.path.sep) for k, v in NoXi_test.items()}
+    DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',
+                                                    os.path.sep + training_config.DATA_TYPE + os.path.sep) for k, v in DAiSEE_train.items()}
+    DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',
+                                                    os.path.sep + training_config.DATA_TYPE + os.path.sep) for k, v in DAiSEE_dev.items()}
+    DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',
+                                                    os.path.sep + training_config.DATA_TYPE + os.path.sep) for k, v in DAiSEE_test.items()}
+
     # concatenate datasets
     train = {**NoXi_train, **DAiSEE_train}
     dev = {**NoXi_dev, **DAiSEE_dev}

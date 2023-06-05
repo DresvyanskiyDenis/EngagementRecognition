@@ -9,10 +9,10 @@ MODEL_INPUT_SIZE:Dict[str, int] = {
 }
 # DATA PATHS
 PRETRAINED:bool = True
-PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/face/deep-capybara-42.pth"
-PATH_TO_DATA:str = '/nfs/home/ddresvya/Data/' # or '/nfs/scratch/ddresvya/Data/'
-DATA_TYPE = "face" # or "pose"
-
+PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/pose/fresh-bush-43.pth"
+PATH_TO_WEIGHTS_HRNET:str = "/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w32_256x192.pth"
+PATH_TO_DATA:str = '/nfs/scratch/ddresvya/Data/' # or '/nfs/scratch/ddresvya/Data/'
+DATA_TYPE = "pose" # or "pose"
 
 # training metaparams
 NUM_EPOCHS:int = 100

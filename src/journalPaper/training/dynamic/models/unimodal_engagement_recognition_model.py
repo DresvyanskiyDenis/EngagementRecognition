@@ -95,7 +95,7 @@ class Pose_engagement_recognition_model(nn.Module):
         self.classifier = nn.Linear(embeddings_layer_neurons//2, num_classes)
 
     def forward(self, x):
-        # facial model
+        # HRNet model
         x = self.pose_model(x)
         # fusion
         x = self.transformer_layer_1(key=x, value=x, query=x)

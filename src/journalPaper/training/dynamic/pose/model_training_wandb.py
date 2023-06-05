@@ -1,7 +1,7 @@
 import sys
 
-sys.path.extend(["/nfs/home/ddresvya/scripts/datatools/"])
-sys.path.extend(["/nfs/home/ddresvya/scripts/engagement_recognition_project_server/"])
+sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
+sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
 sys.path.append('/nfs/home/ddresvya/scripts/simple-HRNet-master/')
 
 import argparse

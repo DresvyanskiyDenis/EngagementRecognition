@@ -1,3 +1,4 @@
+import os
 from functools import partial
 from typing import Tuple, List, Callable, Optional, Dict, Union
 
@@ -5,11 +6,9 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-import torchvision.transforms as T
 
 import training_config
 from decorators.common_decorators import timer
-from pytorch_utils.data_loaders.ImageDataLoader_new import ImageDataLoader
 from pytorch_utils.data_loaders.TemporalDataLoader import TemporalDataLoader
 from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_factor, grayscale_image, \
     collor_jitter_image_random, gaussian_blur_image_random, random_perspective_image, random_rotation_image, \
@@ -18,6 +17,20 @@ from pytorch_utils.data_loaders.pytorch_augmentations import pad_image_random_fa
 from pytorch_utils.models.input_preprocessing import resize_image_saving_aspect_ratio, EfficientNet_image_preprocessor
 
 
+def replace_str_part_in_column_by(df:pd.DataFrame, column:str, old_part:str, new_part:str) -> pd.DataFrame:
+    """
+    Replaces the part of the string in the column by the new part.
+    Args:
+        df (pd.DataFrame): The dataframe.
+        column (str): The column name.
+        old_part (str): The old part of the string.
+        new_part (str): The new part of the string.
+    Returns:
+        pd.DataFrame: The dataframe with replaced strings.
+    """
+    df[column] = df[column].apply(lambda x: x.replace(old_part, new_part))
+    return df
+
 def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
     """
      Loads all dataframes for the datasets NoXi and DAiSEE and split them into
@@ -25,14 +38,19 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     Returns: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
         The tuple of train, dev, and test data.
     """
+    path_to_NoXi_train = os.path.join(training_config.PATH_TO_DATA, "NoXi", "prepared_data",
+                                      training_config.DATA_TYPE, "NoXi_%s_train.csv"%training_config.DATA_TYPE)
+    path_to_NoXi_dev = os.path.join(training_config.PATH_TO_DATA, "NoXi", "prepared_data",
+                                    training_config.DATA_TYPE, "NoXi_%s_dev.csv"%training_config.DATA_TYPE)
+    path_to_NoXi_test = os.path.join(training_config.PATH_TO_DATA, "NoXi", "prepared_data",
+                                        training_config.DATA_TYPE, "NoXi_%s_test.csv"%training_config.DATA_TYPE)
 
-    path_to_NoXi_train = "/work/home/dsu/Datasets/NoXi/prepared_data/poses/NoXi_pose_train.csv"
-    path_to_NoXi_dev = "/work/home/dsu/Datasets/NoXi/prepared_data/poses/NoXi_pose_dev.csv"
-    path_to_NoXi_test = "/work/home/dsu/Datasets/NoXi/prepared_data/poses/NoXi_pose_test.csv"
-
-    path_to_DAiSEE_train = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/DAiSEE_pose_train_labels.csv"
-    path_to_DAiSEE_dev = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/DAiSEE_pose_dev_labels.csv"
-    path_to_DAiSEE_test = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/DAiSEE_pose_test_labels.csv"
+    path_to_DAiSEE_train = os.path.join(training_config.PATH_TO_DATA, "DAiSEE", "prepared_data",
+                                        training_config.DATA_TYPE, "DAiSEE_%s_train_labels.csv"%training_config.DATA_TYPE)
+    path_to_DAiSEE_dev = os.path.join(training_config.PATH_TO_DATA, "DAiSEE", "prepared_data",
+                                        training_config.DATA_TYPE, "DAiSEE_%s_dev_labels.csv"%training_config.DATA_TYPE)
+    path_to_DAiSEE_test = os.path.join(training_config.PATH_TO_DATA, "DAiSEE", "prepared_data",
+                                        training_config.DATA_TYPE, "DAiSEE_%s_test_labels.csv"%training_config.DATA_TYPE)
 
     # load dataframes
     NoXi_train = pd.read_csv(path_to_NoXi_train)
@@ -52,14 +70,10 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_dev = DAiSEE_dev.dropna()
     DAiSEE_test = DAiSEE_test.dropna()
 
-    # drop timestamps
-    NoXi_train = NoXi_train.drop(columns=['timestep'])
-    NoXi_dev = NoXi_dev.drop(columns=['timestep'])
-    NoXi_test = NoXi_test.drop(columns=['timestep'])
-
-    DAiSEE_train = DAiSEE_train.drop(columns=['timestamp'])
-    DAiSEE_dev = DAiSEE_dev.drop(columns=['timestamp'])
-    DAiSEE_test = DAiSEE_test.drop(columns=['timestamp'])
+    # rename timestep to timestamp
+    NoXi_train = NoXi_train.rename(columns={"timestep": "timestamp"})
+    NoXi_dev = NoXi_dev.rename(columns={"timestep": "timestamp"})
+    NoXi_test = NoXi_test.rename(columns={"timestep": "timestamp"})
 
     # change path_to_frame column name to path
     NoXi_train = NoXi_train.rename(columns={"path_to_frame": "path"})
@@ -130,13 +144,12 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_dev = split_data_by_videoname(DAiSEE_dev, position_of_videoname=-3)
     DAiSEE_test = split_data_by_videoname(DAiSEE_test, position_of_videoname=-3)
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    NoXi_train['path'] = NoXi_train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    NoXi_dev['path'] = NoXi_dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    NoXi_test['path'] = NoXi_test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    DAiSEE_train['path'] = DAiSEE_train['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    DAiSEE_dev['path'] = DAiSEE_dev['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-    DAiSEE_test['path'] = DAiSEE_test['path'].apply(lambda x: x.replace('media/external_hdd_2/', '/work/home/dsu/Datasets/'))
-
+    NoXi_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_train.items()}
+    NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_dev.items()}
+    NoXi_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_test.items()}
+    DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_train.items()}
+    DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_dev.items()}
+    DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_test.items()}
     # concatenate datasets
     train = {**NoXi_train, **DAiSEE_train}
     dev = {**NoXi_dev, **DAiSEE_dev}
@@ -241,13 +254,19 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
                                         return_class_weights: Optional[bool] = False) -> \
         Union[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader],
               Tuple[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]]:
-    if model_type not in ['Modified_HRNet']:
-        raise ValueError('The model type should be "Modified_HRNet".')
+    if model_type not in ['EfficientNet-B1', 'EfficientNet-B4', 'Modified_HRNet']:
+        raise ValueError("The model type should be either EfficientNet-B1, EfficientNet-B4 or Modified_HRNet.")
     # load data. The data is represented as Dict[str, pd.DataFrame] where keys are video names and values are
     # pd.DataFrames with data for each video
     train, dev, test = load_all_dataframes()
     # define preprocessing functions
-    if model_type == 'Modified_HRNet':
+    if model_type == 'EfficientNet-B1':
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size=240),
+                                   EfficientNet_image_preprocessor()]
+    elif model_type == 'EfficientNet-B4':
+        preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size=380),
+                                   EfficientNet_image_preprocessor()]
+    elif model_type == 'Modified_HRNet':
         # function for converting image to float and scaling it, do it as subfunction for readability
         def convert_image_to_float_and_scale(image: torch.Tensor) -> torch.Tensor:
             image = image.float() / 255.
@@ -258,7 +277,7 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
                                    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                                    ]  # From HRNet
     else:
-        raise ValueError(f'The model type should be either "Modified_HRNet".'
+        raise ValueError(f'The model type should be either EfficientNet-B1, EfficientNet-B4 or Modified_HRNet.'
                          f'Got {model_type} instead.')
     # define augmentation functions
     augmentation_functions = get_augmentation_function(training_config.AUGMENT_PROB)
@@ -280,8 +299,7 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
         class_weights = 1. / (class_weights / class_weights.sum())
         # normalize class weights
         class_weights = class_weights / class_weights.sum()
-        class_weights = torch.tensor(class_weights.values, dtype=torch.float32)
+        class_weights = torch.tensor(class_weights, dtype=torch.float32)
         return ((train_dataloader, dev_dataloader), class_weights)
 
     return (train_dataloader, dev_dataloader)
-

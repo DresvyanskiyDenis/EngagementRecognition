@@ -15,7 +15,6 @@ import numpy as np
 import torch
 from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
 
-import training_config
 from pytorch_utils.lr_schedullers import WarmUpScheduler
 from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1, \
     Modified_EfficientNet_B4
@@ -24,17 +23,14 @@ from pytorch_utils.training_utils.losses import SoftFocalLoss
 
 import wandb
 
-from data_preparation import load_data_and_construct_dataloaders
-
 from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import \
     Facial_engagement_recognition_model
+from src.journalPaper.training.dynamic import training_config
+from src.journalPaper.training.dynamic.data_preparation import load_data_and_construct_dataloaders
 
 
-
-
-def construct_model(base_model:torch.nn.Module, cut_n_last_layers:int, num_classes:int,
-                    num_timesteps:int, pretrained:Optional[str]=None)->torch.nn.Module:
-
+def construct_model(base_model: torch.nn.Module, cut_n_last_layers: int, num_classes: int,
+                    num_timesteps: int, pretrained: Optional[str] = None) -> torch.nn.Module:
     # if pretrained is not None:
     base_model.load_state_dict(torch.load(pretrained))
     # cut off last layers
@@ -51,12 +47,8 @@ def construct_model(base_model:torch.nn.Module, cut_n_last_layers:int, num_class
     return model
 
 
-
-
-
-
-
-def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[object, float]:
+def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device) -> Dict[
+    object, float]:
     evaluation_metrics_classification = {'val_accuracy_classification': accuracy_score,
                                          'val_precision_classification': partial(precision_score, average='macro'),
                                          'val_recall_classification': partial(recall_score, average='macro'),
@@ -64,7 +56,7 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
                                          }
 
     # create arrays for predictions and ground truth labels
-    predictions_classifier= []
+    predictions_classifier = []
     ground_truth_classifier = []
 
     # start evaluation
@@ -102,7 +94,6 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
         # concatenate all predictions and ground truth labels
         predictions_classifier = np.concatenate(predictions_classifier, axis=0)
         ground_truth_classifier = np.concatenate(ground_truth_classifier, axis=0)
-
 
         # calculate evaluation metrics
         evaluation_metrics_classifier = {
@@ -154,7 +145,7 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
                 device: torch.device, print_step: int = 100,
                 accumulate_gradients: Optional[int] = 1,
                 warmup_lr_scheduller: Optional[object] = None,
-                loss_multiplication_factor:Optional[float]=None) -> float:
+                loss_multiplication_factor: Optional[float] = None) -> float:
     """ Performs one epoch of training for a model.
 
     :param model: torch.nn.Module
@@ -192,7 +183,7 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
         # hovewer, here, in the training, we have soft labels. Therefore, we do not take mode, instead, we
         # average them and normalize so that the sum of the values is 1
         # labels shape: (batch_size, sequence_length, num_classes)
-        labels = labels.sum(axis=-2)/labels.sum(axis=-2).sum(axis=-1, keepdims=True)
+        labels = labels.sum(axis=-2) / labels.sum(axis=-2).sum(axis=-1, keepdims=True)
         # labels shape after transformation: (batch_size, num_classes)
 
         # do train step
@@ -227,10 +218,11 @@ def train_epoch(model: torch.nn.Module, train_generator: torch.utils.data.DataLo
     gc.collect()
     return total_loss / counter
 
+
 def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: torch.utils.data.DataLoader,
-                window_size:float, stride:float, consider_timestamps:bool,
-                class_weights: torch.Tensor, MODEL_TYPE:str, BATCH_SIZE:int, ACCUMULATE_GRADIENTS:int,
-                loss_multiplication_factor:Optional[float]=None) -> None:
+                window_size: float, stride: float, consider_timestamps: bool,
+                class_weights: torch.Tensor, MODEL_TYPE: str, BATCH_SIZE: int, ACCUMULATE_GRADIENTS: int,
+                loss_multiplication_factor: Optional[float] = None) -> None:
     print("Start of the model training.")
     # metaparams
     metaparams = {
@@ -274,11 +266,10 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     # initialization of Weights and Biases
     wandb.init(project="engagement_recognition_seq2one", config=metaparams)
     config = wandb.config
-    wandb.config.update({'BEST_MODEL_SAVE_PATH':wandb.run.dir}, allow_val_change=True)
+    wandb.config.update({'BEST_MODEL_SAVE_PATH': wandb.run.dir}, allow_val_change=True)
     # get one iteration of train generator to get sequence length
     inputs, labels = next(iter(train_generator))
     sequence_length = inputs.shape[1]
-
 
     # create model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -287,12 +278,12 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                          num_regression_neurons=None)
     elif config.MODEL_TYPE == "EfficientNet-B4":
         model = Modified_EfficientNet_B4(embeddings_layer_neurons=256, num_classes=config.NUM_CLASSES,
-                                          num_regression_neurons=None)
+                                         num_regression_neurons=None)
     else:
         raise ValueError("Unknown model type: %s" % config.MODEL_TYPE)
     # construct sequence-to-one model out of base model
     model = construct_model(base_model=model, cut_n_last_layers=-1, num_classes=config.NUM_CLASSES,
-                    num_timesteps=sequence_length, pretrained=config.PATH_TO_WEIGHTS)
+                            num_timesteps=sequence_length, pretrained=config.PATH_TO_WEIGHTS)
 
     model = model.to(device)
     # print model architecture
@@ -319,7 +310,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
                                          lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                                                                  T_max=config.ANNEALING_PERIOD,
                                                                                                  eta_min=config.LR_MIN_CYCLIC),
-                                         len_loader=len(train_generator)//ACCUMULATE_GRADIENTS,
+                                         len_loader=len(train_generator) // ACCUMULATE_GRADIENTS,
                                          warmup_steps=config.WARMUP_STEPS,
                                          warmup_start_lr=config.LR_MIN_WARMUP,
                                          warmup_mode=config.WARMUP_MODE)
@@ -344,7 +335,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         train_loss = train_epoch(model, train_generator, optimizer, criterion, device, print_step=100,
                                  accumulate_gradients=ACCUMULATE_GRADIENTS,
                                  warmup_lr_scheduller=lr_scheduller if config.LR_SCHEDULLER == 'Warmup_cyclic' else None,
-                                 loss_multiplication_factor= config.loss_multiplication_factor)
+                                 loss_multiplication_factor=config.loss_multiplication_factor)
         print("Train loss: %.10f" % train_loss)
 
         # validate the model
@@ -356,7 +347,8 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         # also, save model if we got better recall
         if val_metrics_classification['val_recall_classification'] > best_val_recall_classification:
             best_val_recall_classification = val_metrics_classification['val_recall_classification']
-            wandb.config.update({'best_val_recall_classification': best_val_recall_classification}, allow_val_change=True)
+            wandb.config.update({'best_val_recall_classification': best_val_recall_classification},
+                                allow_val_change=True)
             # save best model
             if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
                 os.makedirs(config.BEST_MODEL_SAVE_PATH)
@@ -383,6 +375,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     gc.collect()
     torch.cuda.empty_cache()
 
+
 def main(window_size, stride, consider_timestamps, model_type, batch_size, accumulate_gradients,
          loss_multiplication_factor):
     print("Start of the script....")
@@ -396,7 +389,7 @@ def main(window_size, stride, consider_timestamps, model_type, batch_size, accum
         return_class_weights=True)
     # train the model
     train_model(window_size=window_size, stride=stride, consider_timestamps=consider_timestamps,
-                train_generator=train_generator, dev_generator=dev_generator,class_weights=class_weights,
+                train_generator=train_generator, dev_generator=dev_generator, class_weights=class_weights,
                 MODEL_TYPE=model_type, BATCH_SIZE=batch_size, ACCUMULATE_GRADIENTS=accumulate_gradients,
                 loss_multiplication_factor=loss_multiplication_factor)
 
@@ -432,9 +425,8 @@ if __name__ == "__main__":
     consider_timestamps = bool(args.consider_timestamps)
     # run main script with passed args
     main(window_size=window_size, stride=stride, consider_timestamps=consider_timestamps,
-        model_type = model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
+         model_type=model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
          loss_multiplication_factor=loss_multiplication_factor)
     # clear RAM
     gc.collect()
     torch.cuda.empty_cache()
-

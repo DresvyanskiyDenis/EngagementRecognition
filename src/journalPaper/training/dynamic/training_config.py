@@ -5,9 +5,14 @@ NUM_CLASSES:int = 3
 MODEL_INPUT_SIZE:Dict[str, int] = {
     "EfficientNet-B1":224,
     "EfficientNet-B4":380,
+    "Modified_HRNet":256,
 }
+# DATA PATHS
 PRETRAINED:bool = True
 PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/face/deep-capybara-42.pth"
+PATH_TO_DATA:str = '/nfs/home/ddresvya/Data/' # or '/nfs/scratch/ddresvya/Data/'
+DATA_TYPE = "face" # or "pose"
+
 
 # training metaparams
 NUM_EPOCHS:int = 100

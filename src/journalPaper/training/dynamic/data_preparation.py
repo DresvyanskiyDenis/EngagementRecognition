@@ -243,7 +243,8 @@ def construct_data_loaders(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.Dat
                            preprocessing_functions: List[Callable],
                            batch_size: int,
                            augmentation_functions: Optional[Dict[Callable, float]] = None,
-                           num_workers: int = 8) \
+                           num_workers: int = 8,
+                           test:Optional[Dict[str, pd.DataFrame]]=None) \
         -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     train_data_loader = TemporalDataLoader(paths_with_labels=train, label_columns=label_columns,
                                            window_size=window_size, stride=stride,
@@ -263,12 +264,23 @@ def construct_data_loaders(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.Dat
                                   shuffle=True)
     dev_dataloader = DataLoader(dev_data_loader, batch_size=batch_size, num_workers=num_workers // 2, shuffle=False)
 
-    return (train_dataloader, dev_dataloader)
+    if test is not None:
+        test_data_loader = TemporalDataLoader(paths_with_labels=test, label_columns=label_columns,
+                                         window_size=window_size, stride=stride,
+                                         consider_timestamps=consider_timestamps,
+                                         preprocessing_functions=preprocessing_functions,
+                                         augmentation_functions=augmentation_functions,
+                                         shuffle=False)
+        test_dataloader = DataLoader(test_data_loader, batch_size=batch_size, num_workers=num_workers // 2, shuffle=False)
+        return (train_dataloader, dev_dataloader, test_dataloader)
+    else:
+        return (train_dataloader, dev_dataloader)
 
 
 def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
                                         window_size: float, stride: float, consider_timestamps: bool,
-                                        return_class_weights: Optional[bool] = False) -> \
+                                        return_class_weights: Optional[bool] = False,
+                                        need_test_set:Optional[bool]=False) -> \
         Union[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader],
               Tuple[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader], torch.Tensor]]:
     if model_type not in ['EfficientNet-B1', 'EfficientNet-B4', 'Modified_HRNet']:
@@ -299,12 +311,14 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
     # define augmentation functions
     augmentation_functions = get_augmentation_function(training_config.AUGMENT_PROB)
     # construct data loaders
-    train_dataloader, dev_dataloader = construct_data_loaders(train, dev, window_size, stride, consider_timestamps,
+    dataloaders = construct_data_loaders(train, dev, window_size, stride, consider_timestamps,
                                                               preprocessing_functions=preprocessing_functions,
                                                               batch_size=batch_size,
                                                               augmentation_functions=augmentation_functions,
                                                               num_workers=training_config.NUM_WORKERS,
-                                                              label_columns=training_config.LABEL_COLUMNS)
+                                                              label_columns=training_config.LABEL_COLUMNS,
+                                                              test=test if need_test_set else None)
+    output = dataloaders
 
     if return_class_weights:
         # get all classes from Dict[str, pd.DataFrame] and calculate class weights
@@ -317,6 +331,6 @@ def load_data_and_construct_dataloaders(model_type: str, batch_size: int,
         # normalize class weights
         class_weights = class_weights / class_weights.sum()
         class_weights = torch.tensor(class_weights, dtype=torch.float32)
-        return ((train_dataloader, dev_dataloader), class_weights)
+        output = (output, class_weights)
 
-    return (train_dataloader, dev_dataloader)
+    return output

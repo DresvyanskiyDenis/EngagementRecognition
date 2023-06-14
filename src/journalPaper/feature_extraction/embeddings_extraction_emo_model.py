@@ -150,10 +150,6 @@ def extract_emo_embeddings_DAiSEE(extractor: EmbeddingsExtractor, output_path: s
 
 
 
-def extract_emo_embeddings_MHHRI():
-    pass
-
-
 if __name__ == "__main__":
     # define preprocessing functions
     preprocessing_functions = [partial(resize_image_saving_aspect_ratio, expected_size=240),

@@ -3,16 +3,16 @@ from typing import Dict, List
 # model architecture params
 NUM_CLASSES:int = 3
 MODEL_INPUT_SIZE:Dict[str, int] = {
-    "EfficientNet-B1":224,
+    "EfficientNet-B1":240,
     "EfficientNet-B4":380,
     "Modified_HRNet":256,
 }
 # DATA PATHS
 PRETRAINED:bool = True
-PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/pose/fresh-bush-43.pth"
+PATH_TO_WEIGHTS:str = "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/face/deep-capybara-42.pth" # "/nfs/home/ddresvya/scripts/EngagementRecognition/weights_best_models/pose/fresh-bush-43.pth"  # or
 PATH_TO_WEIGHTS_HRNET:str = "/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w32_256x192.pth"
-PATH_TO_DATA:str = '/nfs/scratch/ddresvya/Data/' # or '/nfs/scratch/ddresvya/Data/'
-DATA_TYPE = "pose" # or "pose"
+PATH_TO_DATA:str = '/nfs/home/ddresvya/Data/' # '/nfs/scratch/ddresvya/Data/' # or
+DATA_TYPE = "face" # or "pose"
 
 # training metaparams
 NUM_EPOCHS:int = 100

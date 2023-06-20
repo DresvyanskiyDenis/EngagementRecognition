@@ -93,6 +93,10 @@ def get_info_and_download_models_weights_from_project(entity: str, project_name:
     info = pd.DataFrame(columns=['ID', 'model_type', 'window_size', 'stride',
                                  'loss_multiplication_factor', 'best_val_recall'])
     for run in runs:
+        # check if the model was saved during training. If not, skip this run. It can be either because of the error
+        # or because it is in the middle of training
+        if run.file('best_model_recall.pth').size==0:
+            continue
         ID = run.name
         model_type = run.config['MODEL_TYPE']
         window_size = run.config['window_size']
@@ -127,7 +131,7 @@ if __name__ == "__main__":
     project_name = 'engagement_recognition_seq2one'
     entity = 'denisdresvyanskiy'
     output_path_for_models_weights = "/" + os.path.join(*os.path.abspath(__file__).split(os.path.sep)[:-6],
-                                                        'weights_best_models/sequence_to_one/')
+                                                        'weights_best_models/sequence_to_one/face/')
     tested_model_type = 'EfficientNet-B1' # this is a shortcut, since i can change the DATA_TYPE and PATH_TO_DATA variables
     # in the training_config.py only manually and before the start of the script. Of course, it can all these scripts
     # can be rewritten in a more convenient way, but, unfortunately, I don't have time for this right now.
@@ -148,7 +152,7 @@ if __name__ == "__main__":
     info['test_f1'] = -100
     info.reset_index(drop=True, inplace=True)
     for i in range(len(info)):
-        print("Testing model %d / %s" % (i + 1, info['model_type'].iloc[i]))
+        print("Testing model %d / %s / run name: %s" % (i + 1, info['model_type'].iloc[i], info['ID'].iloc[i]))
         # get model type
         model_type = info['model_type'].iloc[i]
         if model_type != tested_model_type:
@@ -160,7 +164,7 @@ if __name__ == "__main__":
         #  You need to change it somehow.
         train_generator, dev_generator, test_generator = load_data_and_construct_dataloaders(model_type=model_type,
                                         batch_size=batch_size,
-                                        window_size=info['window_size'].iloc[i], stride=info['stride'].iloc[i],
+                                        window_size=float(info['window_size'].iloc[i]), stride=float(info['stride'].iloc[i]),
                                         consider_timestamps=True,
                                         return_class_weights = False,
                                         need_test_set=True)
@@ -174,12 +178,16 @@ if __name__ == "__main__":
                                    embeddings_layer_neurons=256, num_classes=training_config.NUM_CLASSES,
                                    num_regression_neurons=None,
                                    consider_only_upper_body=True)
+            # load weights
+            model.load_state_dict(torch.load(training_config.PATH_TO_WEIGHTS))
             model = construct_model_seq2one_pose(base_model=model, cut_n_last_layers=-1, num_classes=training_config.NUM_CLASSES,
                                     num_timesteps=sequence_length, pretrained=None)
 
         elif model_type == "EfficientNet-B1":
             model = Modified_EfficientNet_B1(embeddings_layer_neurons=256, num_classes=training_config.NUM_CLASSES,
                                              num_regression_neurons=None)
+            # load weights
+            model.load_state_dict(torch.load(training_config.PATH_TO_WEIGHTS))
             model = construct_model_seq2one_facial(base_model=model, cut_n_last_layers=-1, num_classes=training_config.NUM_CLASSES,
                                     num_timesteps=sequence_length, pretrained=None)
         else:
@@ -193,7 +201,8 @@ if __name__ == "__main__":
         model = model.to(device)
 
         # test model
-        test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
+        # TODO: CHANGE dev_generator TO test_generator
+        test_metrics = evaluate_model(model, dev_generator, device, metrics_name_prefix='test_', print_metrics=True)
         # draw confusion matrix
         if not os.path.exists(os.path.join(output_path_for_models_weights, 'confusion_matrices')):
             os.makedirs(os.path.join(output_path_for_models_weights, 'confusion_matrices'))

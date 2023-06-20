@@ -4,6 +4,7 @@ from typing import Optional, Dict
 import numpy as np
 import torch
 from sklearn.metrics import precision_score, recall_score, f1_score
+from tqdm import tqdm
 
 from visualization.ConfusionMatrixVisualization import plot_and_save_confusion_matrix
 
@@ -31,7 +32,7 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
     # start evaluation
     model.eval()
     with torch.no_grad():
-        for i, data in enumerate(generator):
+        for i, data in enumerate(tqdm(generator)):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             inputs = inputs.float()
@@ -90,27 +91,30 @@ def draw_confusion_matrix(model: torch.nn.Module, generator: torch.utils.data.Da
     # start evaluation
     model.eval()
     with torch.no_grad():
-        for i, data in enumerate(generator):
+        for i, data in enumerate(tqdm(generator)):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             inputs = inputs.float()
             inputs = inputs.to(device)
 
+            # the labels originally are the sequence of values, since we have several images per one instance
+            # however, we transform it to the sequence-to-one problem. Thus, we take the mode of the sequence, but
+            # firstly we should get rid of the one-hot encoding
+            labels = torch.argmax(labels, dim=-1)
+            # then we take the mode
+            labels = torch.mode(labels, dim=-1)[0]
+
             # forward pass
-            classification_output = model(inputs)
+            outputs = model(inputs)
+            classification_output = outputs
 
             # transform classification output to fit labels
             classification_output = torch.softmax(classification_output, dim=-1)
             classification_output = classification_output.cpu().numpy().squeeze()
-            classification_output = np.argmax(classification_output, axis=-1, keepdims=True) if len(
-                classification_output.shape) == 1 \
-                else np.argmax(classification_output, axis=-1)
+            classification_output = np.argmax(classification_output, axis=-1)
 
             # transform ground truth labels to fit predictions and sklearn metrics
             classification_ground_truth = labels.cpu().numpy().squeeze()
-            classification_ground_truth = np.argmax(classification_ground_truth, axis=-1, keepdims=True) if len(
-                classification_ground_truth.shape) == 1 \
-                else np.argmax(classification_ground_truth, axis=-1)
 
             # save ground_truth labels and predictions in arrays to calculate metrics afterwards by one time
             predictions_classifier.append(classification_output)

@@ -2,9 +2,7 @@ import gc
 import sys
 from typing import Optional
 
-from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1
-from src.journalPaper.training.dynamic import training_config
-from src.journalPaper.training.dynamic.data_preparation import load_data_and_construct_dataloaders
+
 
 sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
 sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
@@ -20,6 +18,9 @@ from pytorch_utils.models.Pose_estimation.HRNet import Modified_HRNet
 from src.journalPaper.training.dynamic.model_evaluation import evaluate_model, draw_confusion_matrix
 from src.journalPaper.training.dynamic.models.unimodal_engagement_recognition_model import \
     Pose_engagement_recognition_model, Facial_engagement_recognition_model
+from pytorch_utils.models.CNN_models import Modified_EfficientNet_B1
+from src.journalPaper.training.dynamic import training_config
+from src.journalPaper.training.dynamic.data_preparation import load_data_and_construct_dataloaders
 
 
 def construct_model_seq2one_facial(base_model: torch.nn.Module, cut_n_last_layers: int, num_classes: int,

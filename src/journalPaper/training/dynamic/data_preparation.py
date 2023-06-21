@@ -251,13 +251,13 @@ def construct_data_loaders(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.Dat
                                            consider_timestamps=consider_timestamps,
                                            preprocessing_functions=preprocessing_functions,
                                            augmentation_functions=augmentation_functions,
-                                           shuffle=False)
+                                           shuffle=True)
 
     dev_data_loader = TemporalDataLoader(paths_with_labels=dev, label_columns=label_columns,
                                          window_size=window_size, stride=stride,
                                          consider_timestamps=consider_timestamps,
                                          preprocessing_functions=preprocessing_functions,
-                                         augmentation_functions=augmentation_functions,
+                                         augmentation_functions=None,
                                          shuffle=False)
 
     train_dataloader = DataLoader(train_data_loader, batch_size=batch_size, num_workers=num_workers, drop_last=True,
@@ -269,7 +269,7 @@ def construct_data_loaders(train: Dict[str, pd.DataFrame], dev: Dict[str, pd.Dat
                                          window_size=window_size, stride=stride,
                                          consider_timestamps=consider_timestamps,
                                          preprocessing_functions=preprocessing_functions,
-                                         augmentation_functions=augmentation_functions,
+                                         augmentation_functions=None,
                                          shuffle=False)
         test_dataloader = DataLoader(test_data_loader, batch_size=batch_size, num_workers=num_workers // 2, shuffle=False)
         return (train_dataloader, dev_dataloader, test_dataloader)

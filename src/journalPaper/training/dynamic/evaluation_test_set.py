@@ -202,8 +202,10 @@ if __name__ == "__main__":
         model = model.to(device)
 
         # test model
-        # TODO: CHANGE dev_generator TO test_generator
-        test_metrics = evaluate_model(model, dev_generator, device, metrics_name_prefix='test_', print_metrics=True)
+        test_metrics = evaluate_model(model, test_generator, device, metrics_name_prefix='test_', print_metrics=True)
+        # dev model
+        print('dev dataset')
+        dev_metrics = evaluate_model(model, dev_generator, device, metrics_name_prefix='dev_', print_metrics=True)
         # draw confusion matrix
         if not os.path.exists(os.path.join(output_path_for_models_weights, 'confusion_matrices')):
             os.makedirs(os.path.join(output_path_for_models_weights, 'confusion_matrices'))
@@ -216,6 +218,11 @@ if __name__ == "__main__":
         info.loc[i, 'test_precision'] = test_metrics['test_precision_classification']
         info.loc[i, 'test_recall'] = test_metrics['test_recall_classification']
         info.loc[i, 'test_f1'] = test_metrics['test_f1_classification']
+        # save dev metrics
+        info.loc[i, 'dev_accuracy'] = dev_metrics['dev_accuracy_classification']
+        info.loc[i, 'dev_precision'] = dev_metrics['dev_precision_classification']
+        info.loc[i, 'dev_recall'] = dev_metrics['dev_recall_classification']
+        info.loc[i, 'dev_f1'] = dev_metrics['dev_f1_classification']
 
         # save info
         info.to_csv(os.path.join(output_path_for_models_weights, 'info.csv'), index=False)

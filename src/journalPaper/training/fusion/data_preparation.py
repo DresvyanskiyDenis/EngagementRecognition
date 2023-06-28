@@ -49,13 +49,20 @@ def load_embeddings(paths:Dict[str,str])->Dict[str, Dict[str, pd.DataFrame]]:
     # split embeddings inside each dataframe on dataframes with frames from one video
     for database_name, df in embeddings.items():
         embeddings[database_name] = split_data_by_videoname(df, position_of_videoname=-3)
-    return embeddings
+    # concatenate embeddings with the same 'part' of the dataset (train, dev, test)
+    result = {}
+    result['train'] = {}
+    result['dev'] = {}
+    result['test'] = {}
+    for database_name in embeddings.keys():
+        if 'train' in database_name:
+            # concatenate it with result['train']
+            result['train'][database_name] = embeddings[database_name]
+        elif 'dev' in database_name:
+            # concatenate it with result['dev']
+            result['dev'][database_name] = embeddings[database_name]
+        elif 'test' in database_name:
+            # concatenate it with result['test']
+            result['test'][database_name] = embeddings[database_name]
 
-
-
-
-
-
-
-
-
+    return result

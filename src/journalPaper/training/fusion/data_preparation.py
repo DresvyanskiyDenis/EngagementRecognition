@@ -29,13 +29,13 @@ def split_data_by_videoname(df:pd.DataFrame, position_of_videoname:int)->Dict[st
     result = {}
     # create additional columns with names of video
     tmp_df = df.copy(deep=True)
-    tmp_df['video_name'] = tmp_df['path'].apply(lambda x: x.split('/')[position_of_videoname])
+    tmp_df['video_name'] = tmp_df['path'].apply(lambda x: os.path.join(*x.split('/')[position_of_videoname:position_of_videoname+2]))
     # get unique video names
     video_names = tmp_df['video_name'].unique()
     # split data by video names. Small trick - we embrace the video_name with '/' to make sure that we get only
     # the video name and not the part of the path
     for video_name in video_names:
-        result[video_name] = tmp_df[tmp_df['path'].str.contains('/' + video_name + '/')]
+        result[video_name] = tmp_df[tmp_df['path'].str.contains(video_name)]
     return result
 
 

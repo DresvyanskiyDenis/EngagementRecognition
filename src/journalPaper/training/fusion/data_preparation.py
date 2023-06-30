@@ -156,6 +156,7 @@ def get_train_dev_test(path_to_embeddings:str, embeddings_type:List[str]):
             test.append(test_pose)
         else:
             raise ValueError('Unknown embeddings type')
+    return train, dev, test
 
 
 def calculate_class_weights(dataset:Dict[str, pd.DataFrame], label_columns:List[str])->torch.Tensor:

@@ -239,7 +239,8 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
         # validate the model
         model.eval()
         print("Evaluation of the model on dev set.")
-        val_metrics_classification = evaluate_model(model, dev_generator, device)
+        val_metrics_classification = evaluate_model(model=model, generator=dev_generator, device=device,
+                   metrics_name_prefix="val_", print_metrics=True)
 
         # update best val metrics got on validation set and log them using wandb
         # also, save model if we got better recall

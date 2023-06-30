@@ -5,7 +5,7 @@ NUM_CLASSES:int = 3
 # training metaparams
 NUM_EPOCHS:int = 100
 OPTIMIZER:str = "AdamW"
-EARLY_STOPPING_PATIENCE:int = 10
+EARLY_STOPPING_PATIENCE:int = 80
 WEIGHT_DECAY:float = 0.0001
 
 # scheduller

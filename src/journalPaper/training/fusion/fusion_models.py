@@ -20,9 +20,13 @@ class AttentionFusionModel_2dim(torch.nn.Module):
         self.classifier = torch.nn.Linear(128, num_classes)
 
     def _build_cross_attention_modules(self, e1_num_features: int, e2_num_features: int):
-        self.e1_cross_att_layer = Transformer_layer(input_dim=e1_num_features, num_heads=e1_num_features // 4,
+        self.e1_cross_att_layer_1 = Transformer_layer(input_dim=e1_num_features, num_heads=e1_num_features // 4,
                                                     dropout=0.1, positional_encoding=True)
-        self.e2_cross_att_layer = Transformer_layer(input_dim=e2_num_features, num_heads=e2_num_features // 4,
+        self.e2_cross_att_layer_1 = Transformer_layer(input_dim=e2_num_features, num_heads=e2_num_features // 4,
+                                                    dropout=0.1, positional_encoding=True)
+        self.e1_cross_att_layer_2 = Transformer_layer(input_dim=e1_num_features, num_heads=e1_num_features // 4,
+                                                    dropout=0.1, positional_encoding=True)
+        self.e2_cross_att_layer_2 = Transformer_layer(input_dim=e2_num_features, num_heads=e2_num_features // 4,
                                                     dropout=0.1, positional_encoding=True)
         self.avg_pool = torch.nn.AdaptiveAvgPool1d(1)
         self.max_pool = torch.nn.AdaptiveMaxPool1d(1)
@@ -31,9 +35,12 @@ class AttentionFusionModel_2dim(torch.nn.Module):
         self.cross_att_activation = torch.nn.ReLU()
 
     def forward_cross_attention(self, e1, e2):
-        # cross attention
-        e1 = self.e1_cross_att_layer(key=e1, value=e1, query=e2) # Output shape (batch_size, sequence_length, e1_num_features)
-        e2 = self.e2_cross_att_layer(key=e2, value=e2, query=e1) # Output shape (batch_size, sequence_length, e2_num_features)
+        # cross attention 1
+        e1 = self.e1_cross_att_layer_1(key=e1, value=e1, query=e2) # Output shape (batch_size, sequence_length, e1_num_features)
+        e2 = self.e2_cross_att_layer_1(key=e2, value=e2, query=e1) # Output shape (batch_size, sequence_length, e2_num_features)
+        # cross attention 2
+        e1 = self.e1_cross_att_layer_2(key=e1, value=e1, query=e2) # Output shape (batch_size, sequence_length, e1_num_features)
+        e2 = self.e2_cross_att_layer_2(key=e2, value=e2, query=e1) # Output shape (batch_size, sequence_length, e2_num_features)
         # concat e1 and e2
         x = torch.cat((e1, e2), dim=-1) # Output shape (batch_size, sequence_length, num_features = e1_num_features + e2_num_features)
         # permute it to (batch_size, num_features, sequence_length) for calculating 1D avg pooling and 1D max pooling

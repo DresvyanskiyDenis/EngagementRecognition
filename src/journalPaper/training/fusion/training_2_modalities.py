@@ -2,9 +2,8 @@ import sys
 
 
 
-sys.path.append('/nfs/home/ddresvya/scripts/EngagementRecognition/')
-sys.path.append('/nfs/home/ddresvya/scripts/datatools/')
-sys.path.append('/nfs/home/ddresvya/scripts/simple-HRNet-master/')
+sys.path.append("/work/home/dsu/engagement_recognition_project_server/")
+sys.path.append("/work/home/dsu/datatools/")
 
 import argparse
 from torchinfo import summary

@@ -78,4 +78,53 @@ def evaluate_model(model: torch.nn.Module, generator: torch.utils.data.DataLoade
     torch.cuda.empty_cache()
     return evaluation_metrics_classifier
 
+def draw_confusion_matrix(model: torch.nn.Module, generator: torch.utils.data.DataLoader, device: torch.device,
+                          output_path:Optional[str]='confusion_matrix', filename:Optional[str]='cm.png')->None:
 
+    # create arrays for predictions and ground truth labels
+    predictions_classifier = []
+    ground_truth_classifier = []
+
+    # start evaluation
+    model.eval()
+    with torch.no_grad():
+        for i, data in enumerate(tqdm(generator)):
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+            # inputs are list of tensors with the shape (batch_size, sequence_length, num_features)
+            inputs = [inp.float().to(device) for inp in inputs]
+            # the labels originally are the sequence of values, since we have several images per one instance
+            # however, we transform it to the sequence-to-one problem. Thus, we take the mode of the sequence, but
+            # firstly we should get rid of the one-hot encoding
+            labels = torch.argmax(labels, dim=-1)
+            # then we take the mode
+            labels = torch.mode(labels, dim=-1)[0]
+
+            # forward pass
+            outputs = model(*inputs)
+            classification_output = outputs
+
+            # transform classification output to fit labels
+            classification_output = torch.softmax(classification_output, dim=-1)
+            classification_output = classification_output.cpu().numpy().squeeze()
+            classification_output = np.argmax(classification_output, axis=-1)
+
+            # transform ground truth labels to fit predictions and sklearn metrics
+            classification_ground_truth = labels.cpu().numpy().squeeze()
+
+            # save ground_truth labels and predictions in arrays to calculate metrics afterwards by one time
+            predictions_classifier.append(classification_output)
+            ground_truth_classifier.append(classification_ground_truth)
+
+        # concatenate all predictions and ground truth labels
+        predictions_classifier = np.concatenate(predictions_classifier, axis=0)
+        ground_truth_classifier = np.concatenate(ground_truth_classifier, axis=0)
+
+        # draw confusion matrix
+        plot_and_save_confusion_matrix(y_true=ground_truth_classifier, y_pred=predictions_classifier,
+                                       name_labels=['disengaged', 'neutral', 'engaged'],
+        path_to_save=output_path, name_filename = filename, title = 'Confusion matrix')
+
+    # clear RAM from unused variables
+    del inputs, labels, classification_output, classification_ground_truth
+    torch.cuda.empty_cache()

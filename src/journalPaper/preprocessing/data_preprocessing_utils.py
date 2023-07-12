@@ -1,4 +1,7 @@
 import sys
+
+from tqdm import tqdm
+
 sys.path.extend(["/work/home/dsu/datatools/"])
 sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
 sys.path.extend(["/work/home/dsu/simple-HRNet-master/"])
@@ -112,7 +115,7 @@ def crop_faces_in_all_videos(paths_to_videos:List[str], output_path:str, detecto
     metadata = pd.DataFrame(columns=["path_to_frame", "timestamp", "detected"])
     # go through all videos
     counter = 0
-    for path_to_video in paths_to_videos:
+    for path_to_video in tqdm(paths_to_videos):
         # create subfolder for the video
         subfolder = path_to_video.split(os.path.sep)[-positions_for_output_path:]
         subfolder[-1] = subfolder[-1].split(".")[0]
@@ -225,7 +228,7 @@ def crop_pose_in_all_videos(paths_to_videos:List[str], output_path:str, detector
     metadata = pd.DataFrame(columns=["path_to_frame", "timestamp", "detected"])
     # go through all videos
     counter = 0
-    for path_to_video in paths_to_videos:
+    for path_to_video in tqdm(paths_to_videos):
         # create subfolder for the video
         subfolder = path_to_video.split(os.path.sep)[-positions_for_output_path:]
         subfolder[-1] = subfolder[-1].split(".")[0]
@@ -251,8 +254,8 @@ def preprocess_NoXi(device, extract_faces=True, extract_poses=True):
     # params for NoXi
     path_to_data = "/media/external_hdd_2/NoXi/Sessions"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*.mp4"))
-    output_path_faces = "/media/external_hdd_2/NoXi/prepared_data/faces"
-    output_path_poses = "/media/external_hdd_2/NoXi/prepared_data/poses"
+    output_path_faces = "/work/home/dsu/Datasets/prepared_data/faces"
+    output_path_poses = "/work/home/dsu/Datasets/prepared_data/poses"
     final_FPS = 5
 
     # face extraction
@@ -294,8 +297,8 @@ def preprocess_DAiSEE(device, extract_faces=True, extract_poses=True):
     # params for DAiSEE
     path_to_data = "/media/external_hdd_2/DAiSEE/DAiSEE/DataSet"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*", "*", "*.avi"))
-    output_path_faces = "/media/external_hdd_2/DAiSEE/prepared_data/faces"
-    output_path_poses = "/media/external_hdd_2/DAiSEE/prepared_data/poses"
+    output_path_faces = "/work/home/dsu/Datasets/DAiSEE/prepared_data/faces"
+    output_path_poses = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses"
     final_FPS = 5
 
     # pose extraction
@@ -382,12 +385,12 @@ def preprocess_MHHRI(part:str, device, extract_faces=True, extract_poses=True):
 if __name__ == "__main__":
     with IgnoreWarnings("deprecated"):
         # identify device
-        device = "cpu"
-        extract_faces = True
+        device = "cuda:0"
+        extract_faces = False
         extract_poses = True
         # extract poses
         preprocess_DAiSEE(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
-        preprocess_NoXi(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
+        #preprocess_NoXi(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
         #preprocess_MHHRI("HHI_Ego_Recordings", device=device,extract_faces=extract_faces, extract_poses=extract_poses)
         #preprocess_MHHRI("HRI_Ego_Recordings", device=device,extract_faces=extract_faces, extract_poses=extract_poses)
 

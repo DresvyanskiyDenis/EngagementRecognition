@@ -255,9 +255,9 @@ if __name__=="__main__":
     # process the NoXi dataset, pose frames
     # params
     path_to_labels = '/media/external_hdd_2/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
-    path_to_frames = '/media/external_hdd_2/NoXi/prepared_data/poses/'
-    path_to_df_with_frame_paths = '/media/external_hdd_2/NoXi/prepared_data/poses/metadata.csv'
-    output_path = '/media/external_hdd_2/NoXi/prepared_data/poses/'
+    path_to_frames = '/work/home/dsu/Datasets/NoXi/prepared_data/poses/'
+    path_to_df_with_frame_paths = '/work/home/dsu/Datasets/NoXi/prepared_data/poses/metadata.csv'
+    output_path = '/work/home/dsu/Datasets/NoXi/prepared_data/poses/'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
     # load and prepare labels
@@ -280,7 +280,7 @@ if __name__=="__main__":
     test_NoXi.to_csv(os.path.join(output_path, 'NoXi_pose_test.csv'), index=False)
 
 
-    # process the NoXi dataset, face frames
+    """# process the NoXi dataset, face frames
     # params
     path_to_labels = '/media/external_hdd_2/NoXi/NoXi_annotations_reliable_gold_standard_classification_with_additional_train_data/'
     path_to_frames = '/media/external_hdd_2/NoXi/prepared_data/faces/'
@@ -312,15 +312,15 @@ if __name__=="__main__":
     # save dataframes
     train_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_train.csv'), index=False)
     dev_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_dev.csv'), index=False)
-    test_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_test.csv'), index=False)
+    test_NoXi.to_csv(os.path.join(output_path, 'NoXi_facial_test.csv'), index=False)"""
 
 
     # process DAiSEE dataset (train), pose frames
     # params
-    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
-    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_frames = '/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/metadata.csv"
     path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TrainLabels.csv'
-    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
+    output_path = '/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/'
     filename = 'DAiSEE_pose_train_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
@@ -333,10 +333,10 @@ if __name__=="__main__":
 
     # process DAiSEE dataset (dev), pose frames
     # params
-    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
-    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_frames = '/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/metadata.csv"
     path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/ValidationLabels.csv'
-    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
+    output_path = '/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/'
     filename = 'DAiSEE_pose_dev_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
@@ -349,10 +349,10 @@ if __name__=="__main__":
 
     # process DAiSEE dataset (test), pose frames
     # params
-    path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
-    path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/poses/metadata.csv"
+    path_to_frames = '/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/'
+    path_to_df_with_frame_paths = "/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/metadata.csv"
     path_to_df_with_labels = '/media/external_hdd_2/DAiSEE/DAiSEE/Labels/TestLabels.csv'
-    output_path = '/media/external_hdd_2/DAiSEE/prepared_data/poses/'
+    output_path = '/work/home/dsu/Datasets/DAiSEE/prepared_data/poses/'
     filename = 'DAiSEE_pose_test_labels.csv'
     # load dataframe with paths to frames
     df_with_frame_paths = pd.read_csv(path_to_df_with_frame_paths)
@@ -363,7 +363,7 @@ if __name__=="__main__":
     # save dataframe
     df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
 
-    # process DAiSEE dataset (train), face frames
+    """# process DAiSEE dataset (train), face frames
     # params
     path_to_frames = '/media/external_hdd_2/DAiSEE/prepared_data/faces/'
     path_to_df_with_frame_paths = "/media/external_hdd_2/DAiSEE/prepared_data/faces/metadata.csv"
@@ -409,7 +409,7 @@ if __name__=="__main__":
     # prepare dataframe for DAiSEE dataset
     df_with_labels = prepare_df_for_DAiSEE(df_with_frame_paths, df_with_labels)
     # save dataframe
-    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)
+    df_with_labels.to_csv(os.path.join(output_path, filename), index=False)"""
 
 
     """# process MHHRI dataset (HHI), face frames

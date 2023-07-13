@@ -168,13 +168,13 @@ def load_NoXi_and_DAiSEE_dataframes(path_to_data_NoXi: str, path_to_data_DAiSEE:
     # therefore, repeat the same procedure, but with '/work/home/dsu/Datasets/*/prepared_data/{data_type}s'
     # NoXi
         train['path'] = train['path'].apply(
-            lambda x: x.replace(f'/work/home/dsu/Datasets/NoXi/prepared_data/{data_type}s',
+            lambda x: x.replace(f'work/home/dsu/Datasets/NoXi/prepared_data/{data_type}s',
                                 path_to_data_NoXi))
         dev['path'] = dev['path'].apply(
-            lambda x: x.replace(f'/work/home/dsu/Datasets/NoXi/prepared_data/{data_type}s',
+            lambda x: x.replace(f'work/home/dsu/Datasets/NoXi/prepared_data/{data_type}s',
                                 path_to_data_NoXi))
         test['path'] = test['path'].apply(
-            lambda x: x.replace(f'/work/home/dsu/Datasets/NoXi/prepared_data/{data_type}s',
+            lambda x: x.replace(f'work/home/dsu/Datasets/NoXi/prepared_data/{data_type}s',
                                 path_to_data_NoXi))
         # DAiSEE
         train['path'] = train['path'].apply(

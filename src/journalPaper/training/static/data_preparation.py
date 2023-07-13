@@ -137,27 +137,54 @@ def load_NoXi_and_DAiSEE_dataframes(path_to_data_NoXi: str, path_to_data_DAiSEE:
     dev = pd.concat([DAiSEE_dev, NoXi_dev], ignore_index=True)
     test = pd.concat([DAiSEE_test, NoXi_test], ignore_index=True)
 
-    # change paths from 'media/external_hdd_2/*/prepared_data/faces' to provided data paths
+    # change paths from 'media/external_hdd_2/*/prepared_data/{data_type}s' (example: media/external_hdd_2/NoXi/prepared_data/poses)
+    # to provided data paths
     # NoXi
-    train['path'] = train['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/%s' % training_config.DATA_TYPE + 's',
-                            path_to_data_NoXi))
-    dev['path'] = dev['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/%s' % training_config.DATA_TYPE + 's',
-                            path_to_data_NoXi))
-    test['path'] = test['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/NoXi/prepared_data/%s' % training_config.DATA_TYPE + 's',
-                            path_to_data_NoXi))
-    # DAiSEE
-    train['path'] = train['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/%s' % training_config.DATA_TYPE + 's',
-                            path_to_data_DAiSEE))
-    dev['path'] = dev['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/%s' % training_config.DATA_TYPE + 's',
-                            path_to_data_DAiSEE))
-    test['path'] = test['path'].apply(
-        lambda x: x.replace('media/external_hdd_2/DAiSEE/prepared_data/%s' % training_config.DATA_TYPE + 's',
-                            path_to_data_DAiSEE))
+    if training_config.DATA_TYPE == 'face':
+        train['path'] = train['path'].apply(
+            lambda x: x.replace(f'media/external_hdd_2/NoXi/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_NoXi))
+        dev['path'] = dev['path'].apply(
+            lambda x: x.replace(f'media/external_hdd_2/NoXi/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_NoXi))
+        test['path'] = test['path'].apply(
+            lambda x: x.replace(f'media/external_hdd_2/NoXi/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_NoXi))
+        # DAiSEE
+        train['path'] = train['path'].apply(
+            lambda x: x.replace(f'media/external_hdd_2/DAiSEE/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_DAiSEE))
+        dev['path'] = dev['path'].apply(
+            lambda x: x.replace(f'media/external_hdd_2/DAiSEE/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_DAiSEE))
+        test['path'] = test['path'].apply(
+            lambda x: x.replace(f'media/external_hdd_2/DAiSEE/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_DAiSEE))
+    elif training_config.DATA_TYPE == 'poses':
+        # there also can be another data paths, as we have re-extracted frames and directly saved them into the ssd disk
+        # therefore, repeat the same procedure, but with '/work/home/dsu/Datasets/*/prepared_data/{data_type}s'
+        # NoXi
+        train['path'] = train['path'].apply(
+            lambda x: x.replace(f'/work/home/dsu/Datasets/NoXi/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_NoXi))
+        dev['path'] = dev['path'].apply(
+            lambda x: x.replace(f'/work/home/dsu/Datasets/NoXi/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_NoXi))
+        test['path'] = test['path'].apply(
+            lambda x: x.replace(f'/work/home/dsu/Datasets/NoXi/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_NoXi))
+        # DAiSEE
+        train['path'] = train['path'].apply(
+            lambda x: x.replace(f'/work/home/dsu/Datasets/DAiSEE/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_DAiSEE))
+        dev['path'] = dev['path'].apply(
+            lambda x: x.replace(f'/work/home/dsu/Datasets/DAiSEE/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_DAiSEE))
+        test['path'] = test['path'].apply(
+            lambda x: x.replace(f'/work/home/dsu/Datasets/DAiSEE/prepared_data/{training_config.DATA_TYPE}s',
+                                path_to_data_DAiSEE))
+    else:
+        raise ValueError(f'Wrong data type: {training_config.DATA_TYPE}')
 
     return train, dev, test
 

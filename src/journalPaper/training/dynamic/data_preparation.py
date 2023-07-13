@@ -146,12 +146,20 @@ def load_all_dataframes() -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFra
     DAiSEE_test = split_data_by_videoname(DAiSEE_test, position_of_videoname=-3)
 
     # change paths from 'media/external_hdd_2/' to '/work/home/dsu/Datasets/'
-    NoXi_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_train.items()}
-    NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_dev.items()}
-    NoXi_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_test.items()}
-    DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_train.items()}
-    DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_dev.items()}
-    DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_test.items()}
+    if training_config.DATA_TYPE == 'face':
+        NoXi_train = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_train.items()}
+        NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_dev.items()}
+        NoXi_test = {k: replace_str_part_in_column_by(v, 'path', 'media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in NoXi_test.items()}
+        DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_train.items()}
+        DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_dev.items()}
+        DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', '/media/external_hdd_2/', training_config.PATH_TO_DATA) for k, v in DAiSEE_test.items()}
+    elif training_config.DATA_TYPE == 'pose':
+        NoXi_train = {k: replace_str_part_in_column_by(v, 'path', 'work/home/dsu/Datasets/', training_config.PATH_TO_DATA) for k, v in NoXi_train.items()}
+        NoXi_dev = {k: replace_str_part_in_column_by(v, 'path', 'work/home/dsu/Datasets/', training_config.PATH_TO_DATA) for k, v in NoXi_dev.items()}
+        NoXi_test = {k: replace_str_part_in_column_by(v, 'path', 'work/home/dsu/Datasets/', training_config.PATH_TO_DATA) for k, v in NoXi_test.items()}
+        DAiSEE_train = {k: replace_str_part_in_column_by(v, 'path', 'work/home/dsu/Datasets/', training_config.PATH_TO_DATA) for k, v in DAiSEE_train.items()}
+        DAiSEE_dev = {k: replace_str_part_in_column_by(v, 'path', 'work/home/dsu/Datasets/', training_config.PATH_TO_DATA) for k, v in DAiSEE_dev.items()}
+        DAiSEE_test = {k: replace_str_part_in_column_by(v, 'path', 'work/home/dsu/Datasets/', training_config.PATH_TO_DATA) for k, v in DAiSEE_test.items()}
 
     # change the paths from '/' + training_config.DATA_TYPE + 's/' to os.path.sep + training_config.DATA_TYPE + os.path.sep (/faces/ -> /face/) or (/poses/ -> /pose/)
     NoXi_train = {k: replace_str_part_in_column_by(v, 'path', '/' + training_config.DATA_TYPE + 's/',

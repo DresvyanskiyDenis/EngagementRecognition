@@ -14,6 +14,33 @@ def merge_dicts(dict1, dict2):
     return dict(dict1, **dict2)
 
 
+def get_get_dicts_with_intersected_keys(dicts):
+    if len(dicts) == 1:
+        return dicts
+
+    # get intersected keys
+    intersected_keys = dicts[0].keys()
+    for i in range(1, len(dicts)):
+        intersected_keys = intersected_keys & dicts[i].keys()
+    # get dicts with intersected keys
+    result = []
+    for dict in dicts:
+        result.append({key: dict[key] for key in intersected_keys})
+    return result
+
+
+def cut_sequences_to_min_df_length(dict_with_dfs):
+    dict_with_dfs = [item.copy() for item in dict_with_dfs]
+    for key in dict_with_dfs[0]:
+        lengths = [df[key].shape[0] for df in dict_with_dfs]
+        min_length = min(*lengths)
+        for df_idx in range(len(dict_with_dfs)):
+            dict_with_dfs[df_idx][key] = dict_with_dfs[df_idx][key].iloc[:min_length]
+
+    return dict_with_dfs
+
+
+
 def split_data_by_videoname(df:pd.DataFrame, position_of_videoname:int)->Dict[str, pd.DataFrame]:
     """ Splits data represented in dataframes by video names.
     The provided data is represented as one big pd.DataFrame. The video names are stored in 'path' column,
@@ -137,6 +164,18 @@ def get_train_dev_test(path_to_embeddings:str, embeddings_type:List[str]):
     test_pose = load_embeddings({'DAiSEE_pose_test': os.path.join(path_to_embeddings, 'DAiSEE_pose_embeddings_test.csv'),
                                     'NoXi_pose_test': os.path.join(path_to_embeddings, 'NoXi_pose_embeddings_test.csv')})
     test_pose = merge_dicts(test_pose['DAiSEE_pose_test'], test_pose['NoXi_pose_test'])
+
+    # check the congruety of the dictionaries. We take only the intersection of the keys
+    train_face, train_pose, train_emo = get_get_dicts_with_intersected_keys([train_face, train_pose, train_emo])
+    dev_face, dev_pose, dev_emo = get_get_dicts_with_intersected_keys([dev_face, dev_pose, dev_emo])
+    test_face, test_pose, test_emo = get_get_dicts_with_intersected_keys([test_face, test_pose, test_emo])
+
+    # cut the dataframes in all dictionaries to the same length (minimal length)
+    train_face, train_pose, train_emo = cut_sequences_to_min_df_length([train_face, train_pose, train_emo])
+    dev_face, dev_pose, dev_emo = cut_sequences_to_min_df_length([dev_face, dev_pose, dev_emo])
+    test_face, test_pose, test_emo = cut_sequences_to_min_df_length([test_face, test_pose, test_emo])
+
+
     # choose what will insert to train, dev, test depending on embeddings type that have been provided
     train = []
     dev = []

@@ -114,18 +114,18 @@ if __name__ == '__main__':
     extractor = EmbeddingsExtractor(model=model, device=device, preprocessing_functions=preprocessing_functions,
                                     output_shape = 256)
     # extract embeddings NoXi
-    extractor.extract_embeddings(data=NoXi_train, batch_size=64, num_workers=16,
+    extractor.extract_embeddings(data=NoXi_train, batch_size=64, num_workers=8,
                                  output_path=os.path.join(output_path, f"NoXi_{data_type}_embeddings_train.csv"), verbose=True)
-    extractor.extract_embeddings(data=NoXi_dev, batch_size=64, num_workers=16,
+    extractor.extract_embeddings(data=NoXi_dev, batch_size=64, num_workers=8,
                                  output_path=os.path.join(output_path, f"NoXi_{data_type}_embeddings_dev.csv"), verbose=True)
-    extractor.extract_embeddings(data=NoXi_test, batch_size=64, num_workers=16,
+    extractor.extract_embeddings(data=NoXi_test, batch_size=64, num_workers=8,
                                     output_path=os.path.join(output_path, f"NoXi_{data_type}_embeddings_test.csv"), verbose=True)
     # extract embeddings DAiSEE
-    extractor.extract_embeddings(data=DAiSEE_train, batch_size=64, num_workers=16,
+    extractor.extract_embeddings(data=DAiSEE_train, batch_size=64, num_workers=8,
                                     output_path=os.path.join(output_path, f"DAiSEE_{data_type}_embeddings_train.csv"), verbose=True)
-    extractor.extract_embeddings(data=DAiSEE_dev, batch_size=64, num_workers=16,
+    extractor.extract_embeddings(data=DAiSEE_dev, batch_size=64, num_workers=8,
                                     output_path=os.path.join(output_path, f"DAiSEE_{data_type}_embeddings_dev.csv"), verbose=True)
-    extractor.extract_embeddings(data=DAiSEE_test, batch_size=64, num_workers=16,
+    extractor.extract_embeddings(data=DAiSEE_test, batch_size=64, num_workers=8,
                                     output_path=os.path.join(output_path, f"DAiSEE_{data_type}_embeddings_test.csv"), verbose=True)
 
 

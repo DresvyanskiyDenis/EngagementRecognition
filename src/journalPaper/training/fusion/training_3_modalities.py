@@ -25,12 +25,12 @@ import wandb
 from src.journalPaper.training.fusion import training_config
 from src.journalPaper.training.fusion.data_preparation import get_train_dev_test, calculate_class_weights, \
     construct_data_loaders
-from src.journalPaper.training.fusion.fusion_models import AttentionFusionModel_2dim
+from src.journalPaper.training.fusion.fusion_models import AttentionFusionModel_2dim, AttentionFusionModel_3dim
 from src.journalPaper.training.fusion.model_evaluation import evaluate_model
 
 def construct_model()->torch.nn.Module:
 
-    model = AttentionFusionModel_2dim(e1_num_features=256, e2_num_features=256, num_classes=3)
+    model = AttentionFusionModel_3dim(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
 
     return model
 
@@ -185,7 +185,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     model = construct_model()
     model = model.to(device)
     # print model architecture
-    summary(model, [(10, sequence_length, 256), (10, sequence_length, 256)])
+    summary(model, [(10, sequence_length, 256), (10, sequence_length, 256), (10, sequence_length, 256)])
 
     # select optimizer
     model_parameters = model.parameters()
@@ -274,11 +274,12 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     torch.cuda.empty_cache()
 
 
-def main(path_to_embeddings:str, embeddings_type:List[str],
+def main(path_to_embeddings:str,
          window_size, stride, consider_timestamps, model_type, batch_size, accumulate_gradients,
          loss_multiplication_factor):
     # embeddings type can be ['face', 'pose', 'emo']
     labels_columns = ['label_0', 'label_1', 'label_2']
+    embeddings_type = ['face', 'pose', 'emo']
     # load data
     train, dev, test = get_train_dev_test(path_to_embeddings=path_to_embeddings, embeddings_type=embeddings_type)
     # the train, for example, is the Dict[str, pd.DataFrame], where keys are video names and values are dataframes
@@ -305,7 +306,6 @@ if __name__ == '__main__':
     # parse args
     parser = argparse.ArgumentParser()
     parser.add_argument('--path_embeddings', type=str, required=True)
-    parser.add_argument('--embeddings_type', type=str, required=True) # shoud be written as a string with spaces between types Example: 'face pose emo'
     parser.add_argument('--model_type', type=str, required=True)
     parser.add_argument('--window_size', type=float, required=True)
     parser.add_argument('--stride', type=float, required=True)
@@ -317,21 +317,15 @@ if __name__ == '__main__':
     print("Passed args: ", args)
     # convert args to variables
     path_embeddings = args.path_embeddings
-    embeddings_type = args.embeddings_type.split(' ')
     model_type = args.model_type
     batch_size = args.batch_size
     accumulate_gradients = args.accumulate_gradients
     loss_multiplication_factor = args.loss_multiplication_factor
     window_size = args.window_size
     stride = args.stride
-
-    # check args
-    for emb_type in embeddings_type:
-        assert emb_type in ['face', 'pose', 'emo'], "embeddings_type should be one of ['face', 'pose', 'emo']"
-
     consider_timestamps = bool(args.consider_timestamps)
     # run main script with passed args
-    main(path_to_embeddings=path_embeddings, embeddings_type=embeddings_type,
+    main(path_to_embeddings=path_embeddings,
          window_size=window_size, stride=stride, consider_timestamps=consider_timestamps,
          model_type=model_type, batch_size=batch_size, accumulate_gradients=accumulate_gradients,
          loss_multiplication_factor=loss_multiplication_factor)

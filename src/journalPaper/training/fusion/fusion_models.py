@@ -302,9 +302,9 @@ class AttentionFusionModel_3dim_v3(torch.nn.Module):
 
     def __build_self_attention_blocks(self):
         self.block_1 = Transformer_layer(input_dim=self.e1_num_features+self.e2_num_features+self.e3_num_features,
-                                         num_heads=16, dropout=0.1, positional_encoding=True)
+                                         num_heads=32, dropout=0.1, positional_encoding=True)
         self.block_2 = Transformer_layer(input_dim=self.e1_num_features+self.e2_num_features+self.e3_num_features,
-                                            num_heads=16, dropout=0.1, positional_encoding=True)
+                                            num_heads=32, dropout=0.1, positional_encoding=True)
         # avg and max pooling to get rid of the sequence length dimension
         self.avg_pool = torch.nn.AdaptiveAvgPool1d(1)
         self.max_pool = torch.nn.AdaptiveMaxPool1d(1)

@@ -25,12 +25,20 @@ import wandb
 from src.journalPaper.training.fusion import training_config
 from src.journalPaper.training.fusion.data_preparation import get_train_dev_test, calculate_class_weights, \
     construct_data_loaders
-from src.journalPaper.training.fusion.fusion_models import AttentionFusionModel_2dim, AttentionFusionModel_3dim
+from src.journalPaper.training.fusion.fusion_models import AttentionFusionModel_3dim_v1, AttentionFusionModel_3dim_v2, \
+    AttentionFusionModel_3dim_v3
 from src.journalPaper.training.fusion.model_evaluation import evaluate_model
 
-def construct_model()->torch.nn.Module:
+def construct_model(model_type:str)->torch.nn.Module:
 
-    model = AttentionFusionModel_3dim(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
+    if model_type == "3dim_v1":
+        model = AttentionFusionModel_3dim_v1(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
+    elif model_type == "3dim_v2":
+        model = AttentionFusionModel_3dim_v2(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
+    elif model_type == "3dim_v3":
+        model = AttentionFusionModel_3dim_v3(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
+    else:
+        raise ValueError("Unknown model type")
 
     return model
 
@@ -182,7 +190,7 @@ def train_model(train_generator: torch.utils.data.DataLoader, dev_generator: tor
     # create model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # construct sequence-to-one model out of base model
-    model = construct_model()
+    model = construct_model(config.MODEL_TYPE)
     model = model.to(device)
     # print model architecture
     summary(model, [(10, sequence_length, 256), (10, sequence_length, 256), (10, sequence_length, 256)])

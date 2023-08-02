@@ -76,7 +76,7 @@ class AttentionFusionModel_2dim(torch.nn.Module):
         return x
 
 
-class AttentionFusionModel_3dim(torch.nn.Module):
+class AttentionFusionModel_3dim_v1(torch.nn.Module):
 
     def __init__(self, e1_num_features: int, e2_num_features: int, e3_num_features: int, num_classes: int):
         # check if all the embeddings have the same sequence length
@@ -145,27 +145,27 @@ class AttentionFusionModel_3dim(torch.nn.Module):
     def __forward_cross_attention_first_stage(self, f, p, a):
         # f - facial, p - pose, a - affective
         # main - facial
-        f_p = self.block_f_p(key = f, value = f, query = p)
-        f_a = self.block_f_a(key = f, value = f, query = a)
+        f_p = self.block_f_p(key = p, value = p, query = f)
+        f_a = self.block_f_a(key = a, value = a, query = f)
         # main - pose
-        p_f = self.block_p_f(key = p, value = p, query = f)
-        p_a = self.block_p_a(key = p, value = p, query = a)
+        p_f = self.block_p_f(key = f, value = f, query = p)
+        p_a = self.block_p_a(key = a, value = a, query = p)
         # main - affective
-        a_f = self.block_a_f(key = a, value = a, query = f)
-        a_p = self.block_a_p(key = a, value = a, query = p)
+        a_f = self.block_a_f(key = f, value = f, query = a)
+        a_p = self.block_a_p(key = p, value = p, query = a)
         return f_p, f_a, p_f, p_a, a_f, a_p
 
     def __forward_cross_attention_second_stage(self, f_p, f_a, p_f, p_a, a_f, a_p, f, p, a):
         # f - facial, p - pose, a - affective
         # main - facial
-        f_p_a = self.block_f_p_a(key = f_p, value = f_p, query = a)
-        f_a_p = self.block_f_a_p(key = f_a, value = f_a, query = p)
+        f_p_a = self.block_f_p_a(key = a, value = a, query = f_p)
+        f_a_p = self.block_f_a_p(key = p, value = p, query = f_a)
         # main - pose
-        p_f_a = self.block_p_f_a(key = p_f, value = p_f, query = a)
-        p_a_f = self.block_p_a_f(key = p_a, value = p_a, query = f)
+        p_f_a = self.block_p_f_a(key = a, value = a, query = p_f)
+        p_a_f = self.block_p_a_f(key = f, value = f, query = p_a)
         # main - affective
-        a_f_p = self.block_a_f_p(key = a_f, value = a_f, query = p)
-        a_p_f = self.block_a_p_f(key = a_p, value = a_p, query = f)
+        a_f_p = self.block_a_f_p(key = p, value = p, query = a_f)
+        a_p_f = self.block_a_p_f(key = f, value = f, query = a_p)
         return f_p_a, f_a_p, p_f_a, p_a_f, a_f_p, a_p_f
 
     def forward(self, f, p, a):
@@ -198,9 +198,166 @@ class AttentionFusionModel_3dim(torch.nn.Module):
         output = self.classifier(output)  # Output size (batch_size, num_classes)
         return output
 
+class AttentionFusionModel_3dim_v2(torch.nn.Module):
+
+    def __init__(self, e1_num_features: int, e2_num_features: int, e3_num_features: int, num_classes: int):
+        # check if all the embeddings have the same sequence length
+        super().__init__()
+        assert e1_num_features == e2_num_features == e3_num_features
+
+        self.e1_num_features = e1_num_features
+        self.e2_num_features = e2_num_features
+        self.e3_num_features = e3_num_features
+        self.num_classes = num_classes
+
+        # create cross-attention blocks
+        self.__build_cross_attention_blocks()
+        # build last fully connected layers
+        self.classifier = torch.nn.Linear(256, num_classes)
+
+
+    def __build_cross_attention_blocks(self):
+        # build cross-attention blocks. In the first stage we have facial and pose features and affective features
+        # as the supporting features.
+        self.block_f_a = Transformer_layer(input_dim=self.e1_num_features, num_heads=8, dropout=0.1,
+                                           positional_encoding=True)
+
+        self.block_p_a = Transformer_layer(input_dim=self.e2_num_features, num_heads=8, dropout=0.1,
+                                           positional_encoding=True)
+        # in te second stage, we unite facial-affective and pose-affective features. The supportive features in this case
+        # are facial-affective or pose-affective features depending on the main features.
+        # For example, the main is facial-affective, then supportive is pose-affective. We call this f_a_p_a
+
+        self.block_f_a_p_a = Transformer_layer(input_dim=self.e1_num_features, num_heads=8, dropout=0.1,
+                                               positional_encoding=True)
+        self.block_p_a_f_a = Transformer_layer(input_dim=self.e2_num_features, num_heads=8, dropout=0.1,
+                                                  positional_encoding=True)
+
+        # at the end of the cross attention we want to calculate 1D avg pooling and 1D max pooling to 'aggregate'
+        # the temporal information
+        # at the time of the pooling, embeddings from all different cross-attention blocks will be concatenated
+        self.avg_pool = torch.nn.AdaptiveAvgPool1d(1)
+        self.max_pool = torch.nn.AdaptiveMaxPool1d(1)
+        self.cross_att_dense_layer = torch.nn.Linear((self.e1_num_features + self.e2_num_features)*2, 256)
+        self.cross_att_batch_norm = torch.nn.BatchNorm1d(256)
+        self.cross_att_activation = torch.nn.Tanh()
+
+
+    def __forward_cross_attention(self, f, p, a):
+        # forward pass through the first stage of cross-attention
+        # query - main feature, key - supportive feature, value - supportive feature
+        f_a = self.block_f_a(query=f, key=a, value=a)
+        p_a = self.block_p_a(query=p, key=a, value=a)
+        # forward pass through the second stage of cross-attention
+        f_a_p_a = self.block_f_a_p_a(query=f_a, key=p_a, value=p_a)
+        p_a_f_a = self.block_p_a_f_a(query=p_a, key=f_a, value=f_a)
+        return f_a_p_a, p_a_f_a
+
+
+
+    def forward(self, f, p, a):
+        # cross-attention
+        f_a_p_a, p_a_f_a = self.__forward_cross_attention(f, p, a)
+        # concat
+        output = torch.cat((f_a_p_a, p_a_f_a), dim=-1)  # Output shape (batch_size, sequence_length, num_features = e1_num_features + e2_num_features)
+        # permute it to (batch_size, num_features, sequence_length) for calculating 1D avg pooling and 1D max pooling
+        output = output.permute(0, 2, 1)  # Output size (batch_size, num_features, sequence_length)
+        # 1D avg pooling and 1D max pooling
+        avg_pool = self.avg_pool(output)  # Output size (batch_size, num_features, 1)
+        max_pool = self.max_pool(output)  # Output size (batch_size, num_features, 1)
+        # get rid of the dimension with size 1 (last dimension)
+        avg_pool = avg_pool.squeeze(-1)  # Output size (batch_size, num_features)
+        max_pool = max_pool.squeeze(-1)  # Output size (batch_size, num_features)
+        # concat avg_pool and max_pool
+        output = torch.cat((avg_pool, max_pool), dim=-1)  # Output size (batch_size, num_features * 2)
+        # dense layer + batch norm + activation
+        output = self.cross_att_dense_layer(output)  # Output size (batch_size, 256)
+        output = self.cross_att_batch_norm(output)  # Output size (batch_size, 256)
+        output = self.cross_att_activation(output)  # Output size (batch_size, 256)
+        # last classification layer
+        output = self.classifier(output)  # Output size (batch_size, num_classes)
+        return output
+
+
+
+class AttentionFusionModel_3dim_v3(torch.nn.Module):
+
+
+    def __init__(self, e1_num_features:int, e2_num_features:int, e3_num_features:int, num_classes:int):
+        super().__init__()
+        # check if all the embeddings have the same sequence length
+        assert e1_num_features == e2_num_features == e3_num_features
+        self.e1_num_features = e1_num_features
+        self.e2_num_features = e2_num_features
+        self.e3_num_features = e3_num_features
+        self.num_classes = num_classes
+
+        # create self-attention blocks
+        self.__build_self_attention_blocks()
+
+        # create last classification layer
+        self.classifier = torch.nn.Linear(256, num_classes)
+
+
+
+    def __build_self_attention_blocks(self):
+        self.block_1 = Transformer_layer(input_dim=self.e1_num_features+self.e2_num_features+self.e3_num_features,
+                                         num_heads=16, dropout=0.1, positional_encoding=True)
+        self.block_2 = Transformer_layer(input_dim=self.e1_num_features+self.e2_num_features+self.e3_num_features,
+                                            num_heads=16, dropout=0.1, positional_encoding=True)
+        # avg and max pooling to get rid of the sequence length dimension
+        self.avg_pool = torch.nn.AdaptiveAvgPool1d(1)
+        self.max_pool = torch.nn.AdaptiveMaxPool1d(1)
+
+        # at the end - dropout, linear, batchnorm, activation
+        self.self_att_dropout = torch.nn.Dropout(0.1)
+        self.self_att_dense_layer = torch.nn.Linear((self.e1_num_features+self.e2_num_features+self.e3_num_features)*2, 256)
+        self.self_att_batch_norm = torch.nn.BatchNorm1d(256)
+        self.self_att_activation = torch.nn.Tanh()
+
+    def __forward_self_attention(self, f_p_a):
+        # f_p_a is already concatenated vector of f, p, a
+        output = self.block_1(key=f_p_a, query=f_p_a, value=f_p_a)
+        output = self.block_2(key=output, query=output, value=output) # Output shape (batch_size, sequence_length, num_features = e1_num_features + e2_num_features + e3_num_features)
+        # permute it to (batch_size, num_features, sequence_length) for calculating 1D avg pooling and 1D max pooling
+        output = output.permute(0, 2, 1)  # Output size (batch_size, num_features, sequence_length)
+        # 1D avg pooling and 1D max pooling
+        avg_pool = self.avg_pool(output)  # Output size (batch_size, num_features, 1)
+        max_pool = self.max_pool(output)  # Output size (batch_size, num_features, 1)
+        # get rid of the dimension with size 1 (last dimension)
+        avg_pool = avg_pool.squeeze(-1)  # Output size (batch_size, num_features)
+        max_pool = max_pool.squeeze(-1)  # Output size (batch_size, num_features)
+        # concat avg_pool and max_pool
+        output = torch.cat((avg_pool, max_pool), dim=-1)  # Output size (batch_size, num_features * 2)
+        # at the end - dropout, linear, batchnorm, activation
+        output = self.self_att_dropout(output)
+        output = self.self_att_dense_layer(output)
+        output = self.self_att_batch_norm(output)
+        output = self.self_att_activation(output)
+        return output
+
+
+
+    def forward(self, f, p, a):
+        # first, concatenate f, p, a
+        f_p_a = torch.cat((f, p, a), dim=-1)  # Output shape (batch_size, sequence_length, num_features = e1_num_features + e2_num_features + e3_num_features)
+        # self-attention
+        output = self.__forward_self_attention(f_p_a) # Output shape (batch_size, 256)
+        # last classification layer
+        output = self.classifier(output)  # Output size (batch_size, num_classes)
+        return output
+
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
-    model = AttentionFusionModel_3dim(256, 256, 256, 3)
+    model = AttentionFusionModel_3dim_v3(256, 256, 256, 3)
     print(model)
     # torch summary
-    summary(model, [(10, 20, 256), (10, 20, 256), (10, 20, 256)], device='cpu')
+    summary(model, [(10, 20, 256), (10, 20, 256), (10, 20, 256)], device='cuda:0')

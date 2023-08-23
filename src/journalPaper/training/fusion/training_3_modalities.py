@@ -26,7 +26,7 @@ from src.journalPaper.training.fusion import training_config
 from src.journalPaper.training.fusion.data_preparation import get_train_dev_test, calculate_class_weights, \
     construct_data_loaders
 from src.journalPaper.training.fusion.fusion_models import AttentionFusionModel_3dim_v1, AttentionFusionModel_3dim_v2, \
-    AttentionFusionModel_3dim_v3
+    AttentionFusionModel_3dim_v3, AttentionFusionModel_3dim_v4, AttentionFusionModel_3dim_v5
 from src.journalPaper.training.fusion.model_evaluation import evaluate_model
 
 def construct_model(model_type:str)->torch.nn.Module:
@@ -37,6 +37,10 @@ def construct_model(model_type:str)->torch.nn.Module:
         model = AttentionFusionModel_3dim_v2(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
     elif model_type == "3dim_v3":
         model = AttentionFusionModel_3dim_v3(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
+    elif model_type == "3dim_v4":
+        model = AttentionFusionModel_3dim_v4(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
+    elif model_type == "3dim_v5":
+        model = AttentionFusionModel_3dim_v5(e1_num_features=256, e2_num_features=256, e3_num_features=256, num_classes=3)
     else:
         raise ValueError("Unknown model type")
 

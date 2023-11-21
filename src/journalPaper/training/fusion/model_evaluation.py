@@ -123,7 +123,8 @@ def draw_confusion_matrix(model: torch.nn.Module, generator: torch.utils.data.Da
         # draw confusion matrix
         plot_and_save_confusion_matrix(y_true=ground_truth_classifier, y_pred=predictions_classifier,
                                        name_labels=['disengaged', 'neutral', 'engaged'],
-        path_to_save=output_path, name_filename = filename, title = 'Confusion matrix')
+        path_to_save=output_path, name_filename = filename, title = 'Confusion matrix',
+                                       save_cm_as_file = filename.replace('png', 'txt'))
 
     # clear RAM from unused variables
     del inputs, labels, classification_output, classification_ground_truth

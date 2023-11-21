@@ -99,6 +99,8 @@ def get_info_and_download_models_weights_from_project(entity: str, project_name:
         if run.file('best_model_recall.pth').size==0:
             continue
         ID = run.name
+        if not ID == "bumbling-smoke-65":
+            continue
         model_type = run.config['MODEL_TYPE']
         window_size = run.config['window_size']
         stride = run.config['stride']
@@ -128,12 +130,12 @@ def get_info_and_download_models_weights_from_project(entity: str, project_name:
 
 if __name__ == "__main__":
     # params
-    batch_size = 16
+    batch_size = 12
     project_name = 'engagement_recognition_seq2one'
     entity = 'denisdresvyanskiy'
     output_path_for_models_weights = "/" + os.path.join(*os.path.abspath(__file__).split(os.path.sep)[:-6],
-                                                        'weights_best_models/sequence_to_one/face/')
-    tested_model_type = 'EfficientNet-B1' # or 'Modified_HRNet' # this is a shortcut, since i can change the DATA_TYPE and PATH_TO_DATA variables
+                                                        'weights_best_models/sequence_to_one/pose/')
+    tested_model_type = 'Modified_HRNet' # 'EfficientNet-B1' or 'Modified_HRNet' # this is a shortcut, since i can change the DATA_TYPE and PATH_TO_DATA variables
     # in the training_config.py only manually and before the start of the script. Of course, it can all these scripts
     # can be rewritten in a more convenient way, but, unfortunately, I don't have time for this right now.
     # so, to run this script, you need to change both the tested_model_type and the DATA_TYPE and PATH_TO_DATA variables

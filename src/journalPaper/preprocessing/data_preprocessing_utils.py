@@ -2,9 +2,9 @@ import sys
 
 from tqdm import tqdm
 
-sys.path.extend(["/work/home/dsu/datatools/"])
-sys.path.extend(["/work/home/dsu/engagement_recognition_project_server/"])
-sys.path.extend(["/work/home/dsu/simple-HRNet-master/"])
+sys.path.extend(["/nfs/home/ddresvya/scripts/datatools/"])
+sys.path.extend(["/nfs/home/ddresvya/scripts/engagement_recognition_project_server/"])
+sys.path.extend(["/nfs/home/ddresvya/scripts/simple-HRNet-master/"])
 
 import gc
 import glob
@@ -18,9 +18,9 @@ import numpy as np
 from PIL import Image
 
 from decorators.common_decorators import timer
-from feature_extraction.face_recognition_utils import recognize_one_face_bbox, extract_face_according_bbox, \
+from feature_extraction.pytorch_based.face_recognition_utils import recognize_one_face_bbox, extract_face_according_bbox, \
     load_and_prepare_detector_retinaFace_mobileNet
-from feature_extraction.pose_recognition_utils import get_pose_bbox, crop_frame_to_pose
+from feature_extraction.pytorch_based.pose_recognition_utils import get_pose_bbox, crop_frame_to_pose
 from utils.warnings_processing import IgnoreWarnings
 from SimpleHRNet import SimpleHRNet
 
@@ -252,10 +252,10 @@ def crop_pose_in_all_videos(paths_to_videos:List[str], output_path:str, detector
 def preprocess_NoXi(device, extract_faces=True, extract_poses=True):
 
     # params for NoXi
-    path_to_data = "/media/external_hdd_2/NoXi/Sessions"
+    path_to_data = "/nfs/scratch/ddresvya/NoXi/NoXi/Sessions"
     path_to_video_files = glob.glob(os.path.join(path_to_data, "*", "*.mp4"))
-    output_path_faces = "/work/home/dsu/Datasets/prepared_data/faces"
-    output_path_poses = "/work/home/dsu/Datasets/prepared_data/poses"
+    output_path_faces = "/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/faces"
+    output_path_poses = "/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/poses"
     final_FPS = 5
 
     # face extraction
@@ -275,10 +275,10 @@ def preprocess_NoXi(device, extract_faces=True, extract_poses=True):
     if extract_poses:
         pose_detector = SimpleHRNet(c=48, nof_joints=17, multiperson=True,
                                yolo_version = 'v3',
-                               yolo_model_def=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
-                               yolo_class_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
-                               yolo_weights_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
-                               checkpoint_path="/work/home/dsu/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
+                               yolo_model_def=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
+                               yolo_class_path=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
+                               yolo_weights_path=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
+                               checkpoint_path="/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
                                return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1, device=torch.device(device))
 
         metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
@@ -305,10 +305,10 @@ def preprocess_DAiSEE(device, extract_faces=True, extract_poses=True):
     if extract_poses:
         pose_detector = SimpleHRNet(c=48, nof_joints=17, multiperson=True,
                                    yolo_version = 'v3',
-                                   yolo_model_def=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
-                                   yolo_class_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
-                                   yolo_weights_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
-                                   checkpoint_path="/work/home/dsu/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
+                                   yolo_model_def=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
+                                   yolo_class_path=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
+                                   yolo_weights_path=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
+                                   checkpoint_path="/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
                                    return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1, device=torch.device(device))
         metadata_poses = crop_pose_in_all_videos(path_to_video_files, output_path_poses, pose_detector, final_FPS,
                                                  positions_for_output_path=4)
@@ -347,10 +347,10 @@ def preprocess_MHHRI(part:str, device, extract_faces=True, extract_poses=True):
     if extract_poses:
         pose_detector = SimpleHRNet(c=48, nof_joints=17, multiperson=True,
                                    yolo_version = 'v3',
-                                   yolo_model_def=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
-                                   yolo_class_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
-                                   yolo_weights_path=os.path.join("/work/home/dsu/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
-                                   checkpoint_path="/work/home/dsu/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
+                                   yolo_model_def=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/config/yolov3.cfg"),
+                                   yolo_class_path=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/data/coco.names"),
+                                   yolo_weights_path=os.path.join("/nfs/home/ddresvya/scripts/simple-HRNet-master/","models_/detectors/yolo/weights/yolov3.weights"),
+                                   checkpoint_path="/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w48_384x288.pth",
                                    return_heatmaps=False, return_bounding_boxes=True, max_batch_size=1, device=torch.device(device))
 
         metadata_poses = crop_pose_in_all_videos(paths_to_video_files, output_path_poses, pose_detector, final_FPS,
@@ -389,8 +389,8 @@ if __name__ == "__main__":
         extract_faces = False
         extract_poses = True
         # extract poses
-        preprocess_DAiSEE(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
-        #preprocess_NoXi(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
+        #preprocess_DAiSEE(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
+        preprocess_NoXi(device=device,extract_faces=extract_faces, extract_poses=extract_poses)
         #preprocess_MHHRI("HHI_Ego_Recordings", device=device,extract_faces=extract_faces, extract_poses=extract_poses)
         #preprocess_MHHRI("HRI_Ego_Recordings", device=device,extract_faces=extract_faces, extract_poses=extract_poses)
 

@@ -58,7 +58,7 @@ def create_and_load_model(model_type: str, path_to_weights: str) -> torch.nn.Mod
                                          num_regression_neurons=None)
     elif model_type == "Modified_HRNet":
         model = Modified_HRNet(pretrained=True,
-                               path_to_weights="/work/home/dsu/simple-HRNet-master/pose_hrnet_w32_256x192.pth",
+                               path_to_weights="/nfs/home/ddresvya/scripts/simple-HRNet-master/pose_hrnet_w32_256x192.pth",
                                embeddings_layer_neurons=256, num_classes=3,
                                num_regression_neurons=None,
                                consider_only_upper_body=True)
@@ -110,13 +110,15 @@ def get_preprocessing_functions(model_type: str) -> List[Callable]:
 def main():
     # params
     output_path = '/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/embeddings/static/'
+    if os.path.exists(output_path) is False:
+        os.makedirs(output_path, exist_ok=True)
     # load paths with labels
-    train_face = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_train_face.csv")
-    dev_face = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_dev_face.csv")
-    train_pose = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_train_pose.csv")
-    dev_pose = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_dev_pose.csv")
-    train_affective = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_train_face.csv")
-    dev_affective = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_dev_face.csv")
+    train_face = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_train_face.csv").rename(columns={"path_to_frame": "path"})
+    dev_face = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_dev_face.csv").rename(columns={"path_to_frame": "path"})
+    train_pose = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_train_pose.csv").rename(columns={"path_to_frame": "path"})
+    dev_pose = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_dev_pose.csv").rename(columns={"path_to_frame": "path"})
+    train_affective = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_train_face.csv").rename(columns={"path_to_frame": "path"})
+    dev_affective = pd.read_csv("/nfs/scratch/ddresvya/NoXi/NoXi/prepared_data/aligned_labels_dev_face.csv").rename(columns={"path_to_frame": "path"})
 
     # extract embeddings (facial)
         # create and load model
@@ -129,10 +131,10 @@ def main():
     preprocessing_functions = get_preprocessing_functions(model_type=model_type)
     extractor = EmbeddingsExtractor(model=model, device=device, preprocessing_functions=preprocessing_functions,
                                     output_shape=256)
-    extractor.extract_embeddings(data=train_face, batch_size=64, num_workers=8,
+    extractor.extract_embeddings(data=train_face, batch_size=64, num_workers=8, labels_columns=["timestep","engagement"],
                                  output_path=os.path.join(output_path, f"NoXi_face_embeddings_train.csv"),
                                  verbose=True)
-    extractor.extract_embeddings(data=dev_face, batch_size=64, num_workers=8,
+    extractor.extract_embeddings(data=dev_face, batch_size=64, num_workers=8, labels_columns=["timestep","engagement"],
                                     output_path=os.path.join(output_path, f"NoXi_face_embeddings_dev.csv"),
                                     verbose=True)
 
@@ -147,10 +149,10 @@ def main():
     preprocessing_functions = get_preprocessing_functions(model_type=model_type)
     extractor = EmbeddingsExtractor(model=model, device=device, preprocessing_functions=preprocessing_functions,
                                     output_shape=256)
-    extractor.extract_embeddings(data=train_pose, batch_size=64, num_workers=8,
+    extractor.extract_embeddings(data=train_pose, batch_size=64, num_workers=8, labels_columns=["timestep","engagement"],
                                     output_path=os.path.join(output_path, f"NoXi_pose_embeddings_train.csv"),
                                     verbose=True)
-    extractor.extract_embeddings(data=dev_pose, batch_size=64, num_workers=8,
+    extractor.extract_embeddings(data=dev_pose, batch_size=64, num_workers=8, labels_columns=["timestep","engagement"],
                                     output_path=os.path.join(output_path, f"NoXi_pose_embeddings_dev.csv"),
                                     verbose=True)
 
@@ -165,10 +167,10 @@ def main():
     preprocessing_functions = get_preprocessing_functions(model_type=model_type)
     extractor = EmbeddingsExtractor(model=model, device=device, preprocessing_functions=preprocessing_functions,
                                     output_shape=256)
-    extractor.extract_embeddings(data=train_affective, batch_size=64, num_workers=8,
+    extractor.extract_embeddings(data=train_affective, batch_size=64, num_workers=8, labels_columns=["timestep","engagement"],
                                     output_path=os.path.join(output_path, f"NoXi_affective_embeddings_train.csv"),
                                     verbose=True)
-    extractor.extract_embeddings(data=dev_affective, batch_size=64, num_workers=8,
+    extractor.extract_embeddings(data=dev_affective, batch_size=64, num_workers=8, labels_columns=["timestep","engagement"],
                                     output_path=os.path.join(output_path, f"NoXi_affective_embeddings_dev.csv"),
                                     verbose=True)
 

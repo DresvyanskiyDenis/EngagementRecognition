@@ -196,6 +196,19 @@ class AttentionFusionModel_3dim_v1_continuous(torch.nn.Module):
         return output
 
 
+def construct_model(model_type:str)->torch.nn.Module:
+
+    if model_type == "2dim":
+        model = AttentionFusionModel_2dim_continuous(e1_num_features=256, e2_num_features=256)
+    elif model_type == "3dim_v1":
+        model = AttentionFusionModel_3dim_v1_continuous(e1_num_features=256, e2_num_features=256, e3_num_features=256)
+    else:
+        raise ValueError("Unknown model type")
+
+    return model
+
+
+
 
 if __name__ == "__main__":
     model = AttentionFusionModel_2dim_continuous(e1_num_features=256, e2_num_features=256)

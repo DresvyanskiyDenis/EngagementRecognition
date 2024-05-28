@@ -54,7 +54,7 @@ def construct_data_loaders(train: List[Dict[str, pd.DataFrame]], dev: List[Dict[
                                             feature_columns=feature_columns,
                                             label_columns=label_columns,
                                             window_size=window_size,
-                                            stride=window_size,
+                                            stride=stride,
                                             consider_timesteps=consider_timesteps,
                                             preprocessing_functions=preprocessing_functions,
                                             shuffle=False)

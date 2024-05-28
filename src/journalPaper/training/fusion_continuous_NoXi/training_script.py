@@ -19,7 +19,7 @@ from pytorch_utils.lr_schedullers import WarmUpScheduler
 from pytorch_utils.training_utils.callbacks import TorchEarlyStopping
 from src.journalPaper.training.fusion_continuous_NoXi.data_preparation import get_train_dev_dataloaders
 from src.journalPaper.training.fusion_continuous_NoXi.losses import Batch_CCCloss
-from src.journalPaper.training.fusion_continuous_NoXi.model_evaluation import evaluate_model
+from src.journalPaper.training.fusion_continuous_NoXi.model_evaluation import evaluate_model, evaluate_model_full
 from src.journalPaper.training.fusion_continuous_NoXi.models import construct_model
 
 
@@ -208,8 +208,10 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
         # validate the model
         model.eval()
         print("Evaluation of the model on dev set.")
-        val_metrics = evaluate_model(model=model, generator=dev_generator, device=device, modalities=config.modalities,
-                   metrics_name_prefix="val_", print_metrics=True)
+        #val_metrics = evaluate_model(model=model, generator=dev_generator, device=device, modalities=config.modalities,
+        #           metrics_name_prefix="val_", print_metrics=True)
+        val_metrics = evaluate_model_full(modalities=config.modalities, model=model,
+                                          device=device, metrics_name_prefix="val_", print_metrics=True)
 
         # update best val metrics got on validation set and log them using wandb
         # also, save model if we got better CCC

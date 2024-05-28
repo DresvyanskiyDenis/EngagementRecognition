@@ -181,9 +181,6 @@ def __interpolate_to_100_fps(df:pd.DataFrame)->pd.DataFrame:
 
 def evaluate_model_one_session(embeddings_dfs: List[pd.DataFrame], origin_labels, modalities,
                                window_size, stride, feature_columns, model, device):
-    evaluation_metrics = {'CCC': np_concordance_correlation_coefficient,
-                          'PCC': lambda x, y: pearsonr(x, y)[0],
-                          }
     model.eval()
     # filter out modalities that we do not need (order is always face, pose, emo)
     embeddings = []
@@ -221,11 +218,7 @@ def evaluate_model_one_session(embeddings_dfs: List[pd.DataFrame], origin_labels
     if origin_labels.shape[0]>predictions_session.shape[0]:
         # cut off last few rows of origin labels
         origin_labels = origin_labels.iloc[:predictions_session.shape[0]]
-    # calculate metrics
-    result = {}
-    for metric_name, metric in evaluation_metrics.items():
-        result[metric_name] = metric(origin_labels['engagement'].values.flatten(), predictions_session['prediction'].values.flatten())
-    return result
+    return predictions_session['prediction'].values.flatten(), origin_labels['engagement'].values.flatten() # order: predictions, ground truth
 
 
 
@@ -235,6 +228,9 @@ def evaluate_model_one_session(embeddings_dfs: List[pd.DataFrame], origin_labels
 
 def evaluate_model_full(modalities:List[str], model, device,
                         metrics_name_prefix, print_metrics):
+    evaluation_metrics = {'CCC': np_concordance_correlation_coefficient,
+                          'PCC': lambda x, y: pearsonr(x, y)[0],
+                          }
     # for the convenience, we will define all parameters inside the function.
     path_to_original_labels = "/nfs/scratch/ddresvya/NoXi/NoXi/NoXi_annotations_original/"
     paths_to_embeddings = {
@@ -266,16 +262,22 @@ def evaluate_model_full(modalities:List[str], model, device,
     session_ids = list(face_dev.keys())
 
     # calculate PCC and CCC for every session separately
-    results_PCC = []
-    results_CCC = []
+    results = []
     for session_id in session_ids:
-        result = evaluate_model_one_session([face_dev[session_id], pose_dev[session_id], emo_dev[session_id]],
+        preds, gts = evaluate_model_one_session([face_dev[session_id], pose_dev[session_id], emo_dev[session_id]],
                                             dev_origin[session_id], modalities, 4, 2,
                                             ['embedding_%i'%i for i in range(256)], model, device)
-        results_PCC.append(result['PCC'])
-        results_CCC.append(result['CCC'])
-    # average the results
-    result = {'%sPCC'%metrics_name_prefix: np.mean(results_PCC), '%sCCC'%metrics_name_prefix: np.mean(results_CCC)}
+        results.append((preds, gts))
+    # calculate metrics. We do two approaches: average the results and calculate metrics on the concatenated predictions and ground truth labels
+    # first calls gen_avg, the second concat
+    result = {
+        'gen_avg_val_PCC': np.mean([evaluation_metrics['PCC'](preds, gts) for preds, gts in results]),
+        'gen_avg_val_CCC': np.mean([evaluation_metrics['CCC'](preds, gts) for preds, gts in results]),
+        'concat_val_PCC': evaluation_metrics['PCC'](np.concatenate([preds for preds, gts in results], axis=0),
+                                                    np.concatenate([gts for preds, gts in results], axis=0)),
+        'concat_val_CCC': evaluation_metrics['CCC'](np.concatenate([preds for preds, gts in results], axis=0),
+                                                    np.concatenate([gts for preds, gts in results], axis=0))
+    }
     # print metrics if needed
     if print_metrics:
         print(result)

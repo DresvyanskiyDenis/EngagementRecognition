@@ -144,7 +144,7 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
         print(f"{key}: {value}")
     print("____________________________________________________")
     # initialization of Weights and Biases
-    wandb.init(project="EngagementRecFusion_NoXi_continuous", config=metaparams)
+    wandb.init(project="EngagementRecFusion_NoXi_continuous", config=metaparams, entity="denisdresvyanskiy")
     config = wandb.config
     wandb.config.update({'BEST_MODEL_SAVE_PATH': wandb.run.dir}, allow_val_change=True)
     # get one iteration of train generator to get sequence length
@@ -187,8 +187,10 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
         optimizer.param_groups[0]['lr'] = config.LR_MIN_WARMUP
 
     # early stopping
-    best_val_CCC = -100
-    best_val_PCC = -100
+    best_val_gen_avg_CCC = -100
+    best_val_gen_avg_PCC = -100
+    best_val_concat_CCC = -100
+    best_val_concat_PCC = -100
     early_stopping_callback = TorchEarlyStopping(verbose=True, patience=config.EARLY_STOPPING_PATIENCE,
                                                  save_path=config.BEST_MODEL_SAVE_PATH,
                                                  mode="max")
@@ -215,23 +217,42 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
 
         # update best val metrics got on validation set and log them using wandb
         # also, save model if we got better CCC
-        if val_metrics['val_CCC'] > best_val_CCC:
-            best_val_CCC = val_metrics['val_CCC']
-            wandb.config.update({'best_val_CCC': best_val_CCC},
+        if val_metrics['gen_avg_val_CCC'] > best_val_gen_avg_CCC:
+            best_val_gen_avg_CCC = val_metrics['gen_avg_val_CCC']
+            wandb.config.update({'gen_avg_val_CCC': best_val_gen_avg_CCC},
                                 allow_val_change=True)
             # save best model
             if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
                 os.makedirs(config.BEST_MODEL_SAVE_PATH)
-            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_CCC.pth'))
-       # the same, but with PCC
-        if val_metrics['val_PCC'] > best_val_PCC:
-            best_val_PCC = val_metrics['val_PCC']
-            wandb.config.update({'best_val_PCC': best_val_PCC},
+            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_CCC_gen_avg_val.pth'))
+       # the same, but for gen_avg_val_PCC
+        if val_metrics['gen_avg_val_PCC'] > best_val_gen_avg_PCC:
+            best_val_gen_avg_PCC = val_metrics['gen_avg_val_PCC']
+            wandb.config.update({'gen_avg_val_PCC': best_val_gen_avg_PCC},
                                 allow_val_change=True)
             # save best model
             if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
                 os.makedirs(config.BEST_MODEL_SAVE_PATH)
-            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_PCC.pth'))
+            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_PCC_gen_avg_val.pth'))
+        # the same, but for concat_val_CCC
+        if val_metrics['concat_val_CCC'] > best_val_concat_CCC:
+            best_val_concat_CCC = val_metrics['concat_val_CCC']
+            wandb.config.update({'concat_val_CCC': best_val_concat_CCC},
+                                allow_val_change=True)
+            # save best model
+            if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
+                os.makedirs(config.BEST_MODEL_SAVE_PATH)
+            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_CCC_concat_val.pth'))
+        # the same, but for concat_val_PCC
+        if val_metrics['concat_val_PCC'] > best_val_concat_PCC:
+            best_val_concat_PCC = val_metrics['concat_val_PCC']
+            wandb.config.update({'concat_val_PCC': best_val_concat_PCC},
+                                allow_val_change=True)
+            # save best model
+            if not os.path.exists(config.BEST_MODEL_SAVE_PATH):
+                os.makedirs(config.BEST_MODEL_SAVE_PATH)
+            torch.save(model.state_dict(), os.path.join(config.BEST_MODEL_SAVE_PATH, 'best_model_PCC_concat_val.pth'))
+
 
         # log everything using wandb
         wandb.log({'epoch': epoch}, commit=False)
@@ -239,7 +260,7 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
         wandb.log(val_metrics, commit=False)
         wandb.log({'train_loss': train_loss})
         # check early stopping
-        early_stopping_result = early_stopping_callback(best_val_CCC, model)
+        early_stopping_result = early_stopping_callback(val_metrics['gen_avg_val_CCC'], model)
         if early_stopping_result:
             print("Early stopping")
             break

@@ -3,6 +3,7 @@ import sys
 import glob
 import itertools
 import os
+from functools import partial
 from typing import List, Optional
 
 # dynamically append the path to the project to the system path
@@ -124,16 +125,16 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
         # training metaparams
         "NUM_EPOCHS": 100,
         "BATCH_SIZE": batch_size,
-        "OPTIMIZER": "AdamW",
+        "OPTIMIZER": "SGD",
         "EARLY_STOPPING_PATIENCE": 50,
         "WEIGHT_DECAY": 0.0001,
         # LR scheduller params
         "LR_SCHEDULLER": "Warmup_cyclic",
-        "ANNEALING_PERIOD": 6,
-        "LR_MAX_CYCLIC": 0.005,
+        "ANNEALING_PERIOD": 5,
+        "LR_MAX_CYCLIC": 0.01,
         "LR_MIN_CYCLIC": 0.0001,
         "LR_MIN_WARMUP": 0.00001,
-        "WARMUP_STEPS": 100,
+        "WARMUP_STEPS": 300,
         "WARMUP_MODE": "linear",
         # loss params
         "loss_multiplication_factor": loss_multiplication_factor,
@@ -164,9 +165,8 @@ def train_model(modalities:str, train_generator: torch.utils.data.DataLoader, de
     optimizers = {'Adam': torch.optim.Adam,
                   'SGD': torch.optim.SGD,
                   'RMSprop': torch.optim.RMSprop,
-                  'AdamW': torch.optim.AdamW}
-    optimizer = optimizers[config.OPTIMIZER](model_parameters, lr=config.LR_MAX_CYCLIC,
-                                             weight_decay=config.WEIGHT_DECAY)
+                  'AdamW': partial(torch.optim.AdamW, weight_decay=config.WEIGHT_DECAY)}
+    optimizer = optimizers[config.OPTIMIZER](model_parameters, lr=config.LR_MAX_CYCLIC)
     # Loss functions
     criterion = Batch_CCCloss()
     # create LR scheduler
